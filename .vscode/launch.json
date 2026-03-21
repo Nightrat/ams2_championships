@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Debug ams2_career",
+            "program": "${workspaceFolder}/target/debug/ams2_career.exe",
+            "args": ["C:\\Users\\gatsc\\OneDrive\\Documents\\SecondMonitor\\Championships\\Championships.xml"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "cargo build"
+        }
+    ]
+}

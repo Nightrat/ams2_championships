@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMS2 Career Championships</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0d0d1a;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Header */
+header {
+  background: linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 100%);
+  border-bottom: 2px solid #c0392b;
+  padding: 1rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+header h1 {
+  font-size: 1.4rem;
+  color: #e74c3c;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
+.tab-btn {
+  background: #1a1a2a;
+  color: #95a5a6;
+  border: 1px solid #2a2a4a;
+  border-bottom: none;
+  padding: 0.35rem 1rem;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+}
+
+.tab-btn:hover { background: #22223a; color: #bdc3c7; }
+
+.tab-btn.tab-active {
+  background: #12122a;
+  color: #e74c3c;
+  border-color: #e74c3c;
+  border-bottom-color: #12122a;
+}
+
+.tab-panel { display: block; }
+.tab-panel-hidden { display: none; }
+
+nav {
+  padding: 0.6rem 2rem;
+  background: #12122a;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+nav a {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 3px;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background 0.15s;
+}
+
+nav a small { font-weight: normal; opacity: 0.7; margin-left: 0.3rem; }
+
+nav a.nav-finished { background: #1a2a1a; border-color: #2ecc71; color: #2ecc71; }
+nav a.nav-active   { background: #2a1a0a; border-color: #f39c12; color: #f39c12; }
+nav a.nav-pending  { background: #1a1a2a; border-color: #7f8c8d; color: #7f8c8d; }
+nav a:hover        { filter: brightness(1.3); }
+
+/* Main */
+main { padding: 1.5rem 2rem; }
+
+/* Championship section */
+.championship {
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.champ-header {
+  background: linear-gradient(135deg, #1e1e3a, #151528);
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.champ-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.champ-title h2 {
+  font-size: 1.2rem;
+  color: #e0e0f0;
+}
+
+.badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-finished { background: #1e4d2b; color: #2ecc71; border: 1px solid #2ecc71; }
+.badge-active   { background: #4d3000; color: #f39c12; border: 1px solid #f39c12; }
+.badge-pending  { background: #2a2a2a; color: #95a5a6; border: 1px solid #95a5a6; }
+
+.class-badge {
+  background: #2a1a3a;
+  color: #9b59b6;
+  border: 1px solid #9b59b6;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.champ-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.78rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+  height: 4px;
+  background: #2a2a4a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
+  border-radius: 2px;
+}
+
+/* Championship body */
+.champ-body {
+  display: flex;
+  gap: 0;
+  padding: 1rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.standings-panel {
+  min-width: 260px;
+  flex: 0 0 auto;
+  margin-right: 1.5rem;
+}
+
+.results-panel { flex: 1 1 auto; min-width: 0; }
+
+.standings-panel h3,
+.results-panel h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #e74c3c;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; }
+
+.standings-table td,
+.standings-table th {
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid #1e1e38;
+}
+
+.standings-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #7f8c8d;
+  background: #0f0f25;
+  letter-spacing: 0.04em;
+}
+
+.standings-table tr:hover { background: #1a1a35; }
+
+.standings-table .pos { text-align: center; width: 2.5rem; color: #95a5a6; font-size: 0.8rem; }
+.standings-table .pts { text-align: right; font-weight: 700; color: #e0e0f0; width: 3rem; }
+.standings-table .car { color: #888; font-size: 0.82rem; }
+
+/* Player rows */
+.player-row { background: #1a1a00 !important; }
+.player-row td { border-bottom-color: #333300 !important; }
+.player-tag {
+  background: #4d4d00;
+  color: #f1c40f;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+
+/* Results grid */
+.grid-scroll { overflow-x: auto; }
+
+.results-grid th,
+.results-grid td {
+  padding: 0.3rem 0.5rem;
+  text-align: center;
+  border: 1px solid #1e1e38;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.results-grid th {
+  background: #0f0f25;
+  color: #7f8c8d;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.results-grid .grid-driver {
+  text-align: left;
+  font-weight: 500;
+  min-width: 120px;
+  color: #ccc;
+}
+
+.results-grid .grid-total {
+  font-weight: 700;
+  color: #e0e0f0;
+  background: #141428;
+}
+
+.results-grid .cell-pts  { color: #2ecc71; }
+.results-grid .cell-npts { color: #666; }
+.results-grid .cell-dns  { color: #e74c3c; font-size: 0.7rem; }
+.results-grid .cell-empty { color: #333; }
+
+.results-grid small { font-size: 0.65rem; color: #888; }
+
+/* Events detail */
+.events-detail {
+  border-top: 1px solid #2a2a4a;
+  padding: 0 1.5rem;
+}
+
+.events-detail summary {
+  padding: 0.75rem 0;
+  font-size: 0.82rem;
+  color: #95a5a6;
+  cursor: pointer;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.events-detail summary:hover { color: #bdc3c7; }
+
+.events-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 0 1rem;
+}
+
+.event-card {
+  background: #0f0f22;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  padding: 0.75rem;
+  min-width: 160px;
+  flex: 0 0 auto;
+}
+
+.event-card.ev-finished { border-color: #1e4d2b; }
+.event-card.ev-active   { border-color: #4d3000; }
+
+.event-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #1e1e38;
+}
+
+.event-name  { font-weight: 700; font-size: 0.82rem; color: #e0e0f0; }
+.event-track { font-size: 0.72rem; color: #888; }
+.event-date  { font-size: 0.7rem; color: #555; }
+
+.session-block { margin-top: 0.4rem; }
+.session-name  { font-size: 0.7rem; color: #e74c3c; text-transform: uppercase; margin-bottom: 0.2rem; }
+
+.session-table td { padding: 0.15rem 0.3rem; font-size: 0.75rem; border: none; }
+.session-table .pts { text-align: right; color: #2ecc71; }
+
+/* Driver stats section */
+.stats-body { padding: 1rem 1.5rem; }
+
+.stats-table { border-collapse: collapse; width: auto; }
+
+.stats-table th,
+.stats-table td {
+  padding: 0.35rem 0.8rem;
+  border-bottom: 1px solid #1e1e38;
+  text-align: left;
+}
+
+.stats-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #7f8c8d;
+  background: #0f0f25;
+  letter-spacing: 0.04em;
+}
+
+.stats-table tr:hover { background: #1a1a35; }
+
+.stats-table .stat-name { min-width: 160px; }
+.stats-table .stat-num  { text-align: right; font-weight: 600; color: #e0e0f0; min-width: 60px; }
+
+.driver-portrait {
+  width: 32px;
+  height: 40px;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+
+.driver-portrait-placeholder {
+  display: inline-block;
+  width: 32px;
+  height: 40px;
+  background: #1e1e38;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+
+/* Sortable table headers */
+.sortable th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sortable th::after { content: ' \2195'; opacity: 0.3; font-size: 0.7em; }
+.sortable th.sort-asc::after  { content: ' \2191'; opacity: 1; }
+.sortable th.sort-desc::after { content: ' \2193'; opacity: 1; }
+.sortable th:hover { color: #bdc3c7; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AMS2 Career Championships</h1>
+  <div class="tab-bar">
+    <button class="tab-btn tab-active" data-tab="championships">Championships</button>
+    <button class="tab-btn" data-tab="driver-stats">Driver Stats</button>
+  </div>
+</header>
+<main>
+  <div id="tab-championships" class="tab-panel">
+    <nav><ul><li><a href="#champ-0" class="nav-pending">Wiper 1974 <small></small></a></li><li><a href="#champ-1" class="nav-pending">Nightrat F1 1988 <small>F-Classic_Gen2</small></a></li><li><a href="#champ-2" class="nav-finished">F3 Historic <small>F-Junior</small></a></li><li><a href="#champ-3" class="nav-finished">WiperPack <small>F-Junior</small></a></li></ul></nav>
+    <section id="champ-0" class="championship">
+  <div class="champ-header">
+    <div class="champ-title">
+      <h2>Wiper 1974</h2>
+      <span class="badge badge-pending">Pending</span>
+      <span class="class-badge"></span>
+    </div>
+    <div class="champ-meta">
+      <span>Created: 2026-03-15</span>
+      <span>Events: 0/15</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="champ-body">
+    <div class="standings-panel">
+      <h3>Standings</h3>
+      <table class="standings-table">
+  <thead><tr><th>Pos</th><th>Driver</th><th>Car</th><th>Pts</th></tr></thead>
+  <tbody></tbody>
+</table>
+    </div>
+    <div class="results-panel">
+      <h3>Round-by-Round</h3>
+      <p>No results available.</p>
+    </div>
+  </div>
+
+  <details class="events-detail">
+    <summary>Event Details (15 rounds)</summary>
+    <div class="events-grid"><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 1</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-03-01</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 2</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-03-22</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 3</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-04-12</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 4</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-05-03</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 5</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-05-17</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 6</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-06-07</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 7</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-06-28</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 8</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-07-12</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 9</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-08-02</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 10</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-08-23</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 11</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-09-13</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 12</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-09-27</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 13</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-10-18</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 14</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-11-08</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 15</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">2026-11-29</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div></div>
+  </details>
+</section><section id="champ-1" class="championship">
+  <div class="champ-header">
+    <div class="champ-title">
+      <h2>Nightrat F1 1988</h2>
+      <span class="badge badge-pending">Pending</span>
+      <span class="class-badge">F-Classic_Gen2</span>
+    </div>
+    <div class="champ-meta">
+      <span>Created: 2026-03-15</span>
+      <span>Events: 1/16</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:6%"></div></div>
+  </div>
+
+  <div class="champ-body">
+    <div class="standings-panel">
+      <h3>Standings</h3>
+      <table class="standings-table">
+  <thead><tr><th>Pos</th><th>Driver</th><th>Car</th><th>Pts</th></tr></thead>
+  <tbody><tr><td class="pos">1</td><td>Ayrton Senna</td><td class="car">McLaren Honda MP4/4</td><td class="pts">9</td></tr><tr><td class="pos">2</td><td>Alain Prost</td><td class="car">McLaren Honda MP4/4</td><td class="pts">6</td></tr><tr><td class="pos">3</td><td>Nigel Mansell</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">4</td></tr><tr><td class="pos">4</td><td>Alessandro Nannini</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">3</td></tr><tr><td class="pos">5</td><td>Thierry Boutsen</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">2</td></tr><tr><td class="pos">6</td><td>Gerhard Berger</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">1</td></tr><tr><td class="pos">7</td><td>Nelson Piquet</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">0</td></tr><tr><td class="pos">8</td><td>Derek Warwick</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">0</td></tr><tr><td class="pos">9</td><td>Michele Alboreto</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">0</td></tr><tr><td class="pos">10</td><td>Maurício Gugelmin</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">0</td></tr><tr><td class="pos">11</td><td>Eddie Cheever</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">0</td></tr><tr><td class="pos">12</td><td>Satoru Nakajima</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">0</td></tr><tr><td class="pos">13</td><td>Philippe Alliot</td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr><tr><td class="pos">14</td><td>Riccardo Patrese</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">0</td></tr><tr><td class="pos">15</td><td>Jonathan Palmer</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">0</td></tr><tr><td class="pos">16</td><td>Andrea de Cesaris</td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr><tr><td class="pos">17</td><td>René Arnoux</td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr><tr><td class="pos">18</td><td>Ivan Capelli</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">0</td></tr><tr><td class="pos">19</td><td>Philippe Streiff</td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr><tr><td class="pos">20</td><td>Stefan Johansson</td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr><tr><td class="pos">21</td><td>Stefano Modena</td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr><tr><td class="pos">22</td><td>Bernd Schneider</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">0</td></tr><tr><td class="pos">23</td><td>Julian Bailey</td><td class="car">Formula Classic Gen2 Model1</td><td class="pts">0</td></tr><tr><td class="pos">24</td><td>Piercarlo Ghinzani</td><td class="car">Formula Classic Gen2 Model3</td><td class="pts">0</td></tr><tr><td class="pos">25</td><td>Gabriele Tarquini</td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr><tr class="player-row"><td class="pos">26</td><td>Nightrat <span class="player-tag">YOU</span></td><td class="car">Formula Classic Gen2 Model2</td><td class="pts">0</td></tr></tbody>
+</table>
+    </div>
+    <div class="results-panel">
+      <h3>Round-by-Round</h3>
+      <div class="grid-scroll">
+<table class="results-grid">
+  <thead><tr><th>Driver</th><th title="Jacarepaguá-Jacarepaguá Historic 1988">Round 1</th><th title="ENTER TRACK NAME">Round 2</th><th title="ENTER TRACK NAME">Round 3</th><th title="ENTER TRACK NAME">Round 4</th><th title="ENTER TRACK NAME">Round 5</th><th title="ENTER TRACK NAME">Round 6</th><th title="ENTER TRACK NAME">Round 7</th><th title="ENTER TRACK NAME">Round 8</th><th title="ENTER TRACK NAME">Round 9</th><th title="ENTER TRACK NAME">Round 10</th><th title="ENTER TRACK NAME">Round 11</th><th title="ENTER TRACK NAME">Round 12</th><th title="ENTER TRACK NAME">Round 13</th><th title="ENTER TRACK NAME">Round 14</th><th title="ENTER TRACK NAME">Round 15</th><th title="ENTER TRACK NAME">Round 16</th><th>Total</th></tr></thead>
+  <tbody><tr><td class="grid-driver">Ayrton Senna</td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">9</td></tr><tr><td class="grid-driver">Alain Prost</td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">6</td></tr><tr><td class="grid-driver">Nigel Mansell</td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">4</td></tr><tr><td class="grid-driver">Alessandro Nannini</td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">3</td></tr><tr><td class="grid-driver">Thierry Boutsen</td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">2</td></tr><tr><td class="grid-driver">Gerhard Berger</td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">1</td></tr><tr><td class="grid-driver">Nelson Piquet</td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Derek Warwick</td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Michele Alboreto</td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Maurício Gugelmin</td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Eddie Cheever</td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Satoru Nakajima</td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Philippe Alliot</td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Riccardo Patrese</td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Jonathan Palmer</td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Andrea de Cesaris</td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">René Arnoux</td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Ivan Capelli</td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Philippe Streiff</td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Stefan Johansson</td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Stefano Modena</td><td class="cell-npts" title="P21">P21<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Bernd Schneider</td><td class="cell-npts" title="P22">P22<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Julian Bailey</td><td class="cell-npts" title="P23">P23<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Piercarlo Ghinzani</td><td class="cell-npts" title="P24">P24<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Gabriele Tarquini</td><td class="cell-npts" title="P25">P25<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr><tr class="player-row"><td class="grid-driver">Nightrat <span class="player-tag">YOU</span></td><td class="cell-npts" title="P26">P26<br><small>0pt</small></td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="grid-total">0</td></tr></tbody>
+</table>
+</div>
+    </div>
+  </div>
+
+  <details class="events-detail">
+    <summary>Event Details (16 rounds)</summary>
+    <div class="events-grid"><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 1</span>
+    <span class="event-track">Jacarepaguá-Jacarepaguá Historic 1988</span>
+    <span class="event-date">1988-03-06</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Ayrton Senna</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Alain Prost</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Nigel Mansell</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Alessandro Nannini</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Thierry Boutsen</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 2</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-03-20</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 3</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-04-10</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 4</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-04-24</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 5</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-05-15</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 6</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-05-29</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 7</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-06-19</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 8</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-07-03</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 9</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-07-24</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 10</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-08-14</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 11</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-08-28</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 12</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-09-18</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 13</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-10-02</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 14</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-10-23</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 15</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-11-06</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div><div class="event-card ev-pending">
+  <div class="event-header">
+    <span class="event-name">Round 16</span>
+    <span class="event-track">ENTER TRACK NAME</span>
+    <span class="event-date">1988-11-27</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody></tbody></table>
+</div>
+</div></div>
+  </details>
+</section><section id="champ-2" class="championship">
+  <div class="champ-header">
+    <div class="champ-title">
+      <h2>F3 Historic</h2>
+      <span class="badge badge-finished">Finished</span>
+      <span class="class-badge">F-Junior</span>
+    </div>
+    <div class="champ-meta">
+      <span>Created: 2025-07-15</span>
+      <span>Events: 8/8</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  </div>
+
+  <div class="champ-body">
+    <div class="standings-panel">
+      <h3>Standings</h3>
+      <table class="standings-table">
+  <thead><tr><th>Pos</th><th>Driver</th><th>Car</th><th>Pts</th></tr></thead>
+  <tbody><tr><td class="pos">1</td><td>Peter Allen</td><td class="car">Formula Junior</td><td class="pts">39</td></tr><tr class="player-row"><td class="pos">2</td><td>Nightrat <span class="player-tag">YOU</span></td><td class="car">Formula Junior</td><td class="pts">36</td></tr><tr><td class="pos">3</td><td>Clas Lindgren</td><td class="car">Formula Junior</td><td class="pts">29</td></tr><tr><td class="pos">4</td><td>Josh Lovett</td><td class="car">Formula Junior</td><td class="pts">29</td></tr><tr><td class="pos">5</td><td>Kuno Arnold Jr</td><td class="car">Formula Junior</td><td class="pts">21</td></tr><tr><td class="pos">6</td><td>Tommy Moore</td><td class="car">Formula Junior</td><td class="pts">13</td></tr><tr><td class="pos">7</td><td>Jorgen Bach</td><td class="car">Formula Junior</td><td class="pts">10</td></tr><tr><td class="pos">8</td><td>Jakob Redl</td><td class="car">Formula Junior</td><td class="pts">9</td></tr><tr><td class="pos">9</td><td>Fred Garner</td><td class="car">Formula Junior</td><td class="pts">6</td></tr><tr><td class="pos">10</td><td>Danny Blume</td><td class="car">Formula Junior</td><td class="pts">3</td></tr><tr><td class="pos">11</td><td>Kaarle-Ohto Weber</td><td class="car">Formula Junior</td><td class="pts">2</td></tr><tr><td class="pos">12</td><td>James Stark</td><td class="car">Formula Junior</td><td class="pts">2</td></tr><tr><td class="pos">13</td><td>John Stevens</td><td class="car">Formula Junior</td><td class="pts">1</td></tr><tr><td class="pos">14</td><td>Anthony Barreto</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">15</td><td>Luciano Baumann</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">16</td><td>Jose Manual Benitez</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">17</td><td>Martin Fence</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">18</td><td>Gael Lione</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">19</td><td>Pat Dryver</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">20</td><td>Ricky Wood</td><td class="car">Formula Junior</td><td class="pts">0</td></tr></tbody>
+</table>
+    </div>
+    <div class="results-panel">
+      <h3>Round-by-Round</h3>
+      <div class="grid-scroll">
+<table class="results-grid">
+  <thead><tr><th>Driver</th><th title="Brands Hatch-Brands Hatch Indy">Round 1</th><th title="Silverstone-Silverstone Historic 1975">Round 2</th><th title="Oulton Park-Oulton Park Fosters">Round 3</th><th title="Cascais-Cascais Historic 1988">Round 4</th><th title="Monza-Monza Historic 1971 Junior">Round 5</th><th title="Imola-Imola Historic 1972">Round 6</th><th title="Indianapolis-Indianapolis Motor Speedway Oval">Round 7</th><th title="Monza-Monza Historic 1991">Round 8</th><th>Total</th></tr></thead>
+  <tbody><tr><td class="grid-driver">Peter Allen</td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="grid-total">39</td></tr><tr class="player-row"><td class="grid-driver">Nightrat <span class="player-tag">YOU</span></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="grid-total">36</td></tr><tr><td class="grid-driver">Clas Lindgren</td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="grid-total">29</td></tr><tr><td class="grid-driver">Josh Lovett</td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="grid-total">29</td></tr><tr><td class="grid-driver">Kuno Arnold Jr</td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="grid-total">21</td></tr><tr><td class="grid-driver">Tommy Moore</td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="grid-total">13</td></tr><tr><td class="grid-driver">Jorgen Bach</td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="grid-total">10</td></tr><tr><td class="grid-driver">Jakob Redl</td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="grid-total">9</td></tr><tr><td class="grid-driver">Fred Garner</td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="grid-total">6</td></tr><tr><td class="grid-driver">Danny Blume</td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="grid-total">3</td></tr><tr><td class="grid-driver">Kaarle-Ohto Weber</td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="grid-total">2</td></tr><tr><td class="grid-driver">James Stark</td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="grid-total">2</td></tr><tr><td class="grid-driver">John Stevens</td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="grid-total">1</td></tr><tr><td class="grid-driver">Anthony Barreto</td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Luciano Baumann</td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Jose Manual Benitez</td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Martin Fence</td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Gael Lione</td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Pat Dryver</td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Ricky Wood</td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="grid-total">0</td></tr></tbody>
+</table>
+</div>
+    </div>
+  </div>
+
+  <details class="events-detail">
+    <summary>Event Details (8 rounds)</summary>
+    <div class="events-grid"><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 1</span>
+    <span class="event-track">Brands Hatch-Brands Hatch Indy</span>
+    <span class="event-date">2025-03-02</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=" player-row"><td>P1</td><td>Nightrat</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Josh Lovett</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Peter Allen</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Clas Lindgren</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Jakob Redl</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 2</span>
+    <span class="event-track">Silverstone-Silverstone Historic 1975</span>
+    <span class="event-date">2025-04-13</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Clas Lindgren</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Kuno Arnold Jr</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Peter Allen</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Tommy Moore</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Josh Lovett</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 3</span>
+    <span class="event-track">Oulton Park-Oulton Park Fosters</span>
+    <span class="event-date">2025-05-25</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Josh Lovett</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Peter Allen</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Jakob Redl</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Tommy Moore</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Kuno Arnold Jr</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 4</span>
+    <span class="event-track">Cascais-Cascais Historic 1988</span>
+    <span class="event-date">2025-06-29</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=" player-row"><td>P1</td><td>Nightrat</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Josh Lovett</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Fred Garner</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Tommy Moore</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Peter Allen</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 5</span>
+    <span class="event-track">Monza-Monza Historic 1971 Junior</span>
+    <span class="event-date">2025-08-10</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=" player-row"><td>P1</td><td>Nightrat</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Peter Allen</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Tommy Moore</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Kuno Arnold Jr</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Clas Lindgren</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 6</span>
+    <span class="event-track">Imola-Imola Historic 1972</span>
+    <span class="event-date">2025-09-14</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Clas Lindgren</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Josh Lovett</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Peter Allen</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Jorgen Bach</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Kaarle-Ohto Weber</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 7</span>
+    <span class="event-track">Indianapolis-Indianapolis Motor Speedway Oval</span>
+    <span class="event-date">2025-10-26</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Peter Allen</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Clas Lindgren</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Jorgen Bach</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Kuno Arnold Jr</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Danny Blume</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 8</span>
+    <span class="event-track">Monza-Monza Historic 1991</span>
+    <span class="event-date">2025-11-30</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=" player-row"><td>P1</td><td>Nightrat</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Kuno Arnold Jr</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Peter Allen</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Jakob Redl</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Jorgen Bach</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div></div>
+  </details>
+</section><section id="champ-3" class="championship">
+  <div class="champ-header">
+    <div class="champ-title">
+      <h2>WiperPack</h2>
+      <span class="badge badge-finished">Finished</span>
+      <span class="class-badge">F-Junior</span>
+    </div>
+    <div class="champ-meta">
+      <span>Created: 2025-07-14</span>
+      <span>Events: 9/17</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:52%"></div></div>
+  </div>
+
+  <div class="champ-body">
+    <div class="standings-panel">
+      <h3>Standings</h3>
+      <table class="standings-table">
+  <thead><tr><th>Pos</th><th>Driver</th><th>Car</th><th>Pts</th></tr></thead>
+  <tbody><tr><td class="pos">1</td><td>Wiper</td><td class="car">Formula Junior</td><td class="pts">54</td></tr><tr><td class="pos">2</td><td>Peter Allen  (AI)</td><td class="car">Formula Junior</td><td class="pts">42</td></tr><tr><td class="pos">3</td><td>Pat Dryver  (AI)</td><td class="car">Formula Junior</td><td class="pts">23</td></tr><tr><td class="pos">4</td><td>Josh Lovett  (AI)</td><td class="car">Formula Junior</td><td class="pts">20</td></tr><tr><td class="pos">5</td><td>Kuno Arnold Jr  (AI)</td><td class="car">Formula Junior</td><td class="pts">17</td></tr><tr><td class="pos">6</td><td>Clas Lindgren  (AI)</td><td class="car">Formula Junior</td><td class="pts">17</td></tr><tr><td class="pos">7</td><td>Danny Blume  (AI)</td><td class="car">Formula Junior</td><td class="pts">15</td></tr><tr class="player-row"><td class="pos">8</td><td>Nightrat <span class="player-tag">YOU</span></td><td class="car">Formula Junior</td><td class="pts">13</td></tr><tr><td class="pos">9</td><td>Jorgen Bach  (AI)</td><td class="car">Formula Junior</td><td class="pts">9</td></tr><tr><td class="pos">10</td><td>Martin Fence  (AI)</td><td class="car">Formula Junior</td><td class="pts">5</td></tr><tr><td class="pos">11</td><td>Loris Bartolini  (AI)</td><td class="car">Formula Junior</td><td class="pts">4</td></tr><tr><td class="pos">12</td><td>Tommy Moore  (AI)</td><td class="car">Formula Junior</td><td class="pts">2</td></tr><tr><td class="pos">13</td><td>Jakob Redl  (AI)</td><td class="car">Formula Junior</td><td class="pts">2</td></tr><tr><td class="pos">14</td><td>Fred Garner  (AI)</td><td class="car">Formula Junior</td><td class="pts">2</td></tr><tr><td class="pos">15</td><td>Anthony Barreto  (AI)</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">16</td><td>Kaarle-Ohto Weber  (AI)</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">17</td><td>John Stevens  (AI)</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">18</td><td>Luciano Baumann  (AI)</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">19</td><td>Jose Manual Benitez  (AI)</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">20</td><td>Gael Lione  (AI)</td><td class="car">Formula Junior</td><td class="pts">0</td></tr><tr><td class="pos">21</td><td>Ricky Wood  (AI)</td><td class="car">Formula Junior</td><td class="pts">0</td></tr></tbody>
+</table>
+    </div>
+    <div class="results-panel">
+      <h3>Round-by-Round</h3>
+      <div class="grid-scroll">
+<table class="results-grid">
+  <thead><tr><th>Driver</th><th title="Brands Hatch-Brands Hatch Indy">Round 1</th><th title="Brands Hatch-Brands Hatch Indy">Round 2</th><th title="Brands Hatch-Brands Hatch Indy">Round 3</th><th title="Velo Città-Velo Città">Round 4</th><th title="Monza-Monza Historic 1971 Junior">Round 5</th><th title="Silverstone-Silverstone Historic 1975">Round 6</th><th title="Zolder-Grand Prix">Round 7</th><th title="Silverstone-Silverstone Historic 1975">Round 8</th><th title="Buenos Aires-Buenos Aires Circuito No.15">Round 9</th><th>Total</th></tr></thead>
+  <tbody><tr><td class="grid-driver">Wiper</td><td class="cell-npts" title="P23">P23<br><small>0pt</small></td><td class="cell-npts" title="P23">P23<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="grid-total">54</td></tr><tr><td class="grid-driver">Peter Allen  (AI)</td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="grid-total">42</td></tr><tr><td class="grid-driver">Pat Dryver  (AI)</td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P21">P21<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="grid-total">23</td></tr><tr><td class="grid-driver">Josh Lovett  (AI)</td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="grid-total">20</td></tr><tr><td class="grid-driver">Kuno Arnold Jr  (AI)</td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="grid-total">17</td></tr><tr><td class="grid-driver">Clas Lindgren  (AI)</td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="grid-total">17</td></tr><tr><td class="grid-driver">Danny Blume  (AI)</td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-pts" title="P2">P2<br><small>6pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="grid-total">15</td></tr><tr class="player-row"><td class="grid-driver">Nightrat <span class="player-tag">YOU</span></td><td class="cell-pts" title="P1">P1<br><small>9pt</small></td><td class="cell-npts" title="P22">P22<br><small>0pt</small></td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-npts" title="P25">P25<br><small>0pt</small></td><td class="cell-npts" title="P25">P25<br><small>0pt</small></td><td class="cell-npts" title="P21">P21<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P21">P21<br><small>0pt</small></td><td class="grid-total">13</td></tr><tr><td class="grid-driver">Jorgen Bach  (AI)</td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-pts" title="P4">P4<br><small>3pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="grid-total">9</td></tr><tr><td class="grid-driver">Martin Fence  (AI)</td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="grid-total">5</td></tr><tr><td class="grid-driver">Loris Bartolini  (AI)</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-pts" title="P3">P3<br><small>4pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="grid-total">4</td></tr><tr><td class="grid-driver">Tommy Moore  (AI)</td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="grid-total">2</td></tr><tr><td class="grid-driver">Jakob Redl  (AI)</td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P23">P23<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-pts" title="P5">P5<br><small>2pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="grid-total">2</td></tr><tr><td class="grid-driver">Fred Garner  (AI)</td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-pts" title="P6">P6<br><small>1pt</small></td><td class="grid-total">2</td></tr><tr><td class="grid-driver">Anthony Barreto  (AI)</td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Kaarle-Ohto Weber  (AI)</td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P8">P8<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P7">P7<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">John Stevens  (AI)</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-empty">-</td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Luciano Baumann  (AI)</td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P10">P10<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P24">P24<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Jose Manual Benitez  (AI)</td><td class="cell-npts" title="P16">P16<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P17">P17<br><small>0pt</small></td><td class="cell-npts" title="P20">P20<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Gael Lione  (AI)</td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P21">P21<br><small>0pt</small></td><td class="cell-npts" title="P9">P9<br><small>0pt</small></td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="cell-npts" title="P21">P21<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="grid-total">0</td></tr><tr><td class="grid-driver">Ricky Wood  (AI)</td><td class="cell-npts" title="P12">P12<br><small>0pt</small></td><td class="cell-npts" title="P11">P11<br><small>0pt</small></td><td class="cell-npts" title="P23">P23<br><small>0pt</small></td><td class="cell-npts" title="P18">P18<br><small>0pt</small></td><td class="cell-npts" title="P24">P24<br><small>0pt</small></td><td class="cell-npts" title="P13">P13<br><small>0pt</small></td><td class="cell-npts" title="P14">P14<br><small>0pt</small></td><td class="cell-npts" title="P19">P19<br><small>0pt</small></td><td class="cell-npts" title="P15">P15<br><small>0pt</small></td><td class="grid-total">0</td></tr></tbody>
+</table>
+</div>
+    </div>
+  </div>
+
+  <details class="events-detail">
+    <summary>Event Details (17 rounds)</summary>
+    <div class="events-grid"><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 1</span>
+    <span class="event-track">Brands Hatch-Brands Hatch Indy</span>
+    <span class="event-date">2025-03-02</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=" player-row"><td>P1</td><td>Nightrat</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Kuno Arnold Jr  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Peter Allen  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Clas Lindgren  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Pat Dryver  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 2</span>
+    <span class="event-track">Brands Hatch-Brands Hatch Indy</span>
+    <span class="event-date">2025-03-23</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Josh Lovett  (AI)</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Pat Dryver  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Peter Allen  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Jorgen Bach  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Martin Fence  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 3</span>
+    <span class="event-track">Brands Hatch-Brands Hatch Indy</span>
+    <span class="event-date">2025-04-06</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Pat Dryver  (AI)</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Peter Allen  (AI)</td><td class="pts">6pt</td></tr><tr class=" player-row"><td>P3</td><td>Nightrat</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Clas Lindgren  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Jorgen Bach  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 4</span>
+    <span class="event-track">Velo Città-Velo Città</span>
+    <span class="event-date">2025-04-27</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Wiper</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Peter Allen  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Loris Bartolini  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Danny Blume  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Martin Fence  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 5</span>
+    <span class="event-track">Monza-Monza Historic 1971 Junior</span>
+    <span class="event-date">2025-05-11</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Wiper</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Pat Dryver  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Peter Allen  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Josh Lovett  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Danny Blume  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 6</span>
+    <span class="event-track">Silverstone-Silverstone Historic 1975</span>
+    <span class="event-date">2025-06-01</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Wiper</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Peter Allen  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Clas Lindgren  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Jorgen Bach  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Kuno Arnold Jr  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 7</span>
+    <span class="event-track">Zolder-Grand Prix</span>
+    <span class="event-date">2025-06-15</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Wiper</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Peter Allen  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Clas Lindgren  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Kuno Arnold Jr  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Jakob Redl  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 8</span>
+    <span class="event-track">Silverstone-Silverstone Historic 1975</span>
+    <span class="event-date">2025-06-29</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Wiper</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Danny Blume  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Kuno Arnold Jr  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Josh Lovett  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Tommy Moore  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div><div class="event-card ev-finished">
+  <div class="event-header">
+    <span class="event-name">Round 9</span>
+    <span class="event-track">Buenos Aires-Buenos Aires Circuito No.15</span>
+    <span class="event-date">2025-07-20</span>
+  </div>
+  <div class="session-block">
+  <div class="session-name">Race 1</div>
+  <table class="session-table"><tbody><tr class=""><td>P1</td><td>Wiper</td><td class="pts">9pt</td></tr><tr class=""><td>P2</td><td>Peter Allen  (AI)</td><td class="pts">6pt</td></tr><tr class=""><td>P3</td><td>Danny Blume  (AI)</td><td class="pts">4pt</td></tr><tr class=""><td>P4</td><td>Josh Lovett  (AI)</td><td class="pts">3pt</td></tr><tr class=""><td>P5</td><td>Clas Lindgren  (AI)</td><td class="pts">2pt</td></tr></tbody></table>
+</div>
+</div></div>
+  </details>
+</section>
+  </div>
+  <div id="tab-driver-stats" class="tab-panel tab-panel-hidden">
+    <section id="driver-stats" class="championship">
+  <div class="champ-header">
+    <div class="champ-title"><h2>Driver Statistics</h2></div>
+  </div>
+  <div class="stats-body">
+    <table class="stats-table sortable" id="stats-table">
+      <thead>
+        <tr>
+          <th class="stat-name sort-asc" data-col="0" data-type="str">Driver</th>
+          <th class="stat-num" data-col="1" data-type="num">Seasons</th>
+          <th class="stat-num" data-col="2" data-type="num">Races</th>
+          <th class="stat-num" data-col="3" data-type="num">Wins</th>
+          <th class="stat-num" data-col="4" data-type="num">Top 3</th>
+          <th class="stat-num" data-col="5" data-type="num">Top 10</th>
+          <th class="stat-num" data-col="6" data-type="num">DNF</th>
+          <th class="stat-num" data-col="7" data-type="num">Champ Wins</th>
+          <th class="stat-num" data-col="8" data-type="num">Champ Top 3</th>
+          <th class="stat-num" data-col="9" data-type="num">Champ Top 10</th>
+          <th class="stat-num" data-col="10" data-type="num">Avg Pos</th>
+        </tr>
+      </thead>
+      <tbody><tr class="player-row"><td class="stat-name"><span class="driver-portrait-placeholder"></span>Nightrat <span class="player-tag">YOU</span></td><td class="stat-num">2</td><td class="stat-num">18</td><td class="stat-num">5</td><td class="stat-num">6</td><td class="stat-num">6</td><td class="stat-num">6</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">2</td><td class="stat-num">14.4</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Wiper</td><td class="stat-num">1</td><td class="stat-num">9</td><td class="stat-num">6</td><td class="stat-num">6</td><td class="stat-num">6</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">7.8</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Clas Lindgren</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">2</td><td class="stat-num">5</td><td class="stat-num">16</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">2</td><td class="stat-num">5.2</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Josh Lovett</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">2</td><td class="stat-num">5</td><td class="stat-num">13</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">2</td><td class="stat-num">6.4</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Pat Dryver</td><td class="stat-num">3</td><td class="stat-num">22</td><td class="stat-num">1</td><td class="stat-num">3</td><td class="stat-num">5</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">14.5</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Peter Allen</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">1</td><td class="stat-num">15</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">2</td><td class="stat-num">2</td><td class="stat-num">3.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Ayrton_Senna_9_%28cropped%29.jpg/330px-Ayrton_Senna_9_%28cropped%29.jpg" alt="Ayrton Senna">Ayrton Senna</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1.0</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Martin Fence</td><td class="stat-num">3</td><td class="stat-num">22</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">6</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">14.6</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>John Stevens</td><td class="stat-num">3</td><td class="stat-num">19</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">4</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">14.2</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Anthony Barreto</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">6</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">11.9</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Danny Blume</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">2</td><td class="stat-num">13</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">2</td><td class="stat-num">7.4</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Fred Garner</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">9</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">11.1</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Gael Lione</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">15.9</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Jakob Redl</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">9</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">10.5</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Jorgen Bach</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">13</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">2</td><td class="stat-num">8.4</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Jose Manual Benitez</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">3</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">15.2</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Kaarle-Ohto Weber</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">5</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">12.1</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Kuno Arnold Jr</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">4</td><td class="stat-num">16</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">2</td><td class="stat-num">5.6</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Luciano Baumann</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">4</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">14.5</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Ricky Wood</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">16.5</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Tommy Moore</td><td class="stat-num">2</td><td class="stat-num">17</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">10</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">10.2</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Loris Bartolini</td><td class="stat-num">2</td><td class="stat-num">11</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">16.6</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>James Stark</td><td class="stat-num">1</td><td class="stat-num">8</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">7</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">8.9</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Festival_automobile_international_2015_-_Photocall_-_065_%28cropped3%29.jpg/330px-Festival_automobile_international_2015_-_Photocall_-_065_%28cropped3%29.jpg" alt="Alain Prost">Alain Prost</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">2.0</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Alessandro Nannini</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">4.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/2/22/Andrea_De_Cesaris_1982.jpg" alt="Andrea de Cesaris">Andrea de Cesaris</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">16.0</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Bernd Schneider</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">22.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Derek_Warwick_Silverstone_2014.JPG/330px-Derek_Warwick_Silverstone_2014.JPG" alt="Derek Warwick">Derek Warwick</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">8.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Eddie_Cheever_Jr_2009_Indy_500_Second_Qual_Day.JPG/330px-Eddie_Cheever_Jr_2009_Indy_500_Second_Qual_Day.JPG" alt="Eddie Cheever">Eddie Cheever</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">11.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Gabriele_tarquini_spafrancorchamps2014.JPG/330px-Gabriele_tarquini_spafrancorchamps2014.JPG" alt="Gabriele Tarquini">Gabriele Tarquini</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">25.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Gerhard_Berger_1991USA_%28cropped%29.jpg/330px-Gerhard_Berger_1991USA_%28cropped%29.jpg" alt="Gerhard Berger">Gerhard Berger</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">6.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Capelli_1991_%28cropped%29.jpg/330px-Capelli_1991_%28cropped%29.jpg" alt="Ivan Capelli">Ivan Capelli</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">18.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Jonathan_Palmer_Profile.jpg/330px-Jonathan_Palmer_Profile.jpg" alt="Jonathan Palmer">Jonathan Palmer</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">15.0</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Julian Bailey</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">23.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Gugelmin_%28cropped%29.jpg/330px-Gugelmin_%28cropped%29.jpg" alt="Maurício Gugelmin">Maurício Gugelmin</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">10.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/SCA_0029_MICHELE_ALBORETO_-_Ferrari_F_1-87_-_1987_neg._125_10x15_R_%28cropped%29.JPG/330px-SCA_0029_MICHELE_ALBORETO_-_Ferrari_F_1-87_-_1987_neg._125_10x15_R_%28cropped%29.JPG" alt="Michele Alboreto">Michele Alboreto</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">9.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Cerimonia_de_entrega_da_medalha_Bras%C3%ADlia_60_anos_-_16.jpg/330px-Cerimonia_de_entrega_da_medalha_Bras%C3%ADlia_60_anos_-_16.jpg" alt="Nelson Piquet">Nelson Piquet</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">7.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Nigel_Mansell_-_Mexican_Grand_Prix_01_%28cropped%29.jpeg/330px-Nigel_Mansell_-_Mexican_Grand_Prix_01_%28cropped%29.jpeg" alt="Nigel Mansell">Nigel Mansell</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">3.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Philippe_Alliot_en_1993.jpg/330px-Philippe_Alliot_en_1993.jpg" alt="Philippe Alliot">Philippe Alliot</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">13.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Festival_automobile_international_2014_-_Photocall_-_019.jpg/330px-Festival_automobile_international_2014_-_Photocall_-_019.jpg" alt="Philippe Streiff">Philippe Streiff</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">19.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/1985_European_GP_Piercarlo_Ghinzani_%28cropped%29.jpg/330px-1985_European_GP_Piercarlo_Ghinzani_%28cropped%29.jpg" alt="Piercarlo Ghinzani">Piercarlo Ghinzani</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">24.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Rene_Arnoux_WSR2008_HU.png/330px-Rene_Arnoux_WSR2008_HU.png" alt="René Arnoux">René Arnoux</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">17.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Riccardo_Patrese_in_the_paddock_before_the_1993_British_Grand_Prix_%2833686653515%29_%28Cropped%29.jpg" alt="Riccardo Patrese">Riccardo Patrese</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">14.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Satoru_Nakajima_2008_Motorsport_Japan_%28cropped%29.jpg/330px-Satoru_Nakajima_2008_Motorsport_Japan_%28cropped%29.jpg" alt="Satoru Nakajima">Satoru Nakajima</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">12.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Stefan_Johansson_at_the_2026_Adelaide_Motorsport_Festival_%28028A6525%29.jpg/330px-Stefan_Johansson_at_the_2026_Adelaide_Motorsport_Festival_%28028A6525%29.jpg" alt="Stefan Johansson">Stefan Johansson</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">20.0</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Stefano Modena</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">21.0</td></tr><tr><td class="stat-name"><img class="driver-portrait" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Thierry_Boutsen_at_the_2026_Adelaide_Motorsport_Festival_%28028A6537%29.jpg/330px-Thierry_Boutsen_at_the_2026_Adelaide_Motorsport_Festival_%28028A6537%29.jpg" alt="Thierry Boutsen">Thierry Boutsen</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">5.0</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Andy Myer</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">-</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Brad Peddler</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">-</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Darren Francis</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">-</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>James Vase</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">-</td></tr><tr><td class="stat-name"><span class="driver-portrait-placeholder"></span>Trent Jones</td><td class="stat-num">1</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">0</td><td class="stat-num">-</td></tr></tbody>
+    </table>
+  </div>
+</section>
+  </div>
+</main>
+<script>
+(function () {
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(function (b) {
+        b.classList.remove('tab-active');
+      });
+      document.querySelectorAll('.tab-panel').forEach(function (p) {
+        p.classList.add('tab-panel-hidden');
+      });
+      btn.classList.add('tab-active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.remove('tab-panel-hidden');
+    });
+  });
+
+  // ── Sortable stats table ───────────────────────────────────────────────────
+  var table = document.getElementById('stats-table');
+  if (!table) return;
+  var tbody = table.tBodies[0];
+  var headers = table.tHead.rows[0].cells;
+  var sortCol = 0, sortAsc = true;
+
+  function cellVal(row, col, type) {
+    var text = row.cells[col].textContent.trim();
+    return type === 'num' ? (parseFloat(text) || 0) : text.toLowerCase();
+  }
+
+  function sort(col, type) {
+    var rows = Array.from(tbody.rows);
+    var asc = (col === sortCol) ? !sortAsc : (type === 'num' ? false : true);
+    rows.sort(function (a, b) {
+      var av = cellVal(a, col, type), bv = cellVal(b, col, type);
+      if (av < bv) return asc ? -1 : 1;
+      if (av > bv) return asc ? 1 : -1;
+      return 0;
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+    Array.from(headers).forEach(function (th) {
+      th.classList.remove('sort-asc', 'sort-desc');
+    });
+    headers[col].classList.add(asc ? 'sort-asc' : 'sort-desc');
+    sortCol = col; sortAsc = asc;
+  }
+
+  Array.from(headers).forEach(function (th) {
+    th.addEventListener('click', function () {
+      sort(+th.dataset.col, th.dataset.type);
+    });
+  });
+}());
+</script>
+</body>
+</html>
