@@ -1,6 +1,6 @@
 # AMS2 Championships
 
-A tool that converts your Automobilista 2 career championship save data into a single self-contained HTML report, with an optional built-in web server to serve it locally.
+A tool that converts your Automobilista 2 career championship save data into a self-contained HTML report, with a built-in web server that also streams a live session overlay directly from the AMS2 shared memory API.
 
 ## Features
 
@@ -9,6 +9,7 @@ A tool that converts your Automobilista 2 career championship save data into a s
 - **Driver statistics** — aggregated stats across all championships: races, wins, top-3/10 finishes, DNFs, championship podiums, and average finishing position
 - **DNF tracking** — races where the session was not completed (player retired early) are counted and shown in a dedicated column
 - **Driver portraits** — automatically fetched from Wikipedia for real-world driver names
+- **Live session overlay** — real-time timing table powered by the AMS2 shared memory API (`$pcars2$`): position, lap count, gap to fastest, sector times (S1/S2/S3), best lap, and last lap for all active participants
 - **Dark theme UI** — sortable stats table, tab switching, collapsible championship sections, progress bars, and badge indicators
 - **Download button** — save the currently rendered page as a static self-contained HTML file directly from the browser
 
@@ -16,6 +17,7 @@ A tool that converts your Automobilista 2 career championship save data into a s
 
 - [Rust](https://www.rust-lang.org/tools/install) (stable, 2021 edition)
 - AMS2 monitored by [Second Monitor](https://gitlab.com/raceengineer1/second-monitor), which produces the `Championships.xml` save file
+- For the live session overlay: the server binary must be running while AMS2 is open (Windows only — reads the `$pcars2$` named shared memory)
 
 ## Build
 
@@ -39,13 +41,13 @@ This generates `championships.html` in the current working directory. Open it in
 cargo run --release --bin ams2_championship -- "%USERPROFILE%\OneDrive\Documents\SecondMonitor\Championships.xml"
 ```
 
-### Serve over HTTP
+### Serve over HTTP (with live session overlay)
 
 ```bash
 cargo run --release --bin ams2_championship_server -- <path/to/Championships.xml> [port]
 ```
 
-Generates the HTML once at startup (including the Wikipedia portrait fetch) and serves it at `http://127.0.0.1:<port>/`. Default port is `8080`.
+Generates the HTML once at startup (including the Wikipedia portrait fetch) and serves it at `http://127.0.0.1:<port>/`. Default port is `8080`. While the server is running, the **Live Session** tab polls `/live` every 2 seconds to read current session data directly from AMS2.
 
 ```bash
 cargo run --release --bin ams2_championship_server -- "%USERPROFILE%\OneDrive\Documents\SecondMonitor\Championships.xml" 8080
@@ -55,12 +57,13 @@ Then open `http://127.0.0.1:8080/` in a browser. Press **Ctrl+C** to stop.
 
 ## Output
 
-The generated HTML file is fully self-contained (no external assets). It contains two tabs:
+The generated HTML file contains three tabs:
 
 | Tab | Content |
 |---|---|
 | **Championships** | One collapsible section per championship (pending/active open by default, finished collapsed) with driver standings, optional constructor standings, a round-by-round results grid, and expandable event details |
 | **Driver Stats** | A sortable table aggregating stats for every driver across all championships |
+| **Live Session** | Real-time timing table, updated every 2 seconds from the AMS2 shared memory API (server mode only) |
 
 ### Driver Stats columns
 
@@ -77,6 +80,18 @@ The generated HTML file is fully self-contained (no external assets). It contain
 | Champ Top 3 | Top-3 championship finishes |
 | Champ Top 10 | Top-10 championship finishes |
 | Avg Pos | Average finishing position |
+
+### Live Session columns
+
+| Column | Description |
+|---|---|
+| Pos | Current race/session position |
+| Driver | Participant name |
+| Lap | Current lap number |
+| Gap | Delta to the overall fastest lap set in the session |
+| S1 / S2 / S3 | Sector times — current lap sector when available, personal best otherwise. **Purple** = overall fastest sector; **green** = driver's personal best |
+| Best Lap | Driver's fastest lap of the session |
+| Last Lap | Driver's most recently completed lap time |
 
 ## Development
 
@@ -102,14 +117,15 @@ cargo test
 
 ```
 src/
-  lib.rs                       # Library entry point, re-exports convert functions
+  lib.rs                       # Library entry point, re-exports public functions
   main.rs                      # Binary: generate HTML file
-  championship_html.rs         # All parsing, stat computation, and HTML generation
+  championship_html.rs         # XML parsing, stat computation, and HTML generation
+  ams2_shared_memory.rs        # AMS2 shared memory reader (Windows, $pcars2$ API)
   assets/
     style.css                  # Embedded at compile time via include_str!
     script.js                  # Embedded at compile time via include_str!
   bin/
-    ams2_championship_server.rs  # Binary: HTTP server
+    ams2_championship_server.rs  # Binary: HTTP server + /live JSON endpoint
 tests/
   integration_test.rs          # End-to-end tests against a fixture XML
   fixtures/
@@ -121,6 +137,7 @@ tests/
 | Crate | Purpose |
 |---|---|
 | [`quick-xml`](https://crates.io/crates/quick-xml) | XML deserialisation via serde |
-| [`serde`](https://crates.io/crates/serde) | Derive macros for XML struct deserialisation |
+| [`serde`](https://crates.io/crates/serde) | Derive macros for XML and JSON serialisation |
+| [`serde_json`](https://crates.io/crates/serde_json) | JSON serialisation for the `/live` endpoint |
 | [`ureq`](https://crates.io/crates/ureq) | HTTP requests to the Wikipedia REST API |
-| [`serde_json`](https://crates.io/crates/serde_json) | Parsing Wikipedia API JSON responses |
+| [`windows-sys`](https://crates.io/crates/windows-sys) | Windows shared memory API (`OpenFileMappingW`, `MapViewOfFile`) — Windows target only |
