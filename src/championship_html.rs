@@ -30,7 +30,7 @@ struct EventData {
     sessions: Vec<SessionData>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct DriverStanding {
     position: u32,
     name: String,
@@ -1164,3 +1164,480 @@ const JS: &str = r#"
   });
 }());
 "#;
+
+// ── Unit tests ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    fn make_result(name: &str, pos: u32, is_player: bool, skipped: bool) -> DriverResult {
+        DriverResult {
+            driver_guid: format!("guid-{}", name),
+            is_player,
+            finish_position: pos,
+            points_gain: 0,
+            driver_name: name.to_string(),
+            was_fastest_lap: false,
+            skipped,
+        }
+    }
+
+    fn make_session(name: &str, completion: f64, results: Vec<DriverResult>) -> SessionData {
+        SessionData {
+            name: name.to_string(),
+            completion_percentage: completion,
+            results,
+        }
+    }
+
+    fn make_standing(name: &str, pos: u32, is_player: bool) -> DriverStanding {
+        DriverStanding {
+            position: pos,
+            name: name.to_string(),
+            total_points: 0,
+            is_player,
+            last_car: String::new(),
+            is_inactive: false,
+            guid: format!("guid-{}", name),
+        }
+    }
+
+    fn make_champ(state: &str, standings: Vec<DriverStanding>, sessions: Vec<SessionData>) -> ChampData {
+        let events = if sessions.is_empty() {
+            vec![]
+        } else {
+            vec![EventData {
+                name: "Round 1".into(),
+                track: "Track".into(),
+                status: "Finished".into(),
+                date: "2025-01-01".into(),
+                sessions,
+            }]
+        };
+        ChampData {
+            name: "Test Champ".into(),
+            class: "Class A".into(),
+            state: state.to_string(),
+            total_events: 1,
+            current_event_index: 1,
+            creation_date: "2025-01-01".into(),
+            events,
+            standings,
+        }
+    }
+
+    // ── driver_base_name ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_driver_base_name_strips_ai_suffix() {
+        assert_eq!(driver_base_name("Alice (AI)"), "Alice");
+    }
+
+    #[test]
+    fn test_driver_base_name_strips_ai_with_extra_spaces() {
+        assert_eq!(driver_base_name("Alice  (AI)"), "Alice");
+    }
+
+    #[test]
+    fn test_driver_base_name_preserves_player_name() {
+        assert_eq!(driver_base_name("Alice"), "Alice");
+    }
+
+    #[test]
+    fn test_driver_base_name_empty_string() {
+        assert_eq!(driver_base_name(""), "");
+    }
+
+    // ── esc ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_esc_ampersand() {
+        assert_eq!(esc("a & b"), "a &amp; b");
+    }
+
+    #[test]
+    fn test_esc_angle_brackets() {
+        assert_eq!(esc("<tag>"), "&lt;tag&gt;");
+    }
+
+    #[test]
+    fn test_esc_quote() {
+        assert_eq!(esc(r#"say "hi""#), "say &quot;hi&quot;");
+    }
+
+    #[test]
+    fn test_esc_no_special_chars() {
+        assert_eq!(esc("plain text"), "plain text");
+    }
+
+    // ── status_badge ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_status_badge_finished() {
+        assert!(status_badge("Finished").contains("badge-finished"));
+    }
+
+    #[test]
+    fn test_status_badge_active() {
+        assert!(status_badge("Active").contains("badge-active"));
+    }
+
+    #[test]
+    fn test_status_badge_unknown_is_pending() {
+        assert!(status_badge("Pending").contains("badge-pending"));
+        assert!(status_badge("").contains("badge-pending"));
+    }
+
+    // ── compute_driver_stats: race counting ──────────────────────────────────
+
+    #[test]
+    fn test_stats_counts_race_sessions_only() {
+        let standings = vec![make_standing("Alice", 1, false)];
+        let sessions = vec![
+            make_session("Qualifying", 1.0, vec![make_result("Alice", 3, false, false)]),
+            make_session("Race 1", 1.0, vec![make_result("Alice", 1, false, false)]),
+        ];
+        let champ = make_champ("Finished", standings, sessions);
+        let stats = compute_driver_stats(&[champ]);
+        let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
+        assert_eq!(alice.races, 1, "qualifying should not count as a race");
+    }
+
+    #[test]
+    fn test_stats_skipped_race_not_counted() {
+        let standings = vec![make_standing("Alice", 1, false)];
+        let sessions = vec![make_session(
+            "Race 1",
+            1.0,
+            vec![make_result("Alice", 1, false, true)],
+        )];
+        let champ = make_champ("Finished", standings, sessions);
+        let stats = compute_driver_stats(&[champ]);
+        let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
+        assert_eq!(alice.races, 0);
+    }
+
+    #[test]
+    fn test_stats_wins_top3_top10() {
+        let standings = vec![
+            make_standing("Alice", 1, false),
+            make_standing("Bob", 2, false),
+            make_standing("Carol", 3, false),
+            make_standing("Dave", 4, false),
+        ];
+        let sessions = vec![make_session(
+            "Race 1",
+            1.0,
+            vec![
+                make_result("Alice", 1, false, false),
+                make_result("Bob", 3, false, false),
+                make_result("Carol", 5, false, false),
+                make_result("Dave", 11, false, false),
+            ],
+        )];
+        let champ = make_champ("Finished", standings, sessions);
+        let stats = compute_driver_stats(&[champ]);
+
+        let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
+        assert_eq!(alice.wins, 1);
+        assert_eq!(alice.top3, 1);
+        assert_eq!(alice.top10, 1);
+
+        let bob = stats.iter().find(|s| s.name == "Bob").unwrap();
+        assert_eq!(bob.wins, 0);
+        assert_eq!(bob.top3, 1);
+        assert_eq!(bob.top10, 1);
+
+        let carol = stats.iter().find(|s| s.name == "Carol").unwrap();
+        assert_eq!(carol.wins, 0);
+        assert_eq!(carol.top3, 0);
+        assert_eq!(carol.top10, 1);
+
+        let dave = stats.iter().find(|s| s.name == "Dave").unwrap();
+        assert_eq!(dave.wins, 0);
+        assert_eq!(dave.top3, 0);
+        assert_eq!(dave.top10, 0);
+    }
+
+    // ── compute_driver_stats: DNF ─────────────────────────────────────────────
+
+    #[test]
+    fn test_stats_dnf_counted_for_player_on_incomplete_race() {
+        let standings = vec![make_standing("Player1", 1, true)];
+        let sessions = vec![make_session(
+            "Race 1",
+            0.6,
+            vec![make_result("Player1", 10, true, false)],
+        )];
+        let champ = make_champ("Finished", standings, sessions);
+        let stats = compute_driver_stats(&[champ]);
+        let p = stats.iter().find(|s| s.name == "Player1").unwrap();
+        assert_eq!(p.dnf, 1);
+        assert_eq!(p.races, 1, "DNF still counts as a race entry");
+    }
+
+    #[test]
+    fn test_stats_dnf_not_counted_on_complete_race() {
+        let standings = vec![make_standing("Player1", 1, true)];
+        let sessions = vec![make_session(
+            "Race 1",
+            1.0,
+            vec![make_result("Player1", 1, true, false)],
+        )];
+        let champ = make_champ("Finished", standings, sessions);
+        let stats = compute_driver_stats(&[champ]);
+        let p = stats.iter().find(|s| s.name == "Player1").unwrap();
+        assert_eq!(p.dnf, 0);
+    }
+
+    #[test]
+    fn test_stats_dnf_not_counted_for_ai_on_incomplete_race() {
+        let standings = vec![
+            make_standing("Player1", 1, true),
+            make_standing("Alice", 2, false),
+        ];
+        let sessions = vec![make_session(
+            "Race 1",
+            0.5,
+            vec![
+                make_result("Player1", 20, true, false),
+                make_result("Alice", 1, false, false),
+            ],
+        )];
+        let champ = make_champ("Finished", standings, sessions);
+        let stats = compute_driver_stats(&[champ]);
+        let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
+        assert_eq!(alice.dnf, 0, "AI drivers should not have DNFs attributed");
+    }
+
+    #[test]
+    fn test_stats_multiple_dnfs_accumulate() {
+        let standings = vec![make_standing("Player1", 1, true)];
+        let sessions = vec![
+            make_session("Race 1", 0.5, vec![make_result("Player1", 10, true, false)]),
+            make_session("Race 2", 1.0, vec![make_result("Player1", 1, true, false)]),
+            make_session("Race 3", 0.2, vec![make_result("Player1", 10, true, false)]),
+        ];
+        let events = vec![EventData {
+            name: "R1".into(), track: "T".into(), status: "Finished".into(),
+            date: "2025-01-01".into(), sessions,
+        }];
+        let champ = ChampData {
+            name: "C".into(), class: "X".into(), state: "Finished".into(),
+            total_events: 1, current_event_index: 1, creation_date: "2025-01-01".into(),
+            events, standings,
+        };
+        let stats = compute_driver_stats(&[champ]);
+        let p = stats.iter().find(|s| s.name == "Player1").unwrap();
+        assert_eq!(p.dnf, 2);
+        assert_eq!(p.races, 3);
+    }
+
+    // ── compute_driver_stats: seasons and champ positions ────────────────────
+
+    #[test]
+    fn test_stats_finished_seasons_only_counted_when_state_finished() {
+        let standings = vec![make_standing("Alice", 1, false)];
+        let active_champ = make_champ("Active", standings.clone(), vec![]);
+        let finished_champ = make_champ("Finished", standings, vec![]);
+        let stats = compute_driver_stats(&[active_champ, finished_champ]);
+        let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
+        assert_eq!(alice.finished_seasons, 1);
+    }
+
+    #[test]
+    fn test_stats_champ_positions() {
+        let standings = vec![
+            make_standing("Alice", 1, false),
+            make_standing("Bob", 2, false),
+            make_standing("Carol", 5, false),
+            make_standing("Dave", 11, false),
+        ];
+        let champ = make_champ("Finished", standings, vec![]);
+        let stats = compute_driver_stats(&[champ]);
+
+        let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
+        assert_eq!(alice.champ_wins, 1);
+        assert_eq!(alice.champ_top3, 1);
+        assert_eq!(alice.champ_top10, 1);
+
+        let bob = stats.iter().find(|s| s.name == "Bob").unwrap();
+        assert_eq!(bob.champ_wins, 0);
+        assert_eq!(bob.champ_top3, 1);
+        assert_eq!(bob.champ_top10, 1);
+
+        let carol = stats.iter().find(|s| s.name == "Carol").unwrap();
+        assert_eq!(carol.champ_wins, 0);
+        assert_eq!(carol.champ_top3, 0);
+        assert_eq!(carol.champ_top10, 1);
+
+        let dave = stats.iter().find(|s| s.name == "Dave").unwrap();
+        assert_eq!(dave.champ_wins, 0);
+        assert_eq!(dave.champ_top3, 0);
+        assert_eq!(dave.champ_top10, 0);
+    }
+
+    // ── compute_driver_stats: AI name merging ────────────────────────────────
+
+    #[test]
+    fn test_stats_merges_ai_and_player_name() {
+        let champ1 = make_champ(
+            "Finished",
+            vec![make_standing("Alice", 1, true)],
+            vec![make_session("Race 1", 1.0, vec![make_result("Alice", 1, true, false)])],
+        );
+        let champ2 = make_champ(
+            "Finished",
+            vec![make_standing("Alice (AI)", 2, false)],
+            vec![make_session("Race 1", 1.0, vec![make_result("Alice (AI)", 2, false, false)])],
+        );
+        let stats = compute_driver_stats(&[champ1, champ2]);
+        let alice: Vec<_> = stats.iter().filter(|s| s.name == "Alice").collect();
+        assert_eq!(alice.len(), 1, "Alice and Alice (AI) should be merged");
+        assert_eq!(alice[0].races, 2);
+        assert_eq!(alice[0].wins, 1);
+    }
+
+    // ── compute_driver_stats: average position ───────────────────────────────
+
+    #[test]
+    fn test_stats_position_sum_accumulates() {
+        let standings = vec![make_standing("Alice", 1, false)];
+        let sessions = vec![
+            make_session("Race 1", 1.0, vec![make_result("Alice", 4, false, false)]),
+            make_session("Race 2", 1.0, vec![make_result("Alice", 2, false, false)]),
+        ];
+        let events = vec![EventData {
+            name: "E".into(), track: "T".into(), status: "Finished".into(),
+            date: "2025-01-01".into(), sessions,
+        }];
+        let champ = ChampData {
+            name: "C".into(), class: "X".into(), state: "Finished".into(),
+            total_events: 1, current_event_index: 1, creation_date: "2025-01-01".into(),
+            events, standings,
+        };
+        let stats = compute_driver_stats(&[champ]);
+        let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
+        assert_eq!(alice.position_sum, 6);
+        assert_eq!(alice.races, 2);
+    }
+
+    // ── generate_driver_stats_section ────────────────────────────────────────
+
+    #[test]
+    fn test_generate_driver_stats_section_empty_returns_empty() {
+        let html = generate_driver_stats_section(&[], &HashMap::new());
+        assert!(html.is_empty());
+    }
+
+    #[test]
+    fn test_generate_driver_stats_section_contains_dnf_header() {
+        let s = DriverStats {
+            name: "Alice".into(),
+            is_player: false,
+            finished_seasons: 1,
+            races: 5,
+            wins: 1,
+            top3: 2,
+            top10: 4,
+            champ_wins: 0,
+            champ_top3: 1,
+            champ_top10: 1,
+            position_sum: 25,
+            dnf: 0,
+        };
+        let html = generate_driver_stats_section(&[s], &HashMap::new());
+        assert!(html.contains(">DNF<"), "table should have a DNF column header");
+    }
+
+    #[test]
+    fn test_generate_driver_stats_section_dnf_value_rendered() {
+        let s = DriverStats {
+            name: "Player1".into(),
+            is_player: true,
+            finished_seasons: 2,
+            races: 10,
+            wins: 3,
+            top3: 5,
+            top10: 8,
+            champ_wins: 1,
+            champ_top3: 1,
+            champ_top10: 2,
+            position_sum: 30,
+            dnf: 3,
+        };
+        let html = generate_driver_stats_section(&[s], &HashMap::new());
+        assert!(html.contains("YOU"), "player row should be marked");
+        assert!(html.contains("player-row"), "player row should have class");
+        assert!(html.contains(r#"<td class="stat-num">3</td>"#));
+    }
+
+    // ── XML parsing ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_parse_session_reads_completion_percentage() {
+        let xml = r#"<SessionDto Name="Race 1">
+  <SessionResult CompletionPercentage="0.75">
+    <DriverSessionResult>
+      <DriverSessionResultDto IsPlayer="true" FinishPosition="5" PointsGain="2"
+        DriverGuid="abc" DriverName="Alice" WasFastestLap="false" SkippedEvent="false" />
+    </DriverSessionResult>
+  </SessionResult>
+</SessionDto>"#;
+        let doc = roxmltree::Document::parse(xml).unwrap();
+        let session = parse_session(doc.root_element());
+        assert!((session.completion_percentage - 0.75).abs() < f64::EPSILON);
+        assert_eq!(session.results.len(), 1);
+        assert_eq!(session.results[0].finish_position, 5);
+    }
+
+    #[test]
+    fn test_parse_session_defaults_completion_to_1_when_missing() {
+        let xml = r#"<SessionDto Name="Race 1">
+  <SessionResult>
+    <DriverSessionResult />
+  </SessionResult>
+</SessionDto>"#;
+        let doc = roxmltree::Document::parse(xml).unwrap();
+        let session = parse_session(doc.root_element());
+        assert!((session.completion_percentage - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_parse_session_skipped_event_flag() {
+        let xml = r#"<SessionDto Name="Race 1">
+  <SessionResult CompletionPercentage="1">
+    <DriverSessionResult>
+      <DriverSessionResultDto IsPlayer="false" FinishPosition="1" PointsGain="9"
+        DriverGuid="g1" DriverName="Bob" WasFastestLap="false" SkippedEvent="true" />
+    </DriverSessionResult>
+  </SessionResult>
+</SessionDto>"#;
+        let doc = roxmltree::Document::parse(xml).unwrap();
+        let session = parse_session(doc.root_element());
+        assert!(session.results[0].skipped);
+    }
+
+    #[test]
+    fn test_parse_session_results_sorted_by_finish_position() {
+        let xml = r#"<SessionDto Name="Race 1">
+  <SessionResult CompletionPercentage="1">
+    <DriverSessionResult>
+      <DriverSessionResultDto IsPlayer="false" FinishPosition="3" PointsGain="0"
+        DriverGuid="g3" DriverName="C" WasFastestLap="false" SkippedEvent="false" />
+      <DriverSessionResultDto IsPlayer="false" FinishPosition="1" PointsGain="9"
+        DriverGuid="g1" DriverName="A" WasFastestLap="false" SkippedEvent="false" />
+      <DriverSessionResultDto IsPlayer="false" FinishPosition="2" PointsGain="6"
+        DriverGuid="g2" DriverName="B" WasFastestLap="false" SkippedEvent="false" />
+    </DriverSessionResult>
+  </SessionResult>
+</SessionDto>"#;
+        let doc = roxmltree::Document::parse(xml).unwrap();
+        let session = parse_session(doc.root_element());
+        let positions: Vec<u32> = session.results.iter().map(|r| r.finish_position).collect();
+        assert_eq!(positions, vec![1, 2, 3]);
+    }
+}

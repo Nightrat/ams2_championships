@@ -1,5 +1,3 @@
-mod championship_html;
-
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -9,7 +7,7 @@ fn main() {
     let xml_path = &args[1];
     let output_path = "championships.html";
 
-    if let Err(e) = championship_html::convert(xml_path, output_path) {
+    if let Err(e) = ams2_career::convert(xml_path, output_path) {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }
