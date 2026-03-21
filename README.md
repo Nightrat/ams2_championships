@@ -1,4 +1,4 @@
-# AMS2 Career
+# AMS2 Championships
 
 A command-line tool that converts your Automobilista 2 career championship save data into a single self-contained HTML report.
 
