@@ -823,6 +823,7 @@ fn generate_html(
   <div class="tab-bar">
     <button class="tab-btn tab-active" data-tab="championships">Championships</button>
     <button class="tab-btn" data-tab="driver-stats">Driver Stats</button>
+    <button class="tab-btn" data-tab="live">&#9679; Live Session</button>
   </div>
 </header>
 <main>
@@ -832,6 +833,39 @@ fn generate_html(
   </div>
   <div id="tab-driver-stats" class="tab-panel tab-panel-hidden">
     {stats_section}
+  </div>
+  <div id="tab-live" class="tab-panel tab-panel-hidden">
+    <section class="live-section">
+      <div id="live-status" class="live-status live-disconnected">
+        <span class="live-dot"></span>
+        <span id="live-status-text">Not connected — start AMS2 and open this page via the server</span>
+      </div>
+      <div id="live-info" class="live-info">
+        <span id="live-session-type"></span>
+        <span id="live-race-state"></span>
+        <span id="live-track" class="live-track"></span>
+      </div>
+      <div class="grid-scroll">
+        <table id="live-table" class="live-table">
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Driver</th>
+              <th>Lap</th>
+              <th>Gap</th>
+              <th>S1</th>
+              <th>S2</th>
+              <th>S3</th>
+              <th>Best Lap</th>
+              <th>Last Lap</th>
+            </tr>
+          </thead>
+          <tbody id="live-tbody">
+            <tr><td colspan="9" class="live-empty">Waiting for session data&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </main>
 <button id="download-btn" title="Download as static HTML file">&#11015; Download</button>

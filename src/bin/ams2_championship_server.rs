@@ -2,17 +2,45 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 
-fn handle(mut stream: TcpStream, html: &[u8]) {
-    // Drain the HTTP request headers (we serve the same HTML for every request)
-    let mut buf = [0u8; 4096];
-    let _ = stream.read(&mut buf);
+use ams2_championship::ams2_shared_memory::read_live_session;
 
+/// Extract the request path from a raw HTTP request buffer.
+fn parse_path(buf: &[u8]) -> String {
+    let line_end = buf
+        .iter()
+        .position(|&b| b == b'\r' || b == b'\n')
+        .unwrap_or(buf.len());
+    let line = std::str::from_utf8(&buf[..line_end]).unwrap_or("");
+    // "GET /path HTTP/1.1" → "/path"
+    line.split_ascii_whitespace()
+        .nth(1)
+        .unwrap_or("/")
+        .to_owned()
+}
+
+fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]) {
     let header = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        html.len()
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n",
+        status,
+        content_type,
+        body.len()
     );
     let _ = stream.write_all(header.as_bytes());
-    let _ = stream.write_all(html);
+    let _ = stream.write_all(body);
+}
+
+fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>) {
+    let mut buf = [0u8; 4096];
+    let n = stream.read(&mut buf).unwrap_or(0);
+    let path = parse_path(&buf[..n]);
+
+    if path == "/live" {
+        let data = read_live_session();
+        let json = serde_json::to_vec(&data).unwrap_or_else(|_| b"{}".to_vec());
+        send_response(&mut stream, "200 OK", "application/json", &json);
+    } else {
+        send_response(&mut stream, "200 OK", "text/html; charset=utf-8", &html);
+    }
 }
 
 fn main() {
@@ -42,11 +70,12 @@ fn main() {
     };
 
     println!("Serving at http://127.0.0.1:{port}/  (Ctrl+C to stop)");
+    println!("Live session endpoint: http://127.0.0.1:{port}/live");
 
     for stream in listener.incoming() {
         if let Ok(stream) = stream {
             let html = Arc::clone(&html);
-            std::thread::spawn(move || handle(stream, &html));
+            std::thread::spawn(move || handle(stream, html));
         }
     }
 }
