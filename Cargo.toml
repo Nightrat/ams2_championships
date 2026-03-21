@@ -1,9 +1,10 @@
 [package]
-name = "ams2_career"
+name = "ams2_championship"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-roxmltree = "0.20"
+quick-xml = { version = "0.36", features = ["serialize"] }
+serde = { version = "1", features = ["derive"] }
 ureq = { version = "2", features = ["json"] }
 serde_json = "1"

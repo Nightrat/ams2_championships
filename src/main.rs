@@ -7,7 +7,7 @@ fn main() {
     let xml_path = &args[1];
     let output_path = "championships.html";
 
-    if let Err(e) = ams2_career::convert(xml_path, output_path) {
+    if let Err(e) = ams2_championship::convert(xml_path, output_path) {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }

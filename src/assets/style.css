@@ -1,0 +1,383 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0d0d1a;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Header */
+header {
+  background: linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 100%);
+  border-bottom: 2px solid #c0392b;
+  padding: 1rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+header h1 {
+  font-size: 1.4rem;
+  color: #e74c3c;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
+.tab-btn {
+  background: #1a1a2a;
+  color: #95a5a6;
+  border: 1px solid #2a2a4a;
+  border-bottom: none;
+  padding: 0.35rem 1rem;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+}
+
+.tab-btn:hover { background: #22223a; color: #bdc3c7; }
+
+.tab-btn.tab-active {
+  background: #12122a;
+  color: #e74c3c;
+  border-color: #e74c3c;
+  border-bottom-color: #12122a;
+}
+
+.tab-panel { display: block; }
+.tab-panel-hidden { display: none; }
+
+nav {
+  padding: 0.6rem 2rem;
+  background: #12122a;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+nav a {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 3px;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background 0.15s;
+}
+
+nav a small { font-weight: normal; opacity: 0.7; margin-left: 0.3rem; }
+
+nav a.nav-finished { background: #1a2a1a; border-color: #2ecc71; color: #2ecc71; }
+nav a.nav-active   { background: #2a1a0a; border-color: #f39c12; color: #f39c12; }
+nav a.nav-pending  { background: #1a1a2a; border-color: #7f8c8d; color: #7f8c8d; }
+nav a:hover        { filter: brightness(1.3); }
+
+/* Main */
+main { padding: 1.5rem 2rem; }
+
+/* Championship section */
+.championship {
+  background: #12122a;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.champ-header {
+  background: linear-gradient(135deg, #1e1e3a, #151528);
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.champ-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.champ-title h2 {
+  font-size: 1.2rem;
+  color: #e0e0f0;
+}
+
+.badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-finished { background: #1e4d2b; color: #2ecc71; border: 1px solid #2ecc71; }
+.badge-active   { background: #4d3000; color: #f39c12; border: 1px solid #f39c12; }
+.badge-pending  { background: #2a2a2a; color: #95a5a6; border: 1px solid #95a5a6; }
+
+.class-badge {
+  background: #2a1a3a;
+  color: #9b59b6;
+  border: 1px solid #9b59b6;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.champ-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.78rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+  height: 4px;
+  background: #2a2a4a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
+  border-radius: 2px;
+}
+
+/* Championship body */
+.champ-body {
+  display: flex;
+  gap: 0;
+  padding: 1rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.standings-panel {
+  min-width: 260px;
+  flex: 0 0 auto;
+  margin-right: 1.5rem;
+}
+
+.results-panel { flex: 1 1 auto; min-width: 0; }
+
+.standings-panel h3,
+.results-panel h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #e74c3c;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; }
+
+.standings-table td,
+.standings-table th {
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid #1e1e38;
+}
+
+.standings-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #7f8c8d;
+  background: #0f0f25;
+  letter-spacing: 0.04em;
+}
+
+.standings-table tr:hover { background: #1a1a35; }
+
+.standings-table .pos { text-align: center; width: 2.5rem; color: #95a5a6; font-size: 0.8rem; }
+.standings-table .pts { text-align: right; font-weight: 700; color: #e0e0f0; width: 3rem; }
+.standings-table .car { color: #888; font-size: 0.82rem; }
+
+/* Player rows */
+.player-row { background: #1a1a00 !important; }
+.player-row td { border-bottom-color: #333300 !important; }
+.player-tag {
+  background: #4d4d00;
+  color: #f1c40f;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+
+/* Results grid */
+.grid-scroll { overflow-x: auto; }
+
+.results-grid th,
+.results-grid td {
+  padding: 0.3rem 0.5rem;
+  text-align: center;
+  border: 1px solid #1e1e38;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.results-grid th {
+  background: #0f0f25;
+  color: #7f8c8d;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.results-grid .grid-driver {
+  text-align: left;
+  font-weight: 500;
+  min-width: 120px;
+  color: #ccc;
+}
+
+.results-grid .grid-total {
+  font-weight: 700;
+  color: #e0e0f0;
+  background: #141428;
+}
+
+.results-grid .cell-pts  { color: #2ecc71; }
+.results-grid .cell-npts { color: #666; }
+.results-grid .cell-dns  { color: #e74c3c; font-size: 0.7rem; }
+.results-grid .cell-empty { color: #333; }
+
+.results-grid small { font-size: 0.65rem; color: #888; }
+
+/* Events detail */
+.events-detail {
+  border-top: 1px solid #2a2a4a;
+  padding: 0 1.5rem;
+}
+
+.events-detail summary {
+  padding: 0.75rem 0;
+  font-size: 0.82rem;
+  color: #95a5a6;
+  cursor: pointer;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.events-detail summary:hover { color: #bdc3c7; }
+
+.events-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 0 1rem;
+}
+
+.event-card {
+  background: #0f0f22;
+  border: 1px solid #2a2a4a;
+  border-radius: 4px;
+  padding: 0.75rem;
+  min-width: 160px;
+  flex: 0 0 auto;
+}
+
+.event-card.ev-finished { border-color: #1e4d2b; }
+.event-card.ev-active   { border-color: #4d3000; }
+
+.event-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #1e1e38;
+}
+
+.event-name  { font-weight: 700; font-size: 0.82rem; color: #e0e0f0; }
+.event-track { font-size: 0.72rem; color: #888; }
+.event-date  { font-size: 0.7rem; color: #555; }
+
+.session-block { margin-top: 0.4rem; }
+.session-name  { font-size: 0.7rem; color: #e74c3c; text-transform: uppercase; margin-bottom: 0.2rem; }
+
+.session-table td { padding: 0.15rem 0.3rem; font-size: 0.75rem; border: none; }
+.session-table .pts { text-align: right; color: #2ecc71; }
+
+/* Driver stats section */
+.stats-body { padding: 1rem 1.5rem; }
+
+.stats-table { border-collapse: collapse; width: auto; }
+
+.stats-table th,
+.stats-table td {
+  padding: 0.35rem 0.8rem;
+  border-bottom: 1px solid #1e1e38;
+  text-align: left;
+}
+
+.stats-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #7f8c8d;
+  background: #0f0f25;
+  letter-spacing: 0.04em;
+}
+
+.stats-table tr:hover { background: #1a1a35; }
+
+.stats-table .stat-name { min-width: 160px; }
+.stats-table .stat-num  { text-align: right; font-weight: 600; color: #e0e0f0; min-width: 60px; }
+
+.driver-portrait {
+  width: 32px;
+  height: 40px;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+
+.driver-portrait-placeholder {
+  display: inline-block;
+  width: 32px;
+  height: 40px;
+  background: #1e1e38;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+
+/* Sortable table headers */
+.sortable th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sortable th::after { content: ' \2195'; opacity: 0.3; font-size: 0.7em; }
+.sortable th.sort-asc::after  { content: ' \2191'; opacity: 1; }
+.sortable th.sort-desc::after { content: ' \2193'; opacity: 1; }
+.sortable th:hover { color: #bdc3c7; }

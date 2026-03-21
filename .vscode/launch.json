@@ -4,7 +4,7 @@
         {
             "type": "cppvsdbg",
             "request": "launch",
-            "name": "Debug ams2_career",
+            "name": "Debug ams2_championship",
             "program": "${workspaceFolder}/target/debug/ams2_career.exe",
             "args": ["C:\\Users\\gatsc\\OneDrive\\Documents\\SecondMonitor\\Championships\\Championships.xml"],
             "stopAtEntry": false,

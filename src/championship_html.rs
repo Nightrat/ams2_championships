@@ -1,3 +1,4 @@
+﻿use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
@@ -71,11 +72,7 @@ struct DriverStats {
     dnf: u32,
 }
 
-// ── XML helpers ──────────────────────────────────────────────────────────────
-
-fn attr(node: roxmltree::Node, name: &str) -> String {
-    node.attribute(name).unwrap_or("").to_string()
-}
+// ── String helpers ────────────────────────────────────────────────────────────
 
 fn driver_base_name(name: &str) -> &str {
     name.trim_end_matches(" (AI)").trim_end()
@@ -88,133 +85,220 @@ fn esc(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-// ── XML parsing ──────────────────────────────────────────────────────────────
+// ── XML deserialization types ─────────────────────────────────────────────────
 
-fn parse_driver_result(node: roxmltree::Node) -> DriverResult {
-    DriverResult {
-        driver_guid: attr(node, "DriverGuid"),
-        is_player: attr(node, "IsPlayer") == "true",
-        finish_position: attr(node, "FinishPosition").parse().unwrap_or(0),
-        points_gain: attr(node, "PointsGain").parse().unwrap_or(0),
-        driver_name: attr(node, "DriverName"),
-        was_fastest_lap: attr(node, "WasFastestLap") == "true",
-        skipped: attr(node, "SkippedEvent") == "true",
-    }
+#[derive(Deserialize)]
+struct XmlRoot {
+    #[serde(rename = "Championships")]
+    championships: XmlChampionshipsWrapper,
 }
 
-fn parse_session(node: roxmltree::Node) -> SessionData {
-    let name = attr(node, "Name");
-    let mut results = Vec::new();
-    let mut completion_percentage = 1.0f64;
+#[derive(Deserialize, Default)]
+struct XmlChampionshipsWrapper {
+    #[serde(rename = "ChampionshipDto", default)]
+    items: Vec<XmlChamp>,
+}
 
-    if let Some(result_node) = node
-        .children()
-        .find(|n| n.tag_name().name() == "SessionResult")
-    {
-        completion_percentage = attr(result_node, "CompletionPercentage")
-            .parse()
-            .unwrap_or(1.0);
-        if let Some(dr_node) = result_node
-            .children()
-            .find(|n| n.tag_name().name() == "DriverSessionResult")
-        {
-            results = dr_node
-                .children()
-                .filter(|n| n.tag_name().name() == "DriverSessionResultDto")
-                .map(parse_driver_result)
-                .collect();
+#[derive(Deserialize)]
+struct XmlChamp {
+    #[serde(rename = "@ChampionshipName", default)]
+    name: String,
+    #[serde(rename = "@ClassName", default)]
+    class: String,
+    #[serde(rename = "@ChampionshipState", default)]
+    state: String,
+    #[serde(rename = "@TotalEvents", default)]
+    total_events: u32,
+    #[serde(rename = "@CurrentEventIndex", default)]
+    current_event_index: u32,
+    #[serde(rename = "CreationDateTime", default)]
+    creation_date: String,
+    #[serde(rename = "Events", default)]
+    events: XmlEventsWrapper,
+    #[serde(rename = "Drivers", default)]
+    drivers: XmlDriversWrapper,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlEventsWrapper {
+    #[serde(rename = "EventDto", default)]
+    items: Vec<XmlEvent>,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlEvent {
+    #[serde(rename = "@EventName", default)]
+    name: String,
+    #[serde(rename = "@TrackName", default)]
+    track: String,
+    #[serde(rename = "@EventStatus", default)]
+    status: String,
+    #[serde(rename = "@EventDate", default)]
+    date: String,
+    #[serde(rename = "Sessions", default)]
+    sessions: XmlSessionsWrapper,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlSessionsWrapper {
+    #[serde(rename = "SessionDto", default)]
+    items: Vec<XmlSession>,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlSession {
+    #[serde(rename = "@Name", default)]
+    name: String,
+    #[serde(rename = "SessionResult")]
+    result: Option<XmlSessionResult>,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlSessionResult {
+    #[serde(rename = "@CompletionPercentage")]
+    completion_percentage: Option<f64>,
+    #[serde(rename = "DriverSessionResult")]
+    driver_results: Option<XmlDriverResultsWrapper>,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlDriverResultsWrapper {
+    #[serde(rename = "DriverSessionResultDto", default)]
+    items: Vec<XmlDriverResult>,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlDriverResult {
+    #[serde(rename = "@DriverGuid", default)]
+    driver_guid: String,
+    #[serde(rename = "@IsPlayer", default)]
+    is_player: bool,
+    #[serde(rename = "@FinishPosition", default)]
+    finish_position: u32,
+    #[serde(rename = "@PointsGain", default)]
+    points_gain: i32,
+    #[serde(rename = "@DriverName", default)]
+    driver_name: String,
+    #[serde(rename = "@WasFastestLap", default)]
+    was_fastest_lap: bool,
+    #[serde(rename = "@SkippedEvent", default)]
+    skipped: bool,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlDriversWrapper {
+    #[serde(rename = "DriverDto", default)]
+    items: Vec<XmlDriverStanding>,
+}
+
+#[derive(Deserialize, Default)]
+struct XmlDriverStanding {
+    #[serde(rename = "@Position", default)]
+    position: u32,
+    #[serde(rename = "@LastUsedName", default)]
+    name: String,
+    #[serde(rename = "@TotalPoints", default)]
+    total_points: i32,
+    #[serde(rename = "@IsPlayer", default)]
+    is_player: bool,
+    #[serde(rename = "@LastCarName", default)]
+    last_car: String,
+    #[serde(rename = "@IsInactive", default)]
+    is_inactive: bool,
+    #[serde(rename = "@GlobalKey", default)]
+    guid: String,
+}
+
+// ── Conversion from XML types to internal types ───────────────────────────────
+
+impl From<XmlDriverResult> for DriverResult {
+    fn from(x: XmlDriverResult) -> Self {
+        DriverResult {
+            driver_guid: x.driver_guid,
+            is_player: x.is_player,
+            finish_position: x.finish_position,
+            points_gain: x.points_gain,
+            driver_name: x.driver_name,
+            was_fastest_lap: x.was_fastest_lap,
+            skipped: x.skipped,
         }
     }
-
-    results.sort_by_key(|r| r.finish_position);
-    SessionData { name, completion_percentage, results }
 }
 
-fn parse_event(node: roxmltree::Node) -> EventData {
-    let name = attr(node, "EventName");
-    let track = attr(node, "TrackName");
-    let status = attr(node, "EventStatus");
-    let date_raw = attr(node, "EventDate");
-    let date = date_raw.split('T').next().unwrap_or("").to_string();
-
-    let sessions = node
-        .children()
-        .find(|n| n.tag_name().name() == "Sessions")
-        .map(|sn| {
-            sn.children()
-                .filter(|n| n.tag_name().name() == "SessionDto")
-                .map(parse_session)
-                .collect()
-        })
-        .unwrap_or_default();
-
-    EventData {
-        name,
-        track,
-        status,
-        date,
-        sessions,
-    }
-}
-
-fn parse_championship(node: roxmltree::Node) -> ChampData {
-    let name = attr(node, "ChampionshipName");
-    let class = attr(node, "ClassName");
-    let state = attr(node, "ChampionshipState");
-    let total_events = attr(node, "TotalEvents").parse().unwrap_or(0);
-    let current_event_index = attr(node, "CurrentEventIndex").parse().unwrap_or(0);
-
-    let mut events = Vec::new();
-    let mut standings = Vec::new();
-    let mut creation_date = String::new();
-
-    for child in node.children() {
-        match child.tag_name().name() {
-            "CreationDateTime" => {
-                creation_date = child
-                    .text()
-                    .unwrap_or("")
-                    .split('T')
-                    .next()
-                    .unwrap_or("")
-                    .to_string();
+impl From<XmlSession> for SessionData {
+    fn from(x: XmlSession) -> Self {
+        let (completion_percentage, mut results) = match x.result {
+            Some(r) => {
+                let pct = r.completion_percentage.unwrap_or(1.0);
+                let results = r
+                    .driver_results
+                    .map(|d| d.items.into_iter().map(DriverResult::from).collect())
+                    .unwrap_or_default();
+                (pct, results)
             }
-            "Events" => {
-                events = child
-                    .children()
-                    .filter(|n| n.tag_name().name() == "EventDto")
-                    .map(parse_event)
-                    .collect();
-            }
-            "Drivers" => {
-                standings = child
-                    .children()
-                    .filter(|n| n.tag_name().name() == "DriverDto")
-                    .map(|n| DriverStanding {
-                        position: attr(n, "Position").parse().unwrap_or(99),
-                        name: attr(n, "LastUsedName"),
-                        total_points: attr(n, "TotalPoints").parse().unwrap_or(0),
-                        is_player: attr(n, "IsPlayer") == "true",
-                        last_car: attr(n, "LastCarName"),
-                        is_inactive: attr(n, "IsInactive") == "true",
-                        guid: attr(n, "GlobalKey"),
-                    })
-                    .collect();
-                standings.sort_by_key(|d| d.position);
-            }
-            _ => {}
+            None => (1.0, vec![]),
+        };
+        results.sort_by_key(|r| r.finish_position);
+        SessionData {
+            name: x.name,
+            completion_percentage,
+            results,
         }
     }
+}
 
-    ChampData {
-        name,
-        class,
-        state,
-        total_events,
-        current_event_index,
-        creation_date,
-        events,
-        standings,
+impl From<XmlEvent> for EventData {
+    fn from(x: XmlEvent) -> Self {
+        let date = x.date.split('T').next().unwrap_or("").to_string();
+        EventData {
+            name: x.name,
+            track: x.track,
+            status: x.status,
+            date,
+            sessions: x
+                .sessions
+                .items
+                .into_iter()
+                .map(SessionData::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<XmlDriverStanding> for DriverStanding {
+    fn from(x: XmlDriverStanding) -> Self {
+        DriverStanding {
+            position: if x.position == 0 { 99 } else { x.position },
+            name: x.name,
+            total_points: x.total_points,
+            is_player: x.is_player,
+            last_car: x.last_car,
+            is_inactive: x.is_inactive,
+            guid: x.guid,
+        }
+    }
+}
+
+impl From<XmlChamp> for ChampData {
+    fn from(x: XmlChamp) -> Self {
+        let creation_date = x.creation_date.split('T').next().unwrap_or("").to_string();
+        let mut standings: Vec<DriverStanding> = x
+            .drivers
+            .items
+            .into_iter()
+            .map(DriverStanding::from)
+            .collect();
+        standings.sort_by_key(|d| d.position);
+        ChampData {
+            name: x.name,
+            class: x.class,
+            state: x.state,
+            total_events: x.total_events,
+            current_event_index: x.current_event_index,
+            creation_date,
+            events: x.events.items.into_iter().map(EventData::from).collect(),
+            standings,
+        }
     }
 }
 
@@ -467,12 +551,11 @@ fn compute_driver_stats(championships: &[ChampData]) -> Vec<DriverStats> {
         // Seed map from standings, keyed by base name to merge across championships
         for standing in &champ.standings {
             let key = driver_base_name(&standing.name).to_string();
-            map.entry(key.clone())
-                .or_insert_with(|| DriverStats {
-                    name: key,
-                    is_player: standing.is_player,
-                    ..Default::default()
-                });
+            map.entry(key.clone()).or_insert_with(|| DriverStats {
+                name: key,
+                is_player: standing.is_player,
+                ..Default::default()
+            });
         }
 
         if champ.state == "Finished" {
@@ -480,9 +563,15 @@ fn compute_driver_stats(championships: &[ChampData]) -> Vec<DriverStats> {
                 let key = driver_base_name(&standing.name);
                 if let Some(s) = map.get_mut(key) {
                     s.finished_seasons += 1;
-                    if standing.position == 1 { s.champ_wins += 1; }
-                    if standing.position <= 3  { s.champ_top3 += 1; }
-                    if standing.position <= 10 { s.champ_top10 += 1; }
+                    if standing.position == 1 {
+                        s.champ_wins += 1;
+                    }
+                    if standing.position <= 3 {
+                        s.champ_top3 += 1;
+                    }
+                    if standing.position <= 10 {
+                        s.champ_top10 += 1;
+                    }
                 }
             }
         }
@@ -551,7 +640,10 @@ fn fetch_driver_portraits(stats: &[DriverStats]) -> HashMap<String, String> {
     portraits
 }
 
-fn generate_driver_stats_section(stats: &[DriverStats], portraits: &HashMap<String, String>) -> String {
+fn generate_driver_stats_section(
+    stats: &[DriverStats],
+    portraits: &HashMap<String, String>,
+) -> String {
     if stats.is_empty() {
         return String::new();
     }
@@ -621,7 +713,11 @@ fn generate_driver_stats_section(stats: &[DriverStats], portraits: &HashMap<Stri
     )
 }
 
-fn generate_html(championships: &[ChampData], stats: &[DriverStats], portraits: &HashMap<String, String>) -> String {
+fn generate_html(
+    championships: &[ChampData],
+    stats: &[DriverStats],
+    portraits: &HashMap<String, String>,
+) -> String {
     let nav: String = championships
         .iter()
         .enumerate()
@@ -690,18 +786,13 @@ fn generate_html(championships: &[ChampData], stats: &[DriverStats], portraits: 
 
 pub fn convert(xml_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let xml = fs::read_to_string(xml_path)?;
-    let doc = roxmltree::Document::parse(&xml)?;
-    let root = doc.root_element();
+    let root: XmlRoot = quick_xml::de::from_str(&xml)?;
 
-    let championships_node = root
-        .children()
-        .find(|n| n.tag_name().name() == "Championships")
-        .ok_or("No <Championships> element found")?;
-
-    let mut championships: Vec<ChampData> = championships_node
-        .children()
-        .filter(|n| n.tag_name().name() == "ChampionshipDto")
-        .map(parse_championship)
+    let mut championships: Vec<ChampData> = root
+        .championships
+        .items
+        .into_iter()
+        .map(ChampData::from)
         .collect();
 
     championships.sort_by(|a, b| b.creation_date.cmp(&a.creation_date));
@@ -709,7 +800,11 @@ pub fn convert(xml_path: &str, output_path: &str) -> Result<(), Box<dyn std::err
     let stats = compute_driver_stats(&championships);
     println!("Fetching driver portraits from Wikipedia...");
     let portraits = fetch_driver_portraits(&stats);
-    println!("Found portraits for {}/{} drivers.", portraits.len(), stats.len());
+    println!(
+        "Found portraits for {}/{} drivers.",
+        portraits.len(),
+        stats.len()
+    );
 
     let html = generate_html(&championships, &stats, &portraits);
     fs::write(output_path, &html)?;
@@ -724,446 +819,11 @@ pub fn convert(xml_path: &str, output_path: &str) -> Result<(), Box<dyn std::err
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
-const CSS: &str = r#"
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  background: #0d0d1a;
-  color: #e0e0e0;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-/* Header */
-header {
-  background: linear-gradient(135deg, #1a0a2e 0%, #0d0d1a 100%);
-  border-bottom: 2px solid #c0392b;
-  padding: 1rem 2rem;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-header h1 {
-  font-size: 1.4rem;
-  color: #e74c3c;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-bottom: 0.5rem;
-}
-
-/* Tabs */
-.tab-bar {
-  display: flex;
-  gap: 0.25rem;
-  margin-top: 0.75rem;
-}
-
-.tab-btn {
-  background: #1a1a2a;
-  color: #95a5a6;
-  border: 1px solid #2a2a4a;
-  border-bottom: none;
-  padding: 0.35rem 1rem;
-  border-radius: 4px 4px 0 0;
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 600;
-  font-family: inherit;
-  letter-spacing: 0.04em;
-  transition: background 0.15s;
-}
-
-.tab-btn:hover { background: #22223a; color: #bdc3c7; }
-
-.tab-btn.tab-active {
-  background: #12122a;
-  color: #e74c3c;
-  border-color: #e74c3c;
-  border-bottom-color: #12122a;
-}
-
-.tab-panel { display: block; }
-.tab-panel-hidden { display: none; }
-
-nav {
-  padding: 0.6rem 2rem;
-  background: #12122a;
-  border-bottom: 1px solid #2a2a4a;
-}
-
-nav ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  list-style: none;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  border-radius: 3px;
-  text-decoration: none;
-  font-size: 0.8rem;
-  font-weight: 600;
-  border: 1px solid transparent;
-  transition: background 0.15s;
-}
-
-nav a small { font-weight: normal; opacity: 0.7; margin-left: 0.3rem; }
-
-nav a.nav-finished { background: #1a2a1a; border-color: #2ecc71; color: #2ecc71; }
-nav a.nav-active   { background: #2a1a0a; border-color: #f39c12; color: #f39c12; }
-nav a.nav-pending  { background: #1a1a2a; border-color: #7f8c8d; color: #7f8c8d; }
-nav a:hover        { filter: brightness(1.3); }
-
-/* Main */
-main { padding: 1.5rem 2rem; }
-
-/* Championship section */
-.championship {
-  background: #12122a;
-  border: 1px solid #2a2a4a;
-  border-radius: 6px;
-  margin-bottom: 2rem;
-  overflow: hidden;
-}
-
-.champ-header {
-  background: linear-gradient(135deg, #1e1e3a, #151528);
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #2a2a4a;
-}
-
-.champ-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.4rem;
-}
-
-.champ-title h2 {
-  font-size: 1.2rem;
-  color: #e0e0f0;
-}
-
-.badge {
-  padding: 0.15rem 0.5rem;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.badge-finished { background: #1e4d2b; color: #2ecc71; border: 1px solid #2ecc71; }
-.badge-active   { background: #4d3000; color: #f39c12; border: 1px solid #f39c12; }
-.badge-pending  { background: #2a2a2a; color: #95a5a6; border: 1px solid #95a5a6; }
-
-.class-badge {
-  background: #2a1a3a;
-  color: #9b59b6;
-  border: 1px solid #9b59b6;
-  padding: 0.15rem 0.5rem;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.champ-meta {
-  display: flex;
-  gap: 1.5rem;
-  font-size: 0.78rem;
-  color: #888;
-  margin-bottom: 0.5rem;
-}
-
-.progress-bar {
-  height: 4px;
-  background: #2a2a4a;
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #c0392b, #e74c3c);
-  border-radius: 2px;
-}
-
-/* Championship body */
-.champ-body {
-  display: flex;
-  gap: 0;
-  padding: 1rem 1.5rem;
-  flex-wrap: wrap;
-}
-
-.standings-panel {
-  min-width: 260px;
-  flex: 0 0 auto;
-  margin-right: 1.5rem;
-}
-
-.results-panel { flex: 1 1 auto; min-width: 0; }
-
-.standings-panel h3,
-.results-panel h3 {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #e74c3c;
-  margin-bottom: 0.6rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 1px solid #2a2a4a;
-}
-
-/* Tables */
-table { border-collapse: collapse; width: 100%; }
-
-.standings-table td,
-.standings-table th {
-  padding: 0.35rem 0.6rem;
-  text-align: left;
-  border-bottom: 1px solid #1e1e38;
-}
-
-.standings-table th {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  color: #7f8c8d;
-  background: #0f0f25;
-  letter-spacing: 0.04em;
-}
-
-.standings-table tr:hover { background: #1a1a35; }
-
-.standings-table .pos { text-align: center; width: 2.5rem; color: #95a5a6; font-size: 0.8rem; }
-.standings-table .pts { text-align: right; font-weight: 700; color: #e0e0f0; width: 3rem; }
-.standings-table .car { color: #888; font-size: 0.82rem; }
-
-/* Player rows */
-.player-row { background: #1a1a00 !important; }
-.player-row td { border-bottom-color: #333300 !important; }
-.player-tag {
-  background: #4d4d00;
-  color: #f1c40f;
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 0.1rem 0.3rem;
-  border-radius: 2px;
-  margin-left: 0.3rem;
-  vertical-align: middle;
-}
-
-/* Results grid */
-.grid-scroll { overflow-x: auto; }
-
-.results-grid th,
-.results-grid td {
-  padding: 0.3rem 0.5rem;
-  text-align: center;
-  border: 1px solid #1e1e38;
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
-.results-grid th {
-  background: #0f0f25;
-  color: #7f8c8d;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-}
-
-.results-grid .grid-driver {
-  text-align: left;
-  font-weight: 500;
-  min-width: 120px;
-  color: #ccc;
-}
-
-.results-grid .grid-total {
-  font-weight: 700;
-  color: #e0e0f0;
-  background: #141428;
-}
-
-.results-grid .cell-pts  { color: #2ecc71; }
-.results-grid .cell-npts { color: #666; }
-.results-grid .cell-dns  { color: #e74c3c; font-size: 0.7rem; }
-.results-grid .cell-empty { color: #333; }
-
-.results-grid small { font-size: 0.65rem; color: #888; }
-
-/* Events detail */
-.events-detail {
-  border-top: 1px solid #2a2a4a;
-  padding: 0 1.5rem;
-}
-
-.events-detail summary {
-  padding: 0.75rem 0;
-  font-size: 0.82rem;
-  color: #95a5a6;
-  cursor: pointer;
-  user-select: none;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.events-detail summary:hover { color: #bdc3c7; }
-
-.events-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 0.75rem 0 1rem;
-}
-
-.event-card {
-  background: #0f0f22;
-  border: 1px solid #2a2a4a;
-  border-radius: 4px;
-  padding: 0.75rem;
-  min-width: 160px;
-  flex: 0 0 auto;
-}
-
-.event-card.ev-finished { border-color: #1e4d2b; }
-.event-card.ev-active   { border-color: #4d3000; }
-
-.event-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid #1e1e38;
-}
-
-.event-name  { font-weight: 700; font-size: 0.82rem; color: #e0e0f0; }
-.event-track { font-size: 0.72rem; color: #888; }
-.event-date  { font-size: 0.7rem; color: #555; }
-
-.session-block { margin-top: 0.4rem; }
-.session-name  { font-size: 0.7rem; color: #e74c3c; text-transform: uppercase; margin-bottom: 0.2rem; }
-
-.session-table td { padding: 0.15rem 0.3rem; font-size: 0.75rem; border: none; }
-.session-table .pts { text-align: right; color: #2ecc71; }
-
-/* Driver stats section */
-.stats-body { padding: 1rem 1.5rem; }
-
-.stats-table { border-collapse: collapse; width: auto; }
-
-.stats-table th,
-.stats-table td {
-  padding: 0.35rem 0.8rem;
-  border-bottom: 1px solid #1e1e38;
-  text-align: left;
-}
-
-.stats-table th {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  color: #7f8c8d;
-  background: #0f0f25;
-  letter-spacing: 0.04em;
-}
-
-.stats-table tr:hover { background: #1a1a35; }
-
-.stats-table .stat-name { min-width: 160px; }
-.stats-table .stat-num  { text-align: right; font-weight: 600; color: #e0e0f0; min-width: 60px; }
-
-.driver-portrait {
-  width: 32px;
-  height: 40px;
-  object-fit: cover;
-  object-position: top;
-  border-radius: 2px;
-  vertical-align: middle;
-  margin-right: 0.5rem;
-}
-
-.driver-portrait-placeholder {
-  display: inline-block;
-  width: 32px;
-  height: 40px;
-  background: #1e1e38;
-  border-radius: 2px;
-  vertical-align: middle;
-  margin-right: 0.5rem;
-}
-
-/* Sortable table headers */
-.sortable th {
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-.sortable th::after { content: ' \2195'; opacity: 0.3; font-size: 0.7em; }
-.sortable th.sort-asc::after  { content: ' \2191'; opacity: 1; }
-.sortable th.sort-desc::after { content: ' \2193'; opacity: 1; }
-.sortable th:hover { color: #bdc3c7; }
-"#;
+const CSS: &str = include_str!("assets/style.css");
 
 // ── Scripts ──────────────────────────────────────────────────────────────────
 
-const JS: &str = r#"
-(function () {
-  // ── Tab switching ──────────────────────────────────────────────────────────
-  document.querySelectorAll('.tab-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.tab-btn').forEach(function (b) {
-        b.classList.remove('tab-active');
-      });
-      document.querySelectorAll('.tab-panel').forEach(function (p) {
-        p.classList.add('tab-panel-hidden');
-      });
-      btn.classList.add('tab-active');
-      document.getElementById('tab-' + btn.dataset.tab).classList.remove('tab-panel-hidden');
-    });
-  });
-
-  // ── Sortable stats table ───────────────────────────────────────────────────
-  var table = document.getElementById('stats-table');
-  if (!table) return;
-  var tbody = table.tBodies[0];
-  var headers = table.tHead.rows[0].cells;
-  var sortCol = 0, sortAsc = true;
-
-  function cellVal(row, col, type) {
-    var text = row.cells[col].textContent.trim();
-    return type === 'num' ? (parseFloat(text) || 0) : text.toLowerCase();
-  }
-
-  function sort(col, type) {
-    var rows = Array.from(tbody.rows);
-    var asc = (col === sortCol) ? !sortAsc : (type === 'num' ? false : true);
-    rows.sort(function (a, b) {
-      var av = cellVal(a, col, type), bv = cellVal(b, col, type);
-      if (av < bv) return asc ? -1 : 1;
-      if (av > bv) return asc ? 1 : -1;
-      return 0;
-    });
-    rows.forEach(function (r) { tbody.appendChild(r); });
-    Array.from(headers).forEach(function (th) {
-      th.classList.remove('sort-asc', 'sort-desc');
-    });
-    headers[col].classList.add(asc ? 'sort-asc' : 'sort-desc');
-    sortCol = col; sortAsc = asc;
-  }
-
-  Array.from(headers).forEach(function (th) {
-    th.addEventListener('click', function () {
-      sort(+th.dataset.col, th.dataset.type);
-    });
-  });
-}());
-"#;
+const JS: &str = include_str!("assets/script.js");
 
 // ── Unit tests ────────────────────────────────────────────────────────────────
 
@@ -1205,7 +865,11 @@ mod tests {
         }
     }
 
-    fn make_champ(state: &str, standings: Vec<DriverStanding>, sessions: Vec<SessionData>) -> ChampData {
+    fn make_champ(
+        state: &str,
+        standings: Vec<DriverStanding>,
+        sessions: Vec<SessionData>,
+    ) -> ChampData {
         let events = if sessions.is_empty() {
             vec![]
         } else {
@@ -1297,7 +961,11 @@ mod tests {
     fn test_stats_counts_race_sessions_only() {
         let standings = vec![make_standing("Alice", 1, false)];
         let sessions = vec![
-            make_session("Qualifying", 1.0, vec![make_result("Alice", 3, false, false)]),
+            make_session(
+                "Qualifying",
+                1.0,
+                vec![make_result("Alice", 3, false, false)],
+            ),
             make_session("Race 1", 1.0, vec![make_result("Alice", 1, false, false)]),
         ];
         let champ = make_champ("Finished", standings, sessions);
@@ -1422,13 +1090,21 @@ mod tests {
             make_session("Race 3", 0.2, vec![make_result("Player1", 10, true, false)]),
         ];
         let events = vec![EventData {
-            name: "R1".into(), track: "T".into(), status: "Finished".into(),
-            date: "2025-01-01".into(), sessions,
+            name: "R1".into(),
+            track: "T".into(),
+            status: "Finished".into(),
+            date: "2025-01-01".into(),
+            sessions,
         }];
         let champ = ChampData {
-            name: "C".into(), class: "X".into(), state: "Finished".into(),
-            total_events: 1, current_event_index: 1, creation_date: "2025-01-01".into(),
-            events, standings,
+            name: "C".into(),
+            class: "X".into(),
+            state: "Finished".into(),
+            total_events: 1,
+            current_event_index: 1,
+            creation_date: "2025-01-01".into(),
+            events,
+            standings,
         };
         let stats = compute_driver_stats(&[champ]);
         let p = stats.iter().find(|s| s.name == "Player1").unwrap();
@@ -1487,12 +1163,20 @@ mod tests {
         let champ1 = make_champ(
             "Finished",
             vec![make_standing("Alice", 1, true)],
-            vec![make_session("Race 1", 1.0, vec![make_result("Alice", 1, true, false)])],
+            vec![make_session(
+                "Race 1",
+                1.0,
+                vec![make_result("Alice", 1, true, false)],
+            )],
         );
         let champ2 = make_champ(
             "Finished",
             vec![make_standing("Alice (AI)", 2, false)],
-            vec![make_session("Race 1", 1.0, vec![make_result("Alice (AI)", 2, false, false)])],
+            vec![make_session(
+                "Race 1",
+                1.0,
+                vec![make_result("Alice (AI)", 2, false, false)],
+            )],
         );
         let stats = compute_driver_stats(&[champ1, champ2]);
         let alice: Vec<_> = stats.iter().filter(|s| s.name == "Alice").collect();
@@ -1511,13 +1195,21 @@ mod tests {
             make_session("Race 2", 1.0, vec![make_result("Alice", 2, false, false)]),
         ];
         let events = vec![EventData {
-            name: "E".into(), track: "T".into(), status: "Finished".into(),
-            date: "2025-01-01".into(), sessions,
+            name: "E".into(),
+            track: "T".into(),
+            status: "Finished".into(),
+            date: "2025-01-01".into(),
+            sessions,
         }];
         let champ = ChampData {
-            name: "C".into(), class: "X".into(), state: "Finished".into(),
-            total_events: 1, current_event_index: 1, creation_date: "2025-01-01".into(),
-            events, standings,
+            name: "C".into(),
+            class: "X".into(),
+            state: "Finished".into(),
+            total_events: 1,
+            current_event_index: 1,
+            creation_date: "2025-01-01".into(),
+            events,
+            standings,
         };
         let stats = compute_driver_stats(&[champ]);
         let alice = stats.iter().find(|s| s.name == "Alice").unwrap();
@@ -1550,7 +1242,10 @@ mod tests {
             dnf: 0,
         };
         let html = generate_driver_stats_section(&[s], &HashMap::new());
-        assert!(html.contains(">DNF<"), "table should have a DNF column header");
+        assert!(
+            html.contains(">DNF<"),
+            "table should have a DNF column header"
+        );
     }
 
     #[test]
@@ -1575,7 +1270,12 @@ mod tests {
         assert!(html.contains(r#"<td class="stat-num">3</td>"#));
     }
 
-    // ── XML parsing ──────────────────────────────────────────────────────────
+    // ── XML deserialization ───────────────────────────────────────────────────
+
+    fn parse_session_xml(xml: &str) -> SessionData {
+        let x: XmlSession = quick_xml::de::from_str(xml).unwrap();
+        SessionData::from(x)
+    }
 
     #[test]
     fn test_parse_session_reads_completion_percentage() {
@@ -1587,8 +1287,7 @@ mod tests {
     </DriverSessionResult>
   </SessionResult>
 </SessionDto>"#;
-        let doc = roxmltree::Document::parse(xml).unwrap();
-        let session = parse_session(doc.root_element());
+        let session = parse_session_xml(xml);
         assert!((session.completion_percentage - 0.75).abs() < f64::EPSILON);
         assert_eq!(session.results.len(), 1);
         assert_eq!(session.results[0].finish_position, 5);
@@ -1601,8 +1300,7 @@ mod tests {
     <DriverSessionResult />
   </SessionResult>
 </SessionDto>"#;
-        let doc = roxmltree::Document::parse(xml).unwrap();
-        let session = parse_session(doc.root_element());
+        let session = parse_session_xml(xml);
         assert!((session.completion_percentage - 1.0).abs() < f64::EPSILON);
     }
 
@@ -1616,8 +1314,7 @@ mod tests {
     </DriverSessionResult>
   </SessionResult>
 </SessionDto>"#;
-        let doc = roxmltree::Document::parse(xml).unwrap();
-        let session = parse_session(doc.root_element());
+        let session = parse_session_xml(xml);
         assert!(session.results[0].skipped);
     }
 
@@ -1635,8 +1332,7 @@ mod tests {
     </DriverSessionResult>
   </SessionResult>
 </SessionDto>"#;
-        let doc = roxmltree::Document::parse(xml).unwrap();
-        let session = parse_session(doc.root_element());
+        let session = parse_session_xml(xml);
         let positions: Vec<u32> = session.results.iter().map(|r| r.finish_position).collect();
         assert_eq!(positions, vec![1, 2, 3]);
     }

@@ -8,9 +8,12 @@ const FIXTURE_XML: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/m
 fn fixture_html() -> &'static str {
     static HTML: OnceLock<String> = OnceLock::new();
     HTML.get_or_init(|| {
-        let out = format!("{}/target/integration_fixture.html", env!("CARGO_MANIFEST_DIR"));
+        let out = format!(
+            "{}/target/integration_fixture.html",
+            env!("CARGO_MANIFEST_DIR")
+        );
         fs::create_dir_all(format!("{}/target", env!("CARGO_MANIFEST_DIR"))).ok();
-        ams2_career::convert(FIXTURE_XML, &out).expect("convert should succeed");
+        ams2_championship::convert(FIXTURE_XML, &out).expect("convert should succeed");
         fs::read_to_string(&out).expect("output file should exist")
     })
 }
@@ -20,8 +23,11 @@ fn fixture_html() -> &'static str {
 #[test]
 fn test_convert_creates_output_file() {
     let out = format!("{}/target/test_creates.html", env!("CARGO_MANIFEST_DIR"));
-    ams2_career::convert(FIXTURE_XML, &out).expect("convert should not error");
-    assert!(std::path::Path::new(&out).exists(), "output HTML file should be created");
+    ams2_championship::convert(FIXTURE_XML, &out).expect("convert should not error");
+    assert!(
+        std::path::Path::new(&out).exists(),
+        "output HTML file should be created"
+    );
     let _ = fs::remove_file(&out);
 }
 
@@ -35,7 +41,7 @@ fn test_convert_output_is_valid_html_skeleton() {
 
 #[test]
 fn test_convert_missing_xml_returns_error() {
-    let result = ams2_career::convert("/nonexistent/Championships.xml", "/tmp/out.html");
+    let result = ams2_championship::convert("/nonexistent/Championships.xml", "/tmp/out.html");
     assert!(result.is_err(), "missing XML should return an error");
 }
 
@@ -43,7 +49,10 @@ fn test_convert_missing_xml_returns_error() {
 
 #[test]
 fn test_convert_contains_championship_name() {
-    assert!(fixture_html().contains("Test Cup"), "championship name should appear in output");
+    assert!(
+        fixture_html().contains("Test Cup"),
+        "championship name should appear in output"
+    );
 }
 
 #[test]
@@ -93,10 +102,14 @@ fn test_convert_player_dnf_counted() {
 
     // The stats section comes after the championship sections.
     // The player row in the stats table contains class="player-row".
-    let stats_start = html.find(r#"id="stats-table""#).expect("stats-table element must exist");
+    let stats_start = html
+        .find(r#"id="stats-table""#)
+        .expect("stats-table element must exist");
     let stats_html = &html[stats_start..];
 
-    let pr_start = stats_html.find("player-row").expect("player-row must exist in stats table");
+    let pr_start = stats_html
+        .find("player-row")
+        .expect("player-row must exist in stats table");
     let pr_html = &stats_html[pr_start..];
     let row_end = pr_html.find("</tr>").expect("player row must close");
     let row = &pr_html[..row_end];
@@ -111,9 +124,13 @@ fn test_convert_player_dnf_counted() {
 fn test_convert_player_race_count() {
     // Player entered 2 race sessions (Round 1 and Round 2).
     let html = fixture_html();
-    let stats_start = html.find(r#"id="stats-table""#).expect("stats-table element must exist");
+    let stats_start = html
+        .find(r#"id="stats-table""#)
+        .expect("stats-table element must exist");
     let stats_html = &html[stats_start..];
-    let pr_start = stats_html.find("player-row").expect("player-row must exist in stats");
+    let pr_start = stats_html
+        .find("player-row")
+        .expect("player-row must exist in stats");
     let pr_html = &stats_html[pr_start..];
     let row_end = pr_html.find("</tr>").expect("player row must close");
     let row = &pr_html[..row_end];
@@ -129,9 +146,13 @@ fn test_convert_player_race_count() {
 fn test_convert_player_win_count() {
     // Player won Round 1 (FinishPosition=1, CompletionPercentage=1).
     let html = fixture_html();
-    let stats_start = html.find(r#"id="stats-table""#).expect("stats-table element must exist");
+    let stats_start = html
+        .find(r#"id="stats-table""#)
+        .expect("stats-table element must exist");
     let stats_html = &html[stats_start..];
-    let pr_start = stats_html.find("player-row").expect("player-row must exist in stats");
+    let pr_start = stats_html
+        .find("player-row")
+        .expect("player-row must exist in stats");
     let pr_html = &stats_html[pr_start..];
     let row_end = pr_html.find("</tr>").expect("player row must close");
     let row = &pr_html[..row_end];
@@ -146,12 +167,18 @@ fn test_convert_player_win_count() {
 fn test_convert_ai_driver_dnf_is_zero() {
     // AI drivers should never accumulate DNFs.
     let html = fixture_html();
-    let stats_start = html.find(r#"id="stats-table""#).expect("stats-table element must exist");
-    let tbody_start = html[stats_start..].find("<tbody>").expect("<tbody> must exist");
+    let stats_start = html
+        .find(r#"id="stats-table""#)
+        .expect("stats-table element must exist");
+    let tbody_start = html[stats_start..]
+        .find("<tbody>")
+        .expect("<tbody> must exist");
     let tbody = &html[stats_start + tbody_start..];
 
     // Find a non-player row for "Bot Alpha".
-    let ai_start = tbody.find("Bot Alpha").expect("Bot Alpha must appear in stats");
+    let ai_start = tbody
+        .find("Bot Alpha")
+        .expect("Bot Alpha must appear in stats");
     let before = &tbody[..ai_start];
     let tr_start = before.rfind("<tr>").expect("must have opening <tr>");
     let tr_html = &tbody[tr_start..];
