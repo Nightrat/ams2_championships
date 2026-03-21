@@ -107,6 +107,30 @@ main { padding: 1.5rem 2rem; }
   background: linear-gradient(135deg, #1e1e3a, #151528);
   padding: 1rem 1.5rem;
   border-bottom: 1px solid #2a2a4a;
+  cursor: pointer;
+  list-style: none;
+  display: block;
+  position: relative;
+}
+
+.champ-header::-webkit-details-marker { display: none; }
+.champ-header::marker { display: none; }
+
+.championship:not([open]) > .champ-header { border-bottom: none; }
+
+.champ-header::after {
+  content: '▶';
+  position: absolute;
+  right: 1.25rem;
+  top: 1rem;
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  transition: transform 0.2s, color 0.2s;
+}
+
+.championship[open] > .champ-header::after {
+  transform: rotate(90deg);
+  color: #e74c3c;
 }
 
 .champ-title {
@@ -165,6 +189,9 @@ main { padding: 1.5rem 2rem; }
   background: linear-gradient(90deg, #c0392b, #e74c3c);
   border-radius: 2px;
 }
+
+/* Ensure collapsed <details> hides all non-summary children */
+details.championship:not([open]) > :not(summary) { display: none; }
 
 /* Championship body */
 .champ-body {
@@ -381,3 +408,39 @@ table { border-collapse: collapse; width: 100%; }
 .sortable th.sort-asc::after  { content: ' \2191'; opacity: 1; }
 .sortable th.sort-desc::after { content: ' \2193'; opacity: 1; }
 .sortable th:hover { color: #bdc3c7; }
+
+/* Download button */
+#download-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #1a1a2a;
+  color: #7f8c8d;
+  border: 1px solid #2a2a4a;
+  padding: 0.4rem 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  z-index: 200;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+#download-btn:hover { background: #22223a; color: #e0e0e0; border-color: #e74c3c; }
+
+/* Constructor standings panel */
+.constructor-panel {
+  min-width: 180px;
+  flex: 0 0 auto;
+  margin-right: 1.5rem;
+}
+
+.constructor-panel h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #e74c3c;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #2a2a4a;
+}

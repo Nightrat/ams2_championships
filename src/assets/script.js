@@ -47,4 +47,19 @@
       sort(+th.dataset.col, th.dataset.type);
     });
   });
+  // ── Download button ────────────────────────────────────────────────────────
+  var dlBtn = document.getElementById('download-btn');
+  if (dlBtn) {
+    dlBtn.addEventListener('click', function () {
+      var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      var blob = new Blob([html], { type: 'text/html' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'championships.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    });
+  }
 }());

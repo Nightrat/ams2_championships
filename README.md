@@ -41,7 +41,7 @@ The generated HTML file is fully self-contained (no external assets). It contain
 
 | Tab | Content |
 |---|---|
-| **Championships** | One section per championship with standings, a round-by-round results grid, and expandable event details |
+| **Championships** | One collapsible section per championship (pending/active open by default, finished collapsed) with standings, a round-by-round results grid, and expandable event details |
 | **Driver Stats** | A sortable table aggregating stats for every driver across all championships |
 
 ### Driver Stats columns
@@ -82,6 +82,9 @@ src/
   lib.rs                  # Library entry point, re-exports `convert`
   main.rs                 # Binary entry point
   championship_html.rs    # All parsing, stat computation, and HTML generation
+  assets/
+    style.css             # Embedded at compile time via include_str!
+    script.js             # Embedded at compile time via include_str!
 tests/
   integration_test.rs     # End-to-end tests against a fixture XML
   fixtures/
@@ -92,6 +95,7 @@ tests/
 
 | Crate | Purpose |
 |---|---|
-| [`roxmltree`](https://crates.io/crates/roxmltree) | Read-only XML parsing |
+| [`quick-xml`](https://crates.io/crates/quick-xml) | XML deserialisation via serde |
+| [`serde`](https://crates.io/crates/serde) | Derive macros for XML struct deserialisation |
 | [`ureq`](https://crates.io/crates/ureq) | HTTP requests to the Wikipedia REST API |
 | [`serde_json`](https://crates.io/crates/serde_json) | Parsing Wikipedia API JSON responses |

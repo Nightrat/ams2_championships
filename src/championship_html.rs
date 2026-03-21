@@ -11,6 +11,7 @@ struct DriverResult {
     finish_position: u32,
     points_gain: i32,
     driver_name: String,
+    car_name: String,
     was_fastest_lap: bool,
     skipped: bool,
 }
@@ -50,6 +51,7 @@ struct ChampData {
     total_events: u32,
     current_event_index: u32,
     creation_date: String,
+    manufacturer_scoring: bool,
     events: Vec<EventData>,
     standings: Vec<DriverStanding>,
 }
@@ -113,6 +115,8 @@ struct XmlChamp {
     current_event_index: u32,
     #[serde(rename = "CreationDateTime", default)]
     creation_date: String,
+    #[serde(rename = "@IsManufacturerScoringEnabled", default)]
+    manufacturer_scoring: bool,
     #[serde(rename = "Events", default)]
     events: XmlEventsWrapper,
     #[serde(rename = "Drivers", default)]
@@ -183,6 +187,8 @@ struct XmlDriverResult {
     was_fastest_lap: bool,
     #[serde(rename = "@SkippedEvent", default)]
     skipped: bool,
+    #[serde(rename = "@CarName", default)]
+    car_name: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -219,6 +225,7 @@ impl From<XmlDriverResult> for DriverResult {
             finish_position: x.finish_position,
             points_gain: x.points_gain,
             driver_name: x.driver_name,
+            car_name: x.car_name,
             was_fastest_lap: x.was_fastest_lap,
             skipped: x.skipped,
         }
@@ -296,6 +303,7 @@ impl From<XmlChamp> for ChampData {
             total_events: x.total_events,
             current_event_index: x.current_event_index,
             creation_date,
+            manufacturer_scoring: x.manufacturer_scoring,
             events: x.events.items.into_iter().map(EventData::from).collect(),
             standings,
         }
@@ -488,6 +496,51 @@ fn generate_events_detail(events: &[EventData]) -> String {
         .collect()
 }
 
+fn compute_constructor_standings(events: &[EventData]) -> Vec<(String, i32)> {
+    let mut totals: HashMap<String, i32> = HashMap::new();
+    for event in events {
+        for session in &event.sessions {
+            for result in &session.results {
+                if !result.skipped && !result.car_name.is_empty() {
+                    *totals.entry(result.car_name.clone()).or_default() += result.points_gain;
+                }
+            }
+        }
+    }
+    let mut standings: Vec<(String, i32)> = totals.into_iter().collect();
+    standings.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    standings
+}
+
+fn generate_constructor_standings(events: &[EventData]) -> String {
+    let standings = compute_constructor_standings(events);
+    if standings.len() < 2 {
+        return String::new();
+    }
+    let rows: String = standings
+        .iter()
+        .enumerate()
+        .map(|(i, (car, pts))| {
+            format!(
+                "<tr><td class=\"pos\">{pos}</td><td>{car}</td><td class=\"pts\">{pts}</td></tr>",
+                pos = i + 1,
+                car = esc(car),
+                pts = pts,
+            )
+        })
+        .collect();
+    format!(
+        r#"<div class="constructor-panel">
+  <h3>Constructor Standings</h3>
+  <table class="standings-table">
+    <thead><tr><th class="pos">Pos</th><th>Constructor</th><th class="pts">Pts</th></tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+</div>"#,
+        rows = rows,
+    )
+}
+
 fn generate_championship_section(idx: usize, c: &ChampData) -> String {
     let progress_pct = if c.total_events > 0 {
         (c.current_event_index as f64 / c.total_events as f64 * 100.0) as u32
@@ -498,10 +551,17 @@ fn generate_championship_section(idx: usize, c: &ChampData) -> String {
     let standings_html = generate_standings_table(&c.standings);
     let grid_html = generate_results_grid(c);
     let events_html = generate_events_detail(&c.events);
+    let constructor_html = if c.manufacturer_scoring {
+        generate_constructor_standings(&c.events)
+    } else {
+        String::new()
+    };
+
+    let open_attr = if c.state == "Finished" { "" } else { " open" };
 
     format!(
-        r#"<section id="champ-{idx}" class="championship">
-  <div class="champ-header">
+        r#"<details id="champ-{idx}" class="championship"{open}>
+  <summary class="champ-header">
     <div class="champ-title">
       <h2>{name}</h2>
       {state_badge}
@@ -512,13 +572,14 @@ fn generate_championship_section(idx: usize, c: &ChampData) -> String {
       <span>Events: {current}/{total}</span>
     </div>
     <div class="progress-bar"><div class="progress-fill" style="width:{pct}%"></div></div>
-  </div>
+  </summary>
 
   <div class="champ-body">
     <div class="standings-panel">
       <h3>Standings</h3>
       {standings_html}
     </div>
+    {constructor_html}
     <div class="results-panel">
       <h3>Round-by-Round</h3>
       {grid_html}
@@ -529,8 +590,9 @@ fn generate_championship_section(idx: usize, c: &ChampData) -> String {
     <summary>Event Details ({total} rounds)</summary>
     <div class="events-grid">{events_html}</div>
   </details>
-</section>"#,
+</details>"#,
         idx = idx,
+        open = open_attr,
         name = esc(&c.name),
         state_badge = status_badge(&c.state),
         class = esc(&c.class),
@@ -539,6 +601,7 @@ fn generate_championship_section(idx: usize, c: &ChampData) -> String {
         total = c.total_events,
         pct = progress_pct,
         standings_html = standings_html,
+        constructor_html = constructor_html,
         grid_html = grid_html,
         events_html = events_html,
     )
@@ -771,6 +834,7 @@ fn generate_html(
     {stats_section}
   </div>
 </main>
+<button id="download-btn" title="Download as static HTML file">&#11015; Download</button>
 <script>{js}</script>
 </body>
 </html>"##,
@@ -784,7 +848,7 @@ fn generate_html(
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-pub fn convert(xml_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn build_html_from_xml(xml_path: &str) -> Result<String, Box<dyn std::error::Error>> {
     let xml = fs::read_to_string(xml_path)?;
     let root: XmlRoot = quick_xml::de::from_str(&xml)?;
 
@@ -807,13 +871,14 @@ pub fn convert(xml_path: &str, output_path: &str) -> Result<(), Box<dyn std::err
     );
 
     let html = generate_html(&championships, &stats, &portraits);
-    fs::write(output_path, &html)?;
+    println!("Generated {} championship(s).", championships.len());
+    Ok(html)
+}
 
-    println!(
-        "Generated {} championship(s) -> {}",
-        championships.len(),
-        output_path
-    );
+pub fn convert(xml_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let html = build_html_from_xml(xml_path)?;
+    fs::write(output_path, &html)?;
+    println!("Written to {}", output_path);
     Ok(())
 }
 
@@ -840,6 +905,7 @@ mod tests {
             finish_position: pos,
             points_gain: 0,
             driver_name: name.to_string(),
+            car_name: String::new(),
             was_fastest_lap: false,
             skipped,
         }
@@ -888,6 +954,7 @@ mod tests {
             total_events: 1,
             current_event_index: 1,
             creation_date: "2025-01-01".into(),
+            manufacturer_scoring: false,
             events,
             standings,
         }
@@ -1103,6 +1170,7 @@ mod tests {
             total_events: 1,
             current_event_index: 1,
             creation_date: "2025-01-01".into(),
+            manufacturer_scoring: false,
             events,
             standings,
         };
@@ -1208,6 +1276,7 @@ mod tests {
             total_events: 1,
             current_event_index: 1,
             creation_date: "2025-01-01".into(),
+            manufacturer_scoring: false,
             events,
             standings,
         };

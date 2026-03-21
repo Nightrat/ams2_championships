@@ -4,9 +4,20 @@
         {
             "type": "cppvsdbg",
             "request": "launch",
-            "name": "Debug ams2_championship",
-            "program": "${workspaceFolder}/target/debug/ams2_career.exe",
+            "name": "ams2_championship (generate HTML)",
+            "program": "${workspaceFolder}/target/debug/ams2_championship.exe",
             "args": ["C:\\Users\\gatsc\\OneDrive\\Documents\\SecondMonitor\\Championships\\Championships.xml"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "cargo build"
+        },
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "ams2_championship_server (serve on :8080)",
+            "program": "${workspaceFolder}/target/debug/ams2_championship_server.exe",
+            "args": ["C:\\Users\\gatsc\\OneDrive\\Documents\\SecondMonitor\\Championships\\Championships.xml", "8080"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
