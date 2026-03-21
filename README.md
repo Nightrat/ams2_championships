@@ -1,14 +1,16 @@
 # AMS2 Championships
 
-A command-line tool that converts your Automobilista 2 career championship save data into a single self-contained HTML report.
+A tool that converts your Automobilista 2 career championship save data into a single self-contained HTML report, with an optional built-in web server to serve it locally.
 
 ## Features
 
-- **Championship overview** — standings table, round-by-round results grid, and event detail for every championship in your save
+- **Championship overview** — collapsible sections per championship with standings, constructor standings, round-by-round results grid, and expandable event details
+- **Constructor standings** — per-championship points table grouped by car model, shown when manufacturer scoring is enabled in the save
 - **Driver statistics** — aggregated stats across all championships: races, wins, top-3/10 finishes, DNFs, championship podiums, and average finishing position
 - **DNF tracking** — races where the session was not completed (player retired early) are counted and shown in a dedicated column
 - **Driver portraits** — automatically fetched from Wikipedia for real-world driver names
-- **Dark theme UI** — sortable stats table, tab switching between Championships and Driver Stats views, progress bars, and badge indicators
+- **Dark theme UI** — sortable stats table, tab switching, collapsible championship sections, progress bars, and badge indicators
+- **Download button** — save the currently rendered page as a static self-contained HTML file directly from the browser
 
 ## Requirements
 
@@ -23,8 +25,10 @@ cargo build --release
 
 ## Usage
 
+### Generate a static HTML file
+
 ```bash
-cargo run --release -- <path/to/Championships.xml>
+cargo run --release --bin ams2_championship -- <path/to/Championships.xml>
 ```
 
 This generates `championships.html` in the current working directory. Open it in any browser.
@@ -32,8 +36,22 @@ This generates `championships.html` in the current working directory. Open it in
 **Example** (default Second Monitor path on Windows):
 
 ```bash
-cargo run --release -- "%USERPROFILE%\OneDrive\Documents\SecondMonitor\Championships\Championships.xml"
+cargo run --release --bin ams2_championship -- "%USERPROFILE%\OneDrive\Documents\SecondMonitor\Championships.xml"
 ```
+
+### Serve over HTTP
+
+```bash
+cargo run --release --bin ams2_championship_server -- <path/to/Championships.xml> [port]
+```
+
+Generates the HTML once at startup (including the Wikipedia portrait fetch) and serves it at `http://127.0.0.1:<port>/`. Default port is `8080`.
+
+```bash
+cargo run --release --bin ams2_championship_server -- "%USERPROFILE%\OneDrive\Documents\SecondMonitor\Championships.xml" 8080
+```
+
+Then open `http://127.0.0.1:8080/` in a browser. Press **Ctrl+C** to stop.
 
 ## Output
 
@@ -41,7 +59,7 @@ The generated HTML file is fully self-contained (no external assets). It contain
 
 | Tab | Content |
 |---|---|
-| **Championships** | One collapsible section per championship (pending/active open by default, finished collapsed) with standings, a round-by-round results grid, and expandable event details |
+| **Championships** | One collapsible section per championship (pending/active open by default, finished collapsed) with driver standings, optional constructor standings, a round-by-round results grid, and expandable event details |
 | **Driver Stats** | A sortable table aggregating stats for every driver across all championships |
 
 ### Driver Stats columns
@@ -64,7 +82,12 @@ The generated HTML file is fully self-contained (no external assets). It contain
 
 ### VS Code
 
-A `.vscode/launch.json` is included. Press **F5** to build and run with the default save path. Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
+A `.vscode/launch.json` is included with two launch configurations selectable from the Run & Debug panel (Ctrl+Shift+D):
+
+- **ams2_championship (generate HTML)** — builds and runs the file generator (F5)
+- **ams2_championship_server (serve on :8080)** — builds and starts the HTTP server
+
+Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
 
 ### Running tests
 
@@ -79,16 +102,18 @@ cargo test
 
 ```
 src/
-  lib.rs                  # Library entry point, re-exports `convert`
-  main.rs                 # Binary entry point
-  championship_html.rs    # All parsing, stat computation, and HTML generation
+  lib.rs                       # Library entry point, re-exports convert functions
+  main.rs                      # Binary: generate HTML file
+  championship_html.rs         # All parsing, stat computation, and HTML generation
   assets/
-    style.css             # Embedded at compile time via include_str!
-    script.js             # Embedded at compile time via include_str!
+    style.css                  # Embedded at compile time via include_str!
+    script.js                  # Embedded at compile time via include_str!
+  bin/
+    ams2_championship_server.rs  # Binary: HTTP server
 tests/
-  integration_test.rs     # End-to-end tests against a fixture XML
+  integration_test.rs          # End-to-end tests against a fixture XML
   fixtures/
-    minimal.xml           # Minimal two-round championship fixture
+    minimal.xml                # Minimal two-round championship fixture
 ```
 
 ## Dependencies
