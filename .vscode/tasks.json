@@ -18,7 +18,7 @@
             "type": "shell",
             "command": "cargo",
             "args": ["test"],
-            "group": "test",
+            "group": "build",
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
