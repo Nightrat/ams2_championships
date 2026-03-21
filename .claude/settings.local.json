@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:pixabay.com)",
-      "WebFetch(domain:www.pexels.com)"
-    ]
-  }
-}
