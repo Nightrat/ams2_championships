@@ -1,5 +1,9 @@
 # AMS2 Championships
 
+[![Release](https://img.shields.io/github/v/release/Nightrat/ams2_championships)](https://github.com/Nightrat/ams2_championships/releases/latest)
+
+> **Download the latest release:** [ams2_championship.exe](https://github.com/Nightrat/ams2_championships/releases/latest/download/ams2_championship.exe) · [ams2_championship_server.exe](https://github.com/Nightrat/ams2_championships/releases/latest/download/ams2_championship_server.exe)
+
 A tool that converts your Automobilista 2 career championship save data into a self-contained HTML report, with a built-in web server that also streams a live session overlay directly from the AMS2 shared memory API.
 
 ## Features
