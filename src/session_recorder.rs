@@ -26,7 +26,7 @@ mod ams2 {
     pub const GAME_STATE_REPLAY:  u32 = 4;
 }
 
-use ams2::{SESSION_PRACTICE, SESSION_QUALIFY, SESSION_RACE, GAME_STATE_TIMEDOUT};
+use ams2::{SESSION_PRACTICE, SESSION_QUALIFY, SESSION_RACE};
 
 
 
@@ -105,7 +105,7 @@ fn should_capture(cached: &LiveSessionData) -> bool {
 ///   Race end:            game=4  session=5  race=5
 ///
 /// Capture triggers:
-///   Race   — race_state was RACING (2) and is no longer (covers Finished=3 and Retired=5)
+///   Race   — when the race is finished the user can only leave session which leads to a disconnect (in SP he can also restart the session, meaning he throws away the current cached result).
 ///   P / Q  — session_state changes (P→Q, Q→Race lobby)
 ///   Any    — disconnect while session was active
 pub fn start(store: SharedStore, path: PathBuf) {

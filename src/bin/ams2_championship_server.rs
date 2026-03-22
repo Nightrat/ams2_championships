@@ -461,12 +461,10 @@ fn main() {
     println!("Career API:     http://127.0.0.1:{port}/api/sessions  |  /api/championships");
 
     let data_path = Arc::new(career_path);
-    for stream in listener.incoming() {
-        if let Ok(stream) = stream {
-            let html = Arc::clone(&html);
-            let store = store.clone();
-            let data_path = Arc::clone(&data_path);
-            std::thread::spawn(move || handle(stream, html, store, data_path));
-        }
+    for stream in listener.incoming().flatten() {
+        let html = Arc::clone(&html);
+        let store = store.clone();
+        let data_path = Arc::clone(&data_path);
+        std::thread::spawn(move || handle(stream, html, store, data_path));
     }
 }
