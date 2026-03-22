@@ -4,24 +4,24 @@
 
 > **Download the latest release:** [ams2_championship.exe](https://github.com/Nightrat/ams2_championships/releases/latest/download/ams2_championship.exe) · [ams2_championship_server.exe](https://github.com/Nightrat/ams2_championships/releases/latest/download/ams2_championship_server.exe)
 
-A tool that converts your Automobilista 2 career championship save data into a self-contained HTML report, with a built-in web server that also streams a live session overlay directly from the AMS2 shared memory API.
+A motorsport career tracker for Automobilista 2. It records race results directly from the AMS2 shared memory API, lets you organise them into championships, and displays everything in a browser-based UI with a real-time live timing overlay. An optional import tab supports legacy data from [Second Monitor](https://gitlab.com/raceengineer1/second-monitor).
 
 ## Features
 
-- **Championship overview** — collapsible sections per championship with standings, constructor standings, round-by-round results grid, and expandable event details
-- **Constructor standings** — per-championship points table grouped by car model, shown when manufacturer scoring is enabled in the save
-- **Driver statistics** — aggregated stats across all championships: races, wins, top-3/10 finishes, DNFs, championship podiums, and average finishing position
-- **DNF tracking** — races where the session was not completed (player retired early) are counted and shown in a dedicated column
-- **Driver portraits** — automatically fetched from Wikipedia for real-world driver names
-- **Live session overlay** — real-time timing table powered by the AMS2 shared memory API (`$pcars2$`): position, lap count, gap to fastest, sector times (S1/S2/S3), best lap, and last lap for all active participants
-- **Dark theme UI** — sortable stats table, tab switching, collapsible championship sections, progress bars, and badge indicators
-- **Download button** — save the currently rendered page as a static self-contained HTML file directly from the browser
+- **Session recorder** — automatically captures race results at session end from the AMS2 shared memory API; no external tool required
+- **Championship management** — create championships, assign recorded sessions to them, set points systems (F1 modern/classic or custom), and track status (Pending / Active / Finished)
+- **Championship standings** — per-championship driver standings computed from race results, with collapsible round-by-round detail
+- **Live session overlay** — real-time timing table powered by the `$pcars2$` shared memory API: position, lap count, gap to fastest, sector times (S1/S2/S3), best lap, and last lap for all active participants
+- **SecondMonitor import** — optional import of `Championships.xml` produced by Second Monitor, with full standings, constructor standings, round-by-round results grid, expandable event details, and driver portraits fetched from Wikipedia
+- **Driver statistics** — aggregated stats across all imported championships: races, wins, top-3/10 finishes, DNFs, championship podiums, and average finishing position
+- **Dark theme UI** — tab-based layout, collapsible sections, sortable stats table, progress bars, and badge indicators
+- **Download button** — save the page as a static self-contained HTML file directly from the browser
 
 ## Requirements
 
 - [Rust](https://www.rust-lang.org/tools/install) (stable, 2021 edition)
-- AMS2 monitored by [Second Monitor](https://gitlab.com/raceengineer1/second-monitor), which produces the `Championships.xml` save file
-- For the live session overlay: the server binary must be running while AMS2 is open (Windows only — reads the `$pcars2$` named shared memory)
+- Windows (the session recorder and live overlay read the `$pcars2$` named shared memory, which is Windows-only)
+- Second Monitor is **no longer required** — career data is recorded automatically by the server
 
 ## Build
 
@@ -31,13 +31,33 @@ cargo build --release
 
 ## Usage
 
-### Generate a static HTML file
+### Web server (recommended)
+
+```bash
+cargo run --release --bin ams2_championship_server -- [port]
+```
+
+Default port is `8080`. The server:
+
+1. Creates a `championships/` folder next to the executable on first run
+2. Loads existing career data from `championships/ams2_career.json`
+3. Starts a background session recorder that saves race results automatically when a race ends in AMS2
+4. Serves the UI at `http://127.0.0.1:8080/`
+
+```bash
+# with a custom port
+cargo run --release --bin ams2_championship_server -- 9000
+```
+
+Open `http://127.0.0.1:8080/` in a browser. Press **Ctrl+C** to stop.
+
+### Generate a static HTML file (SecondMonitor import only)
 
 ```bash
 cargo run --release --bin ams2_championship -- <path/to/Championships.xml>
 ```
 
-This generates `championships.html` in the current working directory. Open it in any browser.
+Generates `championships.html` in the current working directory. The static file includes the SecondMonitor Import tab but does not support live data or the career API.
 
 **Example** (default Second Monitor path on Windows):
 
@@ -45,31 +65,36 @@ This generates `championships.html` in the current working directory. Open it in
 cargo run --release --bin ams2_championship -- "%USERPROFILE%\OneDrive\Documents\SecondMonitor\Championships.xml"
 ```
 
-### Serve over HTTP (with live session overlay)
+### Server with SecondMonitor import
 
-```bash
-cargo run --release --bin ams2_championship_server -- <path/to/Championships.xml> [port]
-```
-
-Generates the HTML once at startup (including the Wikipedia portrait fetch) and serves it at `http://127.0.0.1:<port>/`. Default port is `8080`. While the server is running, the **Live Session** tab polls `/live` every 2 seconds to read current session data directly from AMS2.
+Pass the XML path as the first argument to also populate the SecondMonitor Import tab:
 
 ```bash
 cargo run --release --bin ams2_championship_server -- "%USERPROFILE%\OneDrive\Documents\SecondMonitor\Championships.xml" 8080
 ```
 
-Then open `http://127.0.0.1:8080/` in a browser. Press **Ctrl+C** to stop.
-
-## Output
-
-The generated HTML file contains three tabs:
+## UI tabs
 
 | Tab | Content |
 |---|---|
-| **Championships** | One collapsible section per championship (pending/active open by default, finished collapsed) with driver standings, optional constructor standings, a round-by-round results grid, and expandable event details |
-| **Driver Stats** | A sortable table aggregating stats for every driver across all championships |
-| **Live Session** | Real-time timing table, updated every 2 seconds from the AMS2 shared memory API (server mode only) |
+| **Live Session** | Real-time timing table, updated every 2 seconds from AMS2 shared memory (server mode only) |
+| **Championships** | Driver standings and round-by-round results for each championship created in the Manage tab |
+| **Manage** | Create championships, assign recorded sessions, edit points systems and status |
+| **SecondMonitor Import** | Data imported from a `Championships.xml` file (sub-tabs: Championships, Driver Stats) |
 
-### Driver Stats columns
+### Live Session columns
+
+| Column | Description |
+|---|---|
+| Pos | Current race/session position |
+| Driver | Participant name |
+| Lap | Current lap number |
+| Gap | Delta to the overall fastest lap set in the session |
+| S1 / S2 / S3 | Sector times — current lap sector when available, personal best otherwise. **Purple** = overall fastest sector; **green** = driver's personal best |
+| Best Lap | Driver's fastest lap of the session |
+| Last Lap | Driver's most recently completed lap time |
+
+### Driver Stats columns (SecondMonitor Import)
 
 | Column | Description |
 |---|---|
@@ -85,17 +110,27 @@ The generated HTML file contains three tabs:
 | Champ Top 10 | Top-10 championship finishes |
 | Avg Pos | Average finishing position |
 
-### Live Session columns
+## Career data
 
-| Column | Description |
-|---|---|
-| Pos | Current race/session position |
-| Driver | Participant name |
-| Lap | Current lap number |
-| Gap | Delta to the overall fastest lap set in the session |
-| S1 / S2 / S3 | Sector times — current lap sector when available, personal best otherwise. **Purple** = overall fastest sector; **green** = driver's personal best |
-| Best Lap | Driver's fastest lap of the session |
-| Last Lap | Driver's most recently completed lap time |
+Career data is stored as JSON in `championships/ams2_career.json` next to the server executable. The file is created automatically on first run and updated after every recorded race. It contains two top-level arrays:
+
+- **`sessions`** — each recorded race: track, timestamp, session type, and per-driver results (position, laps, fastest lap, last lap, DNF flag)
+- **`championships`** — each user-created championship: name, status, points system, and the ordered list of session IDs assigned to it
+
+## REST API
+
+The server exposes a JSON API used by the Manage and Championships tabs:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/sessions` | List all recorded sessions |
+| `GET` | `/api/championships` | List all championships |
+| `POST` | `/api/championships` | Create a championship (`{"name": "...", "points_system": [...]}`) |
+| `PATCH` | `/api/championships/:id` | Update name, status, or points system |
+| `DELETE` | `/api/championships/:id` | Delete a championship |
+| `POST` | `/api/championships/:id/sessions/:sid` | Assign a session to a championship |
+| `DELETE` | `/api/championships/:id/sessions/:sid` | Remove a session from a championship |
+| `GET` | `/live` | Current AMS2 session state (real-time telemetry) |
 
 ## Development
 
@@ -103,7 +138,7 @@ The generated HTML file contains three tabs:
 
 A `.vscode/launch.json` is included with two launch configurations selectable from the Run & Debug panel (Ctrl+Shift+D):
 
-- **ams2_championship (generate HTML)** — builds and runs the file generator (F5)
+- **ams2_championship (generate HTML)** — builds and runs the static file generator
 - **ams2_championship_server (serve on :8080)** — builds and starts the HTTP server
 
 Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
@@ -114,34 +149,42 @@ Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
 cargo test
 ```
 
-**Unit tests** cover the parsing helpers, stat computation logic (including DNF attribution, AI name merging, session filtering), and HTML generation.
+**Unit tests** (77 total) cover:
+- XML parsing helpers and session deserialization
+- Stat computation logic (DNF attribution, AI name merging, session filtering)
+- HTML generation functions (standings table, championship section, constructor standings, escaping)
+- Data store: JSON persistence round-trips, error recovery from invalid/missing files
+- HTTP request parsing: method, path, body extraction for all supported routes
+
 **Integration tests** run the full `convert` pipeline against a minimal fixture XML and assert on the generated HTML.
 
 ### Project structure
 
 ```
 src/
-  lib.rs                       # Library entry point, re-exports public functions
-  main.rs                      # Binary: generate HTML file
-  championship_html.rs         # XML parsing, stat computation, and HTML generation
-  ams2_shared_memory.rs        # AMS2 shared memory reader (Windows, $pcars2$ API)
+  lib.rs                         # Library entry point, re-exports public functions
+  main.rs                        # Binary: generate static HTML file
+  championship_html.rs           # SecondMonitor XML parsing, stat computation, HTML generation
+  ams2_shared_memory.rs          # AMS2 shared memory reader (Windows, $pcars2$ API)
+  data_store.rs                  # Career data model (sessions + championships), JSON persistence
+  session_recorder.rs            # Background thread: detects race end, captures results
   assets/
-    style.css                  # Embedded at compile time via include_str!
-    script.js                  # Embedded at compile time via include_str!
+    style.css                    # Embedded at compile time via include_str!
+    script.js                    # Embedded at compile time via include_str!
   bin/
-    ams2_championship_server.rs  # Binary: HTTP server + /live JSON endpoint
+    ams2_championship_server.rs  # Binary: HTTP server, REST API, session recorder startup
 tests/
-  integration_test.rs          # End-to-end tests against a fixture XML
+  integration_test.rs            # End-to-end tests against a fixture XML
   fixtures/
-    minimal.xml                # Minimal two-round championship fixture
+    minimal.xml                  # Minimal two-round championship fixture
 ```
 
 ## Dependencies
 
 | Crate | Purpose |
 |---|---|
-| [`quick-xml`](https://crates.io/crates/quick-xml) | XML deserialisation via serde |
+| [`quick-xml`](https://crates.io/crates/quick-xml) | XML deserialisation via serde (SecondMonitor import) |
 | [`serde`](https://crates.io/crates/serde) | Derive macros for XML and JSON serialisation |
-| [`serde_json`](https://crates.io/crates/serde_json) | JSON serialisation for the `/live` endpoint |
-| [`ureq`](https://crates.io/crates/ureq) | HTTP requests to the Wikipedia REST API |
+| [`serde_json`](https://crates.io/crates/serde_json) | JSON serialisation for the career API and `/live` endpoint |
+| [`ureq`](https://crates.io/crates/ureq) | HTTP requests to the Wikipedia REST API (driver portraits) |
 | [`windows-sys`](https://crates.io/crates/windows-sys) | Windows shared memory API (`OpenFileMappingW`, `MapViewOfFile`) — Windows target only |

@@ -821,20 +821,30 @@ fn generate_html(
 <header>
   <h1>AMS2 Career Championships</h1>
   <div class="tab-bar">
-    <button class="tab-btn tab-active" data-tab="championships">Championships</button>
-    <button class="tab-btn" data-tab="driver-stats">Driver Stats</button>
-    <button class="tab-btn" data-tab="live">&#9679; Live Session</button>
+    <button class="tab-btn tab-active" data-tab="live">&#9679; Live Session</button>
+    <button class="tab-btn" data-tab="career">&#127942; Championships</button>
+    <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
+    <button class="tab-btn" data-tab="import">SecondMonitor Import</button>
   </div>
 </header>
 <main>
-  <div id="tab-championships" class="tab-panel">
-    <nav><ul>{nav}</ul></nav>
-    {sections}
+  <div id="tab-import" class="tab-panel tab-panel-hidden">
+    <div class="sub-tab-bar">
+      <button class="sub-tab-btn sub-tab-active" data-subtab="championships">Championships</button>
+      <button class="sub-tab-btn" data-subtab="driver-stats">Driver Stats</button>
+    </div>
+    <div id="subtab-championships" class="sub-tab-panel">
+      <nav><ul>{nav}</ul></nav>
+      {sections}
+    </div>
+    <div id="subtab-driver-stats" class="sub-tab-panel sub-tab-panel-hidden">
+      {stats_section}
+    </div>
   </div>
-  <div id="tab-driver-stats" class="tab-panel tab-panel-hidden">
-    {stats_section}
+  <div id="tab-career" class="tab-panel tab-panel-hidden">
+    <div id="career-container"></div>
   </div>
-  <div id="tab-live" class="tab-panel tab-panel-hidden">
+  <div id="tab-live" class="tab-panel">
     <section class="live-section">
       <div id="live-status" class="live-status live-disconnected">
         <span class="live-dot"></span>
@@ -866,6 +876,44 @@ fn generate_html(
         </table>
       </div>
     </section>
+  </div>
+  <div id="tab-manage" class="tab-panel tab-panel-hidden">
+    <div class="manage-layout">
+      <div id="manage-new-form" class="manage-new-form" style="display:none">
+        <h3>New Championship</h3>
+        <div class="manage-form-row">
+          <input id="new-champ-name" type="text" placeholder="Championship name" class="manage-input" style="flex:1">
+          <select id="new-champ-points" class="manage-select">
+            <option value="25,18,15,12,10,8,6,4,2,1">F1 Modern (25-18-15&hellip;)</option>
+            <option value="10,6,4,3,2,1">F1 1991-2002 (10-6-4-3-2-1)</option>
+            <option value="9,6,4,3,2,1">F1 Classic (9-6-4-3-2-1)</option>
+            <option value="custom">Custom&hellip;</option>
+          </select>
+          <input id="new-champ-custom" type="text" placeholder="e.g. 25,18,15,12,10" class="manage-input" style="display:none;flex:1">
+          <button id="new-champ-save" class="manage-btn manage-btn-primary">Create</button>
+          <button id="new-champ-cancel" class="manage-btn">Cancel</button>
+        </div>
+      </div>
+      <div class="manage-columns">
+        <div class="manage-left">
+          <div class="manage-left-header">
+            <span>Championships</span>
+            <button id="add-champ-btn" class="manage-btn manage-btn-primary">+ New</button>
+          </div>
+          <div id="champ-list"></div>
+        </div>
+        <div class="manage-right" id="manage-right">
+          <div class="manage-placeholder">Select a championship or create a new one.</div>
+        </div>
+      </div>
+      <div id="manage-sessions-panel" class="manage-sessions-panel" style="display:none">
+        <div class="manage-sessions-header">
+          <span>Available Sessions</span>
+          <button id="close-sessions-btn" class="manage-btn">&#x2715; Close</button>
+        </div>
+        <div id="available-sessions"></div>
+      </div>
+    </div>
   </div>
 </main>
 <button id="download-btn" title="Download as static HTML file">&#11015; Download</button>
@@ -1438,5 +1486,210 @@ mod tests {
         let session = parse_session_xml(xml);
         let positions: Vec<u32> = session.results.iter().map(|r| r.finish_position).collect();
         assert_eq!(positions, vec![1, 2, 3]);
+    }
+
+    // ── compute_constructor_standings ─────────────────────────────────────────
+
+    fn make_result_with_car(name: &str, pos: u32, car: &str, pts: i32, skipped: bool) -> DriverResult {
+        DriverResult {
+            driver_guid: format!("guid-{}", name),
+            is_player: false,
+            finish_position: pos,
+            points_gain: pts,
+            driver_name: name.to_string(),
+            car_name: car.to_string(),
+            was_fastest_lap: false,
+            skipped,
+        }
+    }
+
+    fn make_event(results: Vec<DriverResult>) -> EventData {
+        EventData {
+            name: "Round 1".into(),
+            track: "Track".into(),
+            status: "Finished".into(),
+            date: "2025-01-01".into(),
+            sessions: vec![make_session("Race", 1.0, results)],
+        }
+    }
+
+    #[test]
+    fn test_constructor_standings_sums_points_by_car() {
+        let events = vec![make_event(vec![
+            make_result_with_car("Alice", 1, "Ferrari", 25, false),
+            make_result_with_car("Bob",   2, "Mercedes", 18, false),
+            make_result_with_car("Carol", 3, "Ferrari", 15, false),
+        ])];
+        let standings = compute_constructor_standings(&events);
+        let ferrari = standings.iter().find(|(c, _)| c == "Ferrari").map(|(_, p)| *p);
+        let mercedes = standings.iter().find(|(c, _)| c == "Mercedes").map(|(_, p)| *p);
+        assert_eq!(ferrari, Some(40));
+        assert_eq!(mercedes, Some(18));
+    }
+
+    #[test]
+    fn test_constructor_standings_sorted_descending() {
+        let events = vec![make_event(vec![
+            make_result_with_car("A", 1, "Alfa",    10, false),
+            make_result_with_car("B", 2, "BMW",     20, false),
+            make_result_with_car("C", 3, "Citroën", 15, false),
+        ])];
+        let standings = compute_constructor_standings(&events);
+        let pts: Vec<i32> = standings.iter().map(|(_, p)| *p).collect();
+        assert!(pts.windows(2).all(|w| w[0] >= w[1]), "standings must be sorted descending");
+    }
+
+    #[test]
+    fn test_constructor_standings_skipped_results_excluded() {
+        let events = vec![make_event(vec![
+            make_result_with_car("Alice", 1, "Ferrari", 25, false),
+            make_result_with_car("Bob",   2, "Ferrari", 18, true), // skipped
+        ])];
+        let standings = compute_constructor_standings(&events);
+        let ferrari_pts = standings.iter().find(|(c, _)| c == "Ferrari").map(|(_, p)| *p);
+        assert_eq!(ferrari_pts, Some(25), "skipped results must not count");
+    }
+
+    #[test]
+    fn test_constructor_standings_empty_car_name_excluded() {
+        let events = vec![make_event(vec![
+            make_result_with_car("Alice", 1, "",        25, false),
+            make_result_with_car("Bob",   2, "Ferrari", 18, false),
+        ])];
+        let standings = compute_constructor_standings(&events);
+        assert!(!standings.iter().any(|(c, _)| c.is_empty()), "empty car name must be excluded");
+        assert_eq!(standings.len(), 1);
+    }
+
+    #[test]
+    fn test_constructor_standings_empty_events_returns_empty() {
+        let standings = compute_constructor_standings(&[]);
+        assert!(standings.is_empty());
+    }
+
+    // ── generate_standings_table ──────────────────────────────────────────────
+
+    fn make_standing_with_pts(name: &str, pos: u32, pts: i32) -> DriverStanding {
+        DriverStanding {
+            position: pos,
+            name: name.to_string(),
+            total_points: pts,
+            is_player: false,
+            last_car: "Car".into(),
+            is_inactive: false,
+            guid: format!("guid-{}", name),
+        }
+    }
+
+    #[test]
+    fn test_generate_standings_table_contains_driver_names() {
+        let standings = vec![
+            make_standing_with_pts("Alice", 1, 50),
+            make_standing_with_pts("Bob",   2, 30),
+        ];
+        let html = generate_standings_table(&standings);
+        assert!(html.contains("Alice"));
+        assert!(html.contains("Bob"));
+    }
+
+    #[test]
+    fn test_generate_standings_table_contains_points() {
+        let standings = vec![make_standing_with_pts("Alice", 1, 75)];
+        let html = generate_standings_table(&standings);
+        assert!(html.contains("75"));
+    }
+
+    #[test]
+    fn test_generate_standings_table_inactive_drivers_excluded() {
+        let mut inactive = make_standing_with_pts("Ghost", 3, 10);
+        inactive.is_inactive = true;
+        let standings = vec![make_standing_with_pts("Alice", 1, 50), inactive];
+        let html = generate_standings_table(&standings);
+        assert!(!html.contains("Ghost"), "inactive drivers must not appear in standings");
+    }
+
+    #[test]
+    fn test_generate_standings_table_player_marked() {
+        let mut s = make_standing_with_pts("Player1", 1, 100);
+        s.is_player = true;
+        let html = generate_standings_table(&[s]);
+        assert!(html.contains("player-row") || html.contains("YOU"));
+    }
+
+    #[test]
+    fn test_generate_standings_table_escapes_html() {
+        let standings = vec![make_standing_with_pts("<b>Evil</b>", 1, 10)];
+        let html = generate_standings_table(&standings);
+        assert!(!html.contains("<b>"), "driver name must be HTML-escaped");
+        assert!(html.contains("&lt;b&gt;"));
+    }
+
+    // ── generate_championship_section ─────────────────────────────────────────
+
+    #[test]
+    fn test_championship_section_contains_name() {
+        let c = make_champ("Active", vec![make_standing("Alice", 1, false)], vec![]);
+        let html = generate_championship_section(0, &c);
+        assert!(html.contains("Test Champ"));
+    }
+
+    #[test]
+    fn test_championship_section_active_is_open() {
+        let c = make_champ("Active", vec![], vec![]);
+        let html = generate_championship_section(0, &c);
+        assert!(html.contains("<details") && html.contains(" open"));
+    }
+
+    #[test]
+    fn test_championship_section_finished_is_closed() {
+        let c = make_champ("Finished", vec![], vec![]);
+        let html = generate_championship_section(0, &c);
+        // A closed <details> has no `open` attribute
+        assert!(!html.contains(" open"));
+    }
+
+    #[test]
+    fn test_championship_section_has_status_badge() {
+        let c = make_champ("Active", vec![], vec![]);
+        let html = generate_championship_section(0, &c);
+        assert!(html.contains("badge-active"));
+    }
+
+    #[test]
+    fn test_championship_section_escapes_name() {
+        let mut c = make_champ("Active", vec![], vec![]);
+        c.name = "M&M's <Special>".into();
+        let html = generate_championship_section(0, &c);
+        assert!(!html.contains("<Special>"), "name must be HTML-escaped");
+        assert!(html.contains("M&amp;M"));
+    }
+
+    #[test]
+    fn test_championship_section_manufacturer_scoring_shows_constructor_panel() {
+        let mut c = make_champ(
+            "Active",
+            vec![],
+            vec![make_session("Race", 1.0, vec![
+                make_result_with_car("Alice", 1, "Ferrari", 25, false),
+                make_result_with_car("Bob",   2, "Renault", 18, false),
+            ])],
+        );
+        c.manufacturer_scoring = true;
+        let html = generate_championship_section(0, &c);
+        assert!(html.contains("Constructor"), "constructor panel must be present when manufacturer scoring is on");
+    }
+
+    #[test]
+    fn test_championship_section_no_manufacturer_scoring_hides_constructor_panel() {
+        let c = make_champ(
+            "Active",
+            vec![],
+            vec![make_session("Race", 1.0, vec![
+                make_result_with_car("Alice", 1, "Ferrari", 25, false),
+            ])],
+        );
+        // manufacturer_scoring defaults to false in make_champ
+        let html = generate_championship_section(0, &c);
+        assert!(!html.contains("Constructor"));
     }
 }
