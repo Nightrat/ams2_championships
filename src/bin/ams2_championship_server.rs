@@ -94,6 +94,8 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_pa
             name: String,
             #[serde(default)]
             points_system: Vec<i32>,
+            #[serde(default)]
+            manufacturer_scoring: bool,
         }
         let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
             json_err(&mut stream, "400 Bad Request", "invalid body");
@@ -113,12 +115,33 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_pa
             } else {
                 body.points_system
             },
+            manufacturer_scoring: body.manufacturer_scoring,
+            rounds: vec![],
             session_ids: vec![],
         };
         let json = serde_json::to_vec(&champ).unwrap_or_default();
         store.write().unwrap().championships.push(champ);
         persist(&store, &data_path);
         json_ok(&mut stream, &json);
+        return;
+    }
+
+    // DELETE /api/sessions/unassigned — remove all sessions not in any round
+    if method == "DELETE" && path == "/api/sessions/unassigned" {
+        let mut data = store.write().unwrap();
+        let assigned: std::collections::HashSet<String> = data
+            .championships
+            .iter()
+            .flat_map(|c| c.rounds.iter())
+            .flat_map(|r| r.session_ids.iter().cloned())
+            .collect();
+        let before = data.sessions.len();
+        data.sessions.retain(|s| assigned.contains(&s.id));
+        let removed = before - data.sessions.len();
+        drop(data);
+        persist(&store, &data_path);
+        let body = format!("{{\"removed\":{removed}}}");
+        json_ok(&mut stream, body.as_bytes());
         return;
     }
 
@@ -133,6 +156,7 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_pa
             name: Option<String>,
             status: Option<String>,
             points_system: Option<Vec<i32>>,
+            manufacturer_scoring: Option<bool>,
         }
         let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
             json_err(&mut stream, "400 Bad Request", "invalid body");
@@ -146,6 +170,7 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_pa
         if let Some(name) = body.name { champ.name = name; }
         if let Some(status) = body.status { champ.status = status; }
         if let Some(ps) = body.points_system { champ.points_system = ps; }
+        if let Some(ms) = body.manufacturer_scoring { champ.manufacturer_scoring = ms; }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         persist(&store, &data_path);
@@ -169,21 +194,73 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_pa
         return;
     }
 
-    // POST /api/championships/:id/sessions/:sid — assign session
+    // POST /api/championships/:id/rounds — add a new empty round
     if method == "POST"
-        && segs.len() == 5
+        && segs.len() == 4
         && segs[0] == "api"
         && segs[1] == "championships"
-        && segs[3] == "sessions"
+        && segs[3] == "rounds"
     {
-        let (id, sid) = (segs[2], segs[4]);
+        let id = segs[2];
         let mut data = store.write().unwrap();
         let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
             json_err(&mut stream, "404 Not Found", "not found");
             return;
         };
-        if !champ.session_ids.contains(&sid.to_string()) {
-            champ.session_ids.push(sid.to_string());
+        champ.rounds.push(ams2_championship::data_store::Round::default());
+        let json = serde_json::to_vec(&*champ).unwrap_or_default();
+        drop(data);
+        persist(&store, &data_path);
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // DELETE /api/championships/:id/rounds/:ridx — remove a round
+    if method == "DELETE"
+        && segs.len() == 5
+        && segs[0] == "api"
+        && segs[1] == "championships"
+        && segs[3] == "rounds"
+    {
+        let (id, ridx) = (segs[2], segs[4].parse::<usize>().unwrap_or(usize::MAX));
+        let mut data = store.write().unwrap();
+        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        if ridx >= champ.rounds.len() {
+            json_err(&mut stream, "404 Not Found", "round not found");
+            return;
+        }
+        champ.rounds.remove(ridx);
+        let json = serde_json::to_vec(&*champ).unwrap_or_default();
+        drop(data);
+        persist(&store, &data_path);
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // POST /api/championships/:id/rounds/:ridx/sessions/:sid — add session to round
+    if method == "POST"
+        && segs.len() == 7
+        && segs[0] == "api"
+        && segs[1] == "championships"
+        && segs[3] == "rounds"
+        && segs[5] == "sessions"
+    {
+        let (id, ridx, sid) = (segs[2], segs[4].parse::<usize>().unwrap_or(usize::MAX), segs[6]);
+        let mut data = store.write().unwrap();
+        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        if ridx >= champ.rounds.len() {
+            json_err(&mut stream, "404 Not Found", "round not found");
+            return;
+        }
+        let round = &mut champ.rounds[ridx];
+        if !round.session_ids.contains(&sid.to_string()) {
+            round.session_ids.push(sid.to_string());
         }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
@@ -192,20 +269,25 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_pa
         return;
     }
 
-    // DELETE /api/championships/:id/sessions/:sid — unassign session
+    // DELETE /api/championships/:id/rounds/:ridx/sessions/:sid — remove session from round
     if method == "DELETE"
-        && segs.len() == 5
+        && segs.len() == 7
         && segs[0] == "api"
         && segs[1] == "championships"
-        && segs[3] == "sessions"
+        && segs[3] == "rounds"
+        && segs[5] == "sessions"
     {
-        let (id, sid) = (segs[2], segs[4]);
+        let (id, ridx, sid) = (segs[2], segs[4].parse::<usize>().unwrap_or(usize::MAX), segs[6]);
         let mut data = store.write().unwrap();
         let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
             json_err(&mut stream, "404 Not Found", "not found");
             return;
         };
-        champ.session_ids.retain(|s| s != sid);
+        if ridx >= champ.rounds.len() {
+            json_err(&mut stream, "404 Not Found", "round not found");
+            return;
+        }
+        champ.rounds[ridx].session_ids.retain(|s| s != sid);
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         persist(&store, &data_path);
@@ -309,10 +391,19 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_path_segments_for_routing() {
-        let r = req(b"POST /api/championships/42/sessions/7 HTTP/1.1\r\n\r\n");
+    fn test_parse_path_segments_round_session_route() {
+        let r = req(b"POST /api/championships/42/rounds/0/sessions/7 HTTP/1.1\r\n\r\n");
         let segs: Vec<&str> = r.path.trim_start_matches('/').split('/').collect();
-        assert_eq!(segs, ["api", "championships", "42", "sessions", "7"]);
+        assert_eq!(segs, ["api", "championships", "42", "rounds", "0", "sessions", "7"]);
+        assert_eq!(segs.len(), 7);
+    }
+
+    #[test]
+    fn test_parse_path_segments_add_round_route() {
+        let r = req(b"POST /api/championships/42/rounds HTTP/1.1\r\n\r\n");
+        let segs: Vec<&str> = r.path.trim_start_matches('/').split('/').collect();
+        assert_eq!(segs, ["api", "championships", "42", "rounds"]);
+        assert_eq!(segs.len(), 4);
     }
 }
 
@@ -350,11 +441,11 @@ fn main() {
         Some(xml_path) => match ams2_championship::build_html_from_xml(xml_path) {
             Ok(h) => h.into_bytes(),
             Err(e) => {
-                eprintln!("Warning: could not read XML ({e}) — championship tab will be empty");
-                b"<html><body>No championship XML provided.</body></html>".to_vec()
+                eprintln!("Warning: could not read XML ({e}) — SecondMonitor Import tab will be empty");
+                ams2_championship::build_base_html().into_bytes()
             }
         },
-        None => b"<html><body>No championship XML provided.</body></html>".to_vec(),
+        None => ams2_championship::build_base_html().into_bytes(),
     });
 
     let listener = match TcpListener::bind(format!("127.0.0.1:{port}")) {

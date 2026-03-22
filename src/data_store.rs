@@ -27,7 +27,14 @@ pub struct RecordedSession {
     pub results: Vec<SessionResult>,
 }
 
-/// User-created championship grouping a set of recorded sessions.
+/// A championship round — groups one or more sessions (Practice / Qualify / Race).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct Round {
+    /// Session IDs that belong to this round, in any order.
+    pub session_ids: Vec<String>,
+}
+
+/// User-created championship grouping a set of rounds.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Championship {
     pub id: String,
@@ -36,7 +43,14 @@ pub struct Championship {
     pub status: String,
     /// Points awarded for positions 1, 2, 3, … (may be shorter than field size).
     pub points_system: Vec<i32>,
-    /// Ordered list of session IDs assigned to this championship.
+    /// Whether to compute and display constructor (manufacturer) standings.
+    #[serde(default)]
+    pub manufacturer_scoring: bool,
+    /// Ordered list of rounds.  Each round groups a Practice / Qualify / Race set.
+    #[serde(default)]
+    pub rounds: Vec<Round>,
+    /// Legacy flat session list — migrated to rounds on load, never written back.
+    #[serde(default, skip_serializing)]
     pub session_ids: Vec<String>,
 }
 
@@ -50,12 +64,22 @@ pub struct CareerData {
 pub type SharedStore = Arc<RwLock<CareerData>>;
 
 pub fn load_store(path: &PathBuf) -> SharedStore {
-    let data = if path.exists() {
+    let mut data: CareerData = if path.exists() {
         let content = fs::read_to_string(path).unwrap_or_default();
         serde_json::from_str(&content).unwrap_or_default()
     } else {
         CareerData::default()
     };
+    // Migrate legacy flat session_ids → one round per session.
+    for champ in &mut data.championships {
+        if champ.rounds.is_empty() && !champ.session_ids.is_empty() {
+            champ.rounds = champ
+                .session_ids
+                .drain(..)
+                .map(|sid| Round { session_ids: vec![sid] })
+                .collect();
+        }
+    }
     Arc::new(RwLock::new(data))
 }
 
@@ -87,6 +111,8 @@ mod tests {
             name: "Formula Test".into(),
             status: "Active".into(),
             points_system: vec![25, 18, 15, 12, 10],
+            manufacturer_scoring: false,
+            rounds: vec![Round { session_ids: vec!["100".into()] }],
             session_ids: vec!["100".into()],
         }
     }
@@ -164,7 +190,9 @@ mod tests {
         assert_eq!(data.championships.len(), 1);
         assert_eq!(data.championships[0].name, "Formula Test");
         assert_eq!(data.championships[0].points_system, vec![25, 18, 15, 12, 10]);
-        assert_eq!(data.championships[0].session_ids, vec!["100"]);
+        // session_ids is skip_serializing; rounds persist instead
+        assert_eq!(data.championships[0].rounds.len(), 1);
+        assert_eq!(data.championships[0].rounds[0].session_ids, vec!["100"]);
         fs::remove_file(&path).ok();
     }
 

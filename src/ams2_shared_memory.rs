@@ -5,6 +5,8 @@ use serde::Serialize;
 pub struct ParticipantData {
     pub name: String,
     pub is_active: bool,
+    /// True when this participant is the viewed/human player (mViewedParticipantIndex).
+    pub is_player: bool,
     pub race_position: u32,
     pub laps_completed: u32,
     pub current_lap: u32,
@@ -23,7 +25,7 @@ pub struct ParticipantData {
 }
 
 /// Snapshot of the current AMS2 session state.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct LiveSessionData {
     pub connected: bool,
     pub game_state: u32,
@@ -92,6 +94,7 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_GAME_STATE: usize = 8;
     const OFF_SESSION_STATE: usize = 12;
     const OFF_RACE_STATE: usize = 16;
+    const OFF_VIEWED_PARTICIPANT: usize = 20;
     const OFF_NUM_PARTICIPANTS: usize = 24;
     const OFF_PARTICIPANTS: usize = 28;
     const OFF_TRACK_LOCATION: usize = 6576;
@@ -170,6 +173,7 @@ pub fn read_live_session() -> LiveSessionData {
         let game_state = ru32(ptr, OFF_GAME_STATE);
         let session_state = ru32(ptr, OFF_SESSION_STATE);
         let race_state = ru32(ptr, OFF_RACE_STATE);
+        let viewed_idx = ri32(ptr, OFF_VIEWED_PARTICIPANT);
         let num_participants = ri32(ptr, OFF_NUM_PARTICIPANTS).clamp(0, 64);
         let track_location = rstr(ptr, OFF_TRACK_LOCATION, 64);
         let track_length = rf32(ptr, OFF_TRACK_LENGTH);
@@ -188,6 +192,7 @@ pub fn read_live_session() -> LiveSessionData {
             participants.push(ParticipantData {
                 name,
                 is_active,
+                is_player: i as i32 == viewed_idx,
                 race_position: ru32(ptr, base + P_RACE_POS),
                 laps_completed: ru32(ptr, base + P_LAPS_DONE),
                 current_lap: ru32(ptr, base + P_CUR_LAP),

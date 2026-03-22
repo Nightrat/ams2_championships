@@ -854,6 +854,7 @@ fn generate_html(
         <span id="live-session-type"></span>
         <span id="live-race-state"></span>
         <span id="live-track" class="live-track"></span>
+        <span id="live-raw-states" class="live-raw-states"></span>
       </div>
       <div class="grid-scroll">
         <table id="live-table" class="live-table">
@@ -890,6 +891,7 @@ fn generate_html(
             <option value="custom">Custom&hellip;</option>
           </select>
           <input id="new-champ-custom" type="text" placeholder="e.g. 25,18,15,12,10" class="manage-input" style="display:none;flex:1">
+          <label class="manage-checkbox-label"><input type="checkbox" id="new-champ-manufacturer"> Constructor Scoring</label>
           <button id="new-champ-save" class="manage-btn manage-btn-primary">Create</button>
           <button id="new-champ-cancel" class="manage-btn">Cancel</button>
         </div>
@@ -905,6 +907,9 @@ fn generate_html(
         <div class="manage-right" id="manage-right">
           <div class="manage-placeholder">Select a championship or create a new one.</div>
         </div>
+      </div>
+      <div class="manage-danger-zone">
+        <button id="purge-sessions-btn" class="manage-btn manage-btn-danger">&#x1f5d1; Delete unassigned sessions</button>
       </div>
       <div id="manage-sessions-panel" class="manage-sessions-panel" style="display:none">
         <div class="manage-sessions-header">
@@ -928,7 +933,13 @@ fn generate_html(
     )
 }
 
-// ── Entry point ──────────────────────────────────────────────────────────────
+// ── Entry points ─────────────────────────────────────────────────────────────
+
+/// Generate the full page with no SecondMonitor import data.
+/// Used when the server is started without an XML file.
+pub fn build_base_html() -> String {
+    generate_html(&[], &[], &std::collections::HashMap::new())
+}
 
 pub fn build_html_from_xml(xml_path: &str) -> Result<String, Box<dyn std::error::Error>> {
     let xml = fs::read_to_string(xml_path)?;

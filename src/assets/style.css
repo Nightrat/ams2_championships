@@ -483,7 +483,14 @@ table { border-collapse: collapse; width: 100%; }
   margin-bottom: 1rem;
   display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
   align-items: center;
+}
+.live-raw-states {
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: #555;
+  letter-spacing: 0.03em;
 }
 
 #live-session-type {
@@ -622,6 +629,60 @@ table { border-collapse: collapse; width: 100%; }
 }
 .champ-sessions-list { display: flex; flex-direction: column; gap: 0.5rem; }
 
+/* Round blocks in the Manage tab */
+.champ-rounds-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0 0.5rem;
+  border-top: 1px solid #2a2a4a;
+  font-size: 0.8rem;
+  color: #95a5a6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.champ-rounds-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.round-block {
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.round-block-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #111122;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid #2a2a4a;
+}
+.round-block-title {
+  font-weight: 700;
+  color: #e74c3c;
+  font-size: 0.85rem;
+  flex: 1;
+}
+.round-block-sessions { padding: 0.5rem 0.85rem; display: flex; flex-direction: column; gap: 0.4rem; }
+
+/* Session-type badge: P / Q / R */
+.session-type-badge {
+  display: inline-block;
+  background: #1a1a2a;
+  border: 1px solid #3a3a5a;
+  border-radius: 3px;
+  color: #e74c3c;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  min-width: 1.4rem;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+/* Round session sub-row (career Championships view) */
+.round-session { margin-bottom: 0.5rem; }
+.round-session-label { font-size: 0.8rem; color: #95a5a6; margin-bottom: 0.25rem; }
+
 .session-card {
   display: flex;
   justify-content: space-between;
@@ -711,6 +772,7 @@ table { border-collapse: collapse; width: 100%; }
 .manage-btn-danger:hover { background: #3a1515; }
 
 .manage-empty { color: #555; font-style: italic; padding: 0.75rem 0; font-size: 0.85rem; }
+.manage-danger-zone { padding: 0.75rem 1.25rem; border-top: 1px solid #2a2a4a; }
 
 /* ── Sub-tabs (SecondMonitor Import) ─────────────────────────────────────── */
 .sub-tab-bar {
@@ -739,3 +801,19 @@ table { border-collapse: collapse; width: 100%; }
 .sub-tab-active { background: #1a1a2a !important; color: #e0e0e0 !important; border-color: #3a3a5a; }
 
 .sub-tab-panel-hidden { display: none; }
+
+/* Manage checkbox */
+.manage-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #bdc3c7;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.manage-checkbox-label input[type="checkbox"] { accent-color: #e74c3c; cursor: pointer; }
+
+/* Player row highlight in live table */
+#live-table .player-row td { background: #1a1a30; }
+#live-table .player-row .live-name { font-weight: 700; color: #e0e0e0; }

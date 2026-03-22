@@ -73,13 +73,14 @@
     fetch('/live')
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        var statusEl  = document.getElementById('live-status');
-        var statusTxt = document.getElementById('live-status-text');
-        var infoEl    = document.getElementById('live-info');
-        var liveBody  = document.getElementById('live-tbody');
-        var sessType  = document.getElementById('live-session-type');
-        var raceState = document.getElementById('live-race-state');
-        var trackEl   = document.getElementById('live-track');
+        var statusEl   = document.getElementById('live-status');
+        var statusTxt  = document.getElementById('live-status-text');
+        var infoEl     = document.getElementById('live-info');
+        var liveBody   = document.getElementById('live-tbody');
+        var sessType   = document.getElementById('live-session-type');
+        var raceState  = document.getElementById('live-race-state');
+        var trackEl    = document.getElementById('live-track');
+        var rawStates  = document.getElementById('live-raw-states');
         if (!statusEl || !liveBody) return;
 
         if (!d.connected || d.game_state < 2) {
@@ -93,8 +94,11 @@
         statusEl.className = 'live-status live-connected';
         statusTxt.textContent = 'Connected';
         sessType.textContent = SESSION_NAMES[d.session_state] || ('Session ' + d.session_state);
-        raceState.textContent = RACE_NAMES[d.race_state] || '';
+        // race_state is only meaningful for race sessions; hide it otherwise to avoid "Not Started" showing during practice.
+        raceState.textContent = d.session_state === 5 ? (RACE_NAMES[d.race_state] || '') : '';
         if (trackEl) trackEl.textContent = d.track_location || '';
+        if (rawStates) rawStates.textContent =
+          'game:' + d.game_state + '  session:' + d.session_state + '  race:' + d.race_state;
         infoEl.style.visibility = '';
 
         if (!d.participants || d.participants.length === 0) {
@@ -139,9 +143,11 @@
 
         liveBody.innerHTML = d.participants.map(function (p) {
           var pos = p.race_position > 0 ? p.race_position : '\u2014';
-          return '<tr>' +
+          var rowCls = p.is_player ? ' class="player-row"' : '';
+          var nameSuffix = p.is_player ? ' <span class="player-tag">YOU</span>' : '';
+          return '<tr' + rowCls + '>' +
             '<td class="live-pos">'  + pos + '</td>' +
-            '<td class="live-name">' + p.name + '</td>' +
+            '<td class="live-name">' + p.name + nameSuffix + '</td>' +
             '<td class="live-num">'  + p.current_lap + '</td>' +
             '<td class="live-gap">'  + fmtGap(p) + '</td>' +
             '<td class="live-time">' + fmtSector(p.cur_s1, p.best_s1, bestS1) + '</td>' +
@@ -172,17 +178,22 @@
 
   // ── Career Championships tab ───────────────────────────────────────────────
 
+  var SESSION_TYPE_LABELS = { 1: 'P', 3: 'Q', 5: 'R' };
+  var SESSION_TYPE_NAMES  = { 1: 'Practice', 3: 'Qualify', 5: 'Race' };
+
   function careerComputeStandings(champ, sessions) {
     var pts = {}, wins = {};
-    champ.session_ids.forEach(function (sid) {
-      var s = sessions.find(function (s) { return s.id === sid; });
-      if (!s) return;
-      s.results.forEach(function (r) {
-        if (!pts[r.name]) { pts[r.name] = 0; wins[r.name] = 0; }
-        if (!r.dnf) {
-          pts[r.name] += champ.points_system[r.race_position - 1] || 0;
-          if (r.race_position === 1) wins[r.name]++;
-        }
+    (champ.rounds || []).forEach(function (round) {
+      (round.session_ids || []).forEach(function (sid) {
+        var s = sessions.find(function (s) { return s.id === sid; });
+        if (!s || s.session_type !== 5) return; // only race sessions score points
+        s.results.forEach(function (r) {
+          if (!pts[r.name]) { pts[r.name] = 0; wins[r.name] = 0; }
+          if (!r.dnf) {
+            pts[r.name] += champ.points_system[r.race_position - 1] || 0;
+            if (r.race_position === 1) wins[r.name]++;
+          }
+        });
       });
     });
     return Object.keys(pts).map(function (name) {
@@ -206,40 +217,62 @@
   }
 
   function careerRoundsHtml(champ, sessions) {
-    var assigned = champ.session_ids
-      .map(function (sid) { return sessions.find(function (s) { return s.id === sid; }); })
-      .filter(Boolean);
-    if (!assigned.length) return '<p class="manage-empty">No rounds assigned yet.</p>';
+    var rounds = champ.rounds || [];
+    if (!rounds.length) return '<p class="manage-empty">No rounds assigned yet.</p>';
 
-    var rows = assigned.map(function (s, idx) {
-      var winner = s.results.find(function (r) { return r.race_position === 1; });
-      var resultRows = s.results
-        .slice()
-        .sort(function (a, b) { return a.race_position - b.race_position; })
-        .map(function (r) {
-          var fl = r.fastest_lap > 0 ? fmtLapTime(r.fastest_lap) : '\u2014';
+    var rows = rounds.map(function (round, rIdx) {
+      var roundSessions = (round.session_ids || [])
+        .map(function (sid) { return sessions.find(function (s) { return s.id === sid; }); })
+        .filter(Boolean)
+        .sort(function (a, b) { return a.session_type - b.session_type; });
+      if (!roundSessions.length) return '';
+
+      var raceSess = roundSessions.find(function (s) { return s.session_type === 5; });
+      var trackName = raceSess
+        ? raceSess.track
+        : (roundSessions[0] ? roundSessions[0].track : 'Unknown');
+      var winner = raceSess
+        ? raceSess.results.find(function (r) { return r.race_position === 1; })
+        : null;
+
+      var sessionsHtml = roundSessions.map(function (s) {
+        var typeLabel = SESSION_TYPE_LABELS[s.session_type] || '?';
+        var typeName  = SESSION_TYPE_NAMES[s.session_type]  || 'Session';
+        var isRace    = s.session_type === 5;
+
+        var sorted = s.results.slice().sort(function (a, b) { return a.race_position - b.race_position; });
+        var resultRows = sorted.map(function (r, idx) {
+          var pos = r.race_position > 0 ? r.race_position : (idx + 1);
+          var fl  = r.fastest_lap > 0 ? fmtLapTime(r.fastest_lap) : '\u2014';
           var dnf = r.dnf ? ' <span class="badge badge-pending">DNF</span>' : '';
-          return '<tr><td class="pos">' + r.race_position + '</td>' +
+          var pts = isRace ? '<td class="pts">' + (champ.points_system[r.race_position - 1] || 0) + '</td>' : '';
+          return '<tr><td class="pos">' + pos + '</td>' +
             '<td>' + esc(r.name) + dnf + '</td>' +
-            '<td class="pts">' + (champ.points_system[r.race_position - 1] || 0) + '</td>' +
+            pts +
             '<td class="car">' + fl + '</td></tr>';
         }).join('');
 
+        var ptsHeader = isRace ? '<th>Pts</th>' : '';
+        return '<div class="round-session">' +
+          '<div class="round-session-label"><span class="session-type-badge">' + typeLabel + '</span> ' + typeName +
+            ' <span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
+            ' <span class="session-drivers">' + s.results.length + ' drivers</span>' +
+          '</div>' +
+          '<table class="standings-table"><thead><tr><th>Pos</th><th>Driver</th>' + ptsHeader + '<th>Best Lap</th></tr></thead>' +
+          '<tbody>' + resultRows + '</tbody></table></div>';
+      }).join('');
+
       return '<details class="events-detail">' +
-        '<summary>R' + (idx + 1) + ' \u2014 ' + esc(s.track) +
-          ' <span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
+        '<summary>R' + (rIdx + 1) + ' \u2014 ' + esc(trackName) +
           (winner ? ' &nbsp;&#127942; ' + esc(winner.name) : '') +
         '</summary>' +
-        '<div class="events-grid">' +
-          '<table class="standings-table">' +
-            '<thead><tr><th>Pos</th><th>Driver</th><th>Pts</th><th>Best Lap</th></tr></thead>' +
-            '<tbody>' + resultRows + '</tbody>' +
-          '</table>' +
-        '</div>' +
+        '<div class="events-grid">' + sessionsHtml + '</div>' +
         '</details>';
-    }).join('');
+    }).filter(Boolean).join('');
 
-    return '<div class="champ-sessions-list">' + rows + '</div>';
+    return rows
+      ? '<div class="champ-sessions-list">' + rows + '</div>'
+      : '<p class="manage-empty">No rounds assigned yet.</p>';
   }
 
   function renderCareerChampionships(champs, sessions) {
@@ -262,7 +295,7 @@
           '</div>' +
           '<div class="champ-meta">' +
             '<span>Points: ' + esc(champ.points_system.slice(0, 5).join('\u2013') + (champ.points_system.length > 5 ? '\u2026' : '')) + '</span>' +
-            '<span>Rounds: ' + champ.session_ids.length + '</span>' +
+            '<span>Rounds: ' + (champ.rounds || []).length + '</span>' +
           '</div>' +
         '</summary>' +
         '<div class="champ-body">' +
@@ -292,7 +325,7 @@
   });
 
   // ── Manage tab ─────────────────────────────────────────────────────────────
-  var manageState = { champs: [], sessions: [], selectedId: null };
+  var manageState = { champs: [], sessions: [], selectedId: null, currentRidx: 0 };
 
   function esc(str) {
     return String(str)
@@ -359,9 +392,39 @@
     var right = document.getElementById('manage-right');
     if (!champ || !right) return;
 
-    var assignedSessions = champ.session_ids
-      .map(function (sid) { return manageState.sessions.find(function (s) { return s.id === sid; }); })
-      .filter(Boolean);
+    var rounds = champ.rounds || [];
+
+    var roundsHtml = rounds.length === 0
+      ? '<div class="manage-empty">No rounds yet. Click \u201c+ Add Round\u201d to create one.</div>'
+      : rounds.map(function (round, rIdx) {
+          var roundSessions = (round.session_ids || [])
+            .map(function (sid) { return manageState.sessions.find(function (s) { return s.id === sid; }); })
+            .filter(Boolean);
+
+          var sessionCards = roundSessions.map(function (s) {
+            var typeLabel = SESSION_TYPE_LABELS[s.session_type] || '?';
+            return '<div class="session-card">' +
+              '<div class="session-card-info">' +
+                '<span class="session-type-badge">' + typeLabel + '</span>' +
+                '<span class="session-track">' + esc(s.track) + '</span>' +
+                '<span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
+                '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
+                '<span class="session-winner">\u{1f3c6} ' + esc(sessionWinner(s)) + '</span>' +
+              '</div>' +
+              '<button class="manage-btn manage-btn-danger session-remove-btn"' +
+                ' data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '" data-sid="' + esc(s.id) + '">Remove</button>' +
+              '</div>';
+          }).join('') || '<div class="manage-empty">No sessions in this round.</div>';
+
+          return '<div class="round-block">' +
+            '<div class="round-block-header">' +
+              '<span class="round-block-title">Round ' + (rIdx + 1) + '</span>' +
+              '<button class="manage-btn manage-btn-primary show-sessions-btn" data-ridx="' + rIdx + '">+ Add Session</button>' +
+              '<button class="manage-btn manage-btn-danger round-remove-btn" data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '">Remove Round</button>' +
+            '</div>' +
+            '<div class="round-block-sessions">' + sessionCards + '</div>' +
+            '</div>';
+        }).join('');
 
     right.innerHTML =
       '<div class="champ-detail">' +
@@ -376,29 +439,14 @@
           }).join('') +
         '</select></label>' +
         '<label>Points&nbsp;<input class="manage-input champ-points-input" value="' + esc(champ.points_system.join(',')) + '" data-id="' + esc(champ.id) + '" size="32" title="Comma-separated points per finishing position"></label>' +
+        '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
       '</div>' +
-      '<div class="champ-sessions-header">' +
-        '<span>Rounds&nbsp;(' + assignedSessions.length + ')</span>' +
-        '<button class="manage-btn manage-btn-primary show-sessions-btn">+ Add Sessions</button>' +
+      '<div class="champ-rounds-header">' +
+        '<span>Rounds&nbsp;(' + rounds.length + ')</span>' +
+        '<button class="manage-btn manage-btn-primary add-round-btn" data-cid="' + esc(champ.id) + '">+ Add Round</button>' +
       '</div>' +
-      '<div class="champ-sessions-list">' +
-        (assignedSessions.length === 0
-          ? '<div class="manage-empty">No sessions assigned yet.</div>'
-          : assignedSessions.map(function (s, idx) {
-              return '<div class="session-card">' +
-                '<div class="session-card-info">' +
-                  '<span class="session-round">R' + (idx + 1) + '</span>' +
-                  '<span class="session-track">' + esc(s.track) + '</span>' +
-                  '<span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
-                  '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
-                  '<span class="session-winner">\u{1f3c6} ' + esc(sessionWinner(s)) + '</span>' +
-                '</div>' +
-                '<button class="manage-btn manage-btn-danger session-remove-btn"' +
-                  ' data-cid="' + esc(champ.id) + '" data-sid="' + esc(s.id) + '">Remove</button>' +
-                '</div>';
-            }).join('')
-        ) +
-      '</div></div>';
+      '<div class="champ-rounds-list">' + roundsHtml + '</div>' +
+      '</div>';
 
     right.querySelector('.champ-name-input').addEventListener('blur', function () {
       patchChamp(champ.id, { name: this.value });
@@ -412,6 +460,9 @@
         .filter(function (n) { return !isNaN(n); });
       patchChamp(champ.id, { points_system: pts });
     });
+    right.querySelector('.champ-manufacturer-check').addEventListener('change', function () {
+      patchChamp(champ.id, { manufacturer_scoring: this.checked });
+    });
     right.querySelector('.champ-delete-btn').addEventListener('click', function () {
       if (!confirm('Delete "' + champ.name + '"?')) return;
       fetch('/api/championships/' + champ.id, { method: 'DELETE' }).then(function () {
@@ -421,24 +472,45 @@
         if (right) right.innerHTML = '<div class="manage-placeholder">Select a championship or create a new one.</div>';
       });
     });
-    right.querySelectorAll('.session-remove-btn').forEach(function (btn) {
+    right.querySelector('.add-round-btn').addEventListener('click', function () {
+      fetch('/api/championships/' + champ.id + '/rounds', { method: 'POST' })
+        .then(function () { loadManage(); });
+    });
+    right.querySelectorAll('.round-remove-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        fetch('/api/championships/' + btn.dataset.cid + '/sessions/' + btn.dataset.sid,
+        if (!confirm('Remove round ' + (+btn.dataset.ridx + 1) + ' and all its sessions?')) return;
+        fetch('/api/championships/' + btn.dataset.cid + '/rounds/' + btn.dataset.ridx,
               { method: 'DELETE' })
           .then(function () { loadManage(); });
       });
     });
-    right.querySelector('.show-sessions-btn').addEventListener('click', function () {
-      renderAvailableSessions(champ.id);
-      var panel = document.getElementById('manage-sessions-panel');
-      if (panel) panel.style.display = '';
+    right.querySelectorAll('.session-remove-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        fetch('/api/championships/' + btn.dataset.cid + '/rounds/' + btn.dataset.ridx + '/sessions/' + btn.dataset.sid,
+              { method: 'DELETE' })
+          .then(function () { loadManage(); });
+      });
+    });
+    right.querySelectorAll('.show-sessions-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        manageState.currentRidx = parseInt(btn.dataset.ridx, 10);
+        renderAvailableSessions(champ.id);
+        var panel = document.getElementById('manage-sessions-panel');
+        if (panel) panel.style.display = '';
+      });
     });
   }
 
   function renderAvailableSessions(champId) {
     var champ = manageState.champs.find(function (c) { return c.id === champId; });
-    var assigned = champ ? champ.session_ids : [];
-    var available = manageState.sessions.filter(function (s) { return !assigned.includes(s.id); });
+    var assignedIds = [];
+    if (champ) {
+      (champ.rounds || []).forEach(function (round) {
+        (round.session_ids || []).forEach(function (sid) { assignedIds.push(sid); });
+      });
+    }
+    var ridx = manageState.currentRidx || 0;
+    var available = manageState.sessions.filter(function (s) { return !assignedIds.includes(s.id); });
     var el = document.getElementById('available-sessions');
     if (!el) return;
     if (!available.length) {
@@ -446,20 +518,22 @@
       return;
     }
     el.innerHTML = available.map(function (s) {
+      var typeLabel = SESSION_TYPE_LABELS[s.session_type] || '?';
       return '<div class="session-card">' +
         '<div class="session-card-info">' +
+          '<span class="session-type-badge">' + typeLabel + '</span>' +
           '<span class="session-track">' + esc(s.track) + '</span>' +
           '<span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
           '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
           '<span class="session-winner">\u{1f3c6} ' + esc(sessionWinner(s)) + '</span>' +
         '</div>' +
         '<button class="manage-btn manage-btn-primary session-add-btn"' +
-          ' data-cid="' + esc(champId) + '" data-sid="' + esc(s.id) + '">+ Add</button>' +
+          ' data-cid="' + esc(champId) + '" data-ridx="' + ridx + '" data-sid="' + esc(s.id) + '">+ Add to Round ' + (ridx + 1) + '</button>' +
         '</div>';
     }).join('');
     el.querySelectorAll('.session-add-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        fetch('/api/championships/' + btn.dataset.cid + '/sessions/' + btn.dataset.sid,
+        fetch('/api/championships/' + btn.dataset.cid + '/rounds/' + btn.dataset.ridx + '/sessions/' + btn.dataset.sid,
               { method: 'POST' })
           .then(function () {
             loadManage();
@@ -503,10 +577,11 @@
       var pts = ptsVal.split(',')
         .map(function (v) { return parseInt(v.trim(), 10); })
         .filter(function (n) { return !isNaN(n); });
+      var manufacturerScoring = document.getElementById('new-champ-manufacturer').checked;
       fetch('/api/championships', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, points_system: pts })
+        body: JSON.stringify({ name: name, points_system: pts, manufacturer_scoring: manufacturerScoring })
       }).then(function () {
         newForm.style.display = 'none';
         document.getElementById('new-champ-name').value = '';
@@ -520,6 +595,24 @@
     closeSessionsBtn.addEventListener('click', function () {
       var panel = document.getElementById('manage-sessions-panel');
       if (panel) panel.style.display = 'none';
+    });
+  }
+
+  var purgeBtn = document.getElementById('purge-sessions-btn');
+  if (purgeBtn) {
+    purgeBtn.addEventListener('click', function () {
+      var unassigned = manageState.sessions.filter(function (s) {
+        return !manageState.champs.some(function (c) {
+          return (c.rounds || []).some(function (r) {
+            return (r.session_ids || []).includes(s.id);
+          });
+        });
+      });
+      if (!unassigned.length) { alert('No unassigned sessions.'); return; }
+      if (!confirm('Delete ' + unassigned.length + ' unassigned session(s)? This cannot be undone.')) return;
+      fetch('/api/sessions/unassigned', { method: 'DELETE' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { loadManage(); });
     });
   }
 
