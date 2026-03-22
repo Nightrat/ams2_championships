@@ -4,17 +4,20 @@ use std::sync::OnceLock;
 /// Path to the minimal fixture XML.
 const FIXTURE_XML: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/minimal.xml");
 
-/// Generate HTML from the fixture exactly once and cache it for all tests.
+/// Raw XML content of the fixture, loaded once.
+fn fixture_xml_str() -> &'static str {
+    static XML: OnceLock<String> = OnceLock::new();
+    XML.get_or_init(|| fs::read_to_string(FIXTURE_XML).expect("fixture xml must exist"))
+}
+
+/// Combined championships + stats fragment HTML, generated from the fixture XML.
 fn fixture_html() -> &'static str {
     static HTML: OnceLock<String> = OnceLock::new();
     HTML.get_or_init(|| {
-        let out = format!(
-            "{}/target/integration_fixture.html",
-            env!("CARGO_MANIFEST_DIR")
-        );
-        fs::create_dir_all(format!("{}/target", env!("CARGO_MANIFEST_DIR"))).ok();
-        ams2_championship::convert(FIXTURE_XML, &out).expect("convert should succeed");
-        fs::read_to_string(&out).expect("output file should exist")
+        let (champ_html, stats_html) =
+            ams2_championship::import_fragment_from_xml_str(fixture_xml_str())
+                .expect("import_fragment_from_xml_str should succeed");
+        champ_html + &stats_html
     })
 }
 
@@ -33,7 +36,11 @@ fn test_convert_creates_output_file() {
 
 #[test]
 fn test_convert_output_is_valid_html_skeleton() {
-    let html = fixture_html();
+    let out = format!("{}/target/test_skeleton.html", env!("CARGO_MANIFEST_DIR"));
+    fs::create_dir_all(format!("{}/target", env!("CARGO_MANIFEST_DIR"))).ok();
+    ams2_championship::convert(FIXTURE_XML, &out).expect("convert should not error");
+    let html = fs::read_to_string(&out).expect("output file should exist");
+    let _ = fs::remove_file(&out);
     assert!(html.contains("<!DOCTYPE html>"));
     assert!(html.contains("<html"));
     assert!(html.contains("</html>"));
@@ -69,7 +76,6 @@ fn test_convert_contains_track_names() {
 
 #[test]
 fn test_convert_player_marked_with_you_tag() {
-    // The player-tag span is rendered in both the standings grid and the stats table.
     assert!(
         fixture_html().contains("player-tag"),
         "player should be highlighted with player-tag class"
@@ -95,25 +101,17 @@ fn test_convert_driver_stats_has_dnf_column() {
 
 #[test]
 fn test_convert_player_dnf_counted() {
-    // Round 2 has CompletionPercentage="0.5" so the player gets 1 DNF.
-    // Find the player row in the stats table (contains "player-row") and
-    // check there is a stat-num cell containing "1" (the DNF count).
     let html = fixture_html();
-
-    // The stats section comes after the championship sections.
-    // The player row in the stats table contains class="player-row".
     let stats_start = html
         .find(r#"id="stats-table""#)
         .expect("stats-table element must exist");
     let stats_html = &html[stats_start..];
-
     let pr_start = stats_html
         .find("player-row")
         .expect("player-row must exist in stats table");
     let pr_html = &stats_html[pr_start..];
     let row_end = pr_html.find("</tr>").expect("player row must close");
     let row = &pr_html[..row_end];
-
     assert!(
         row.contains(r#"<td class="stat-num">1</td>"#),
         "player row should show DNF=1 somewhere in its cells, got: {row}"
@@ -122,7 +120,6 @@ fn test_convert_player_dnf_counted() {
 
 #[test]
 fn test_convert_player_race_count() {
-    // Player entered 2 race sessions (Round 1 and Round 2).
     let html = fixture_html();
     let stats_start = html
         .find(r#"id="stats-table""#)
@@ -134,8 +131,6 @@ fn test_convert_player_race_count() {
     let pr_html = &stats_html[pr_start..];
     let row_end = pr_html.find("</tr>").expect("player row must close");
     let row = &pr_html[..row_end];
-
-    // The races column is 2 — verify by counting stat-num cells or checking value.
     assert!(
         row.contains(r#"<td class="stat-num">2</td>"#),
         "player should have 2 races, row: {row}"
@@ -144,7 +139,6 @@ fn test_convert_player_race_count() {
 
 #[test]
 fn test_convert_player_win_count() {
-    // Player won Round 1 (FinishPosition=1, CompletionPercentage=1).
     let html = fixture_html();
     let stats_start = html
         .find(r#"id="stats-table""#)
@@ -156,7 +150,6 @@ fn test_convert_player_win_count() {
     let pr_html = &stats_html[pr_start..];
     let row_end = pr_html.find("</tr>").expect("player row must close");
     let row = &pr_html[..row_end];
-
     assert!(
         row.contains(r#"<td class="stat-num">1</td>"#),
         "player should have wins=1, row: {row}"
@@ -165,7 +158,6 @@ fn test_convert_player_win_count() {
 
 #[test]
 fn test_convert_ai_driver_dnf_is_zero() {
-    // AI drivers should never accumulate DNFs.
     let html = fixture_html();
     let stats_start = html
         .find(r#"id="stats-table""#)
@@ -174,8 +166,6 @@ fn test_convert_ai_driver_dnf_is_zero() {
         .find("<tbody>")
         .expect("<tbody> must exist");
     let tbody = &html[stats_start + tbody_start..];
-
-    // Find a non-player row for "Bot Alpha".
     let ai_start = tbody
         .find("Bot Alpha")
         .expect("Bot Alpha must appear in stats");
@@ -184,16 +174,10 @@ fn test_convert_ai_driver_dnf_is_zero() {
     let tr_html = &tbody[tr_start..];
     let row_end = tr_html.find("</tr>").expect("row must close");
     let row = &tr_html[..row_end];
-
     assert!(
         !row.contains("player-row"),
         "Bot Alpha should not be the player row"
     );
-    // DNF column for AI should be 0. The row must not contain a DNF > 0.
-    // We can verify there is no value other than 0 in any stat-num cell
-    // by checking DNF is 0: every stat-num in this row should not be > 0
-    // except for races/positions. We at least confirm the row does not have
-    // an unexpected "dnf" value by checking 0 is present.
     assert!(
         row.contains(r#"<td class="stat-num">0</td>"#),
         "AI row should contain a 0 (DNF=0), row: {row}"

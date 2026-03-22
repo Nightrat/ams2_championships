@@ -4,6 +4,8 @@ use serde::Serialize;
 #[derive(Serialize, Clone)]
 pub struct ParticipantData {
     pub name: String,
+    pub car_name: String,
+    pub car_class: String,
     pub is_active: bool,
     /// True when this participant is the viewed/human player (mViewedParticipantIndex).
     pub is_player: bool,
@@ -22,6 +24,10 @@ pub struct ParticipantData {
     pub best_s3: f32,
     pub fastest_lap_time: f32,
     pub last_lap_time: f32,
+    /// World X position in metres.
+    pub world_pos_x: f32,
+    /// World Z position in metres (horizontal plane with X).
+    pub world_pos_z: f32,
 }
 
 /// Snapshot of the current AMS2 session state.
@@ -33,8 +39,13 @@ pub struct LiveSessionData {
     pub race_state: u32,
     pub num_participants: i32,
     pub track_location: String,
+    pub track_variation: String,
     /// Total track length in metres (mTrackLength), used for gap calculation.
     pub track_length: f32,
+    /// Player's car name (mCarName).
+    pub car_name: String,
+    /// Player's car class name (mCarClassName).
+    pub car_class: String,
     pub participants: Vec<ParticipantData>,
 }
 
@@ -46,7 +57,10 @@ fn disconnected() -> LiveSessionData {
         race_state: 0,
         num_participants: 0,
         track_location: String::new(),
+        track_variation: String::new(),
         track_length: 0.0,
+        car_name: String::new(),
+        car_class: String::new(),
         participants: vec![],
     }
 }
@@ -97,7 +111,10 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_VIEWED_PARTICIPANT: usize = 20;
     const OFF_NUM_PARTICIPANTS: usize = 24;
     const OFF_PARTICIPANTS: usize = 28;
-    const OFF_TRACK_LOCATION: usize = 6576;
+    const OFF_CAR_NAME:        usize = 6444;  // char mCarName[64]
+    const OFF_CAR_CLASS:       usize = 6508;  // char mCarClassName[64]
+    const OFF_TRACK_LOCATION:  usize = 6576;  // char mTrackLocation[64]
+    const OFF_TRACK_VARIATION: usize = 6640;  // char mTrackVariation[64]
     const OFF_TRACK_LENGTH: usize = 6704;
     // Sector time arrays (all float[64], indexed by participant slot)
     // float mCurrentSector1Times[64]  //  7408  (256)
@@ -108,6 +125,8 @@ pub fn read_live_session() -> LiveSessionData {
     // float mFastestSector3Times[64]  //  8688  (256)
     // float mFastestLapTimes[64]      //  8944  (256)
     // float mLastLapTimes[64]         //  9200  (256)
+    const OFF_CAR_NAMES:       usize = 11056; // char mCarNames[64][64]
+    const OFF_CAR_CLASS_NAMES: usize = 15152; // char mCarClassNames[64][64]
     const OFF_CUR_S1: usize = 7408;
     const OFF_CUR_S2: usize = 7664;
     const OFF_CUR_S3: usize = 7920;
@@ -134,6 +153,8 @@ pub fn read_live_session() -> LiveSessionData {
     const STRIDE: usize = 100;
     const P_IS_ACTIVE: usize = 0;
     const P_NAME: usize = 1;
+    // mWorldPosition[3] floats at +68 (+72 = Y skipped, +76 = Z)
+    const P_WORLD_POS: usize = 68;
     const P_CUR_LAP_DIST: usize = 80;
     const P_RACE_POS: usize = 84;
     const P_LAPS_DONE: usize = 88;
@@ -175,8 +196,11 @@ pub fn read_live_session() -> LiveSessionData {
         let race_state = ru32(ptr, OFF_RACE_STATE);
         let viewed_idx = ri32(ptr, OFF_VIEWED_PARTICIPANT);
         let num_participants = ri32(ptr, OFF_NUM_PARTICIPANTS).clamp(0, 64);
-        let track_location = rstr(ptr, OFF_TRACK_LOCATION, 64);
-        let track_length = rf32(ptr, OFF_TRACK_LENGTH);
+        let car_name       = rstr(ptr, OFF_CAR_NAME, 64);
+        let car_class      = rstr(ptr, OFF_CAR_CLASS, 64);
+        let track_location  = rstr(ptr, OFF_TRACK_LOCATION, 64);
+        let track_variation = rstr(ptr, OFF_TRACK_VARIATION, 64);
+        let track_length    = rf32(ptr, OFF_TRACK_LENGTH);
 
         let mut participants = Vec::with_capacity(num_participants as usize);
         for i in 0..num_participants as usize {
@@ -185,12 +209,16 @@ pub fn read_live_session() -> LiveSessionData {
             if !is_active {
                 continue;
             }
-            let name = rstr(ptr, base + P_NAME, 64);
+            let name      = rstr(ptr, base + P_NAME, 64);
+            let car_name  = rstr(ptr, OFF_CAR_NAMES + i * 64, 64);
+            let car_class = rstr(ptr, OFF_CAR_CLASS_NAMES + i * 64, 64);
 
             // All timing arrays are at top-level, indexed by participant slot i
             let stride4 = i * 4;
             participants.push(ParticipantData {
                 name,
+                car_name,
+                car_class,
                 is_active,
                 is_player: i as i32 == viewed_idx,
                 race_position: ru32(ptr, base + P_RACE_POS),
@@ -205,6 +233,8 @@ pub fn read_live_session() -> LiveSessionData {
                 best_s3: rf32(ptr, OFF_BEST_S3 + stride4),
                 fastest_lap_time: rf32(ptr, OFF_FASTEST_LAP_TIMES + stride4),
                 last_lap_time: rf32(ptr, OFF_LAST_LAP_TIMES + stride4),
+                world_pos_x: rf32(ptr, base + P_WORLD_POS),
+                world_pos_z: rf32(ptr, base + P_WORLD_POS + 8),
             });
         }
         // Sort by race position; unset (0) positions go to the end
@@ -227,7 +257,10 @@ pub fn read_live_session() -> LiveSessionData {
             race_state,
             num_participants,
             track_location,
+            track_variation,
             track_length,
+            car_name,
+            car_class,
             participants,
         }
     }

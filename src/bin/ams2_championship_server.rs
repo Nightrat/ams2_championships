@@ -14,6 +14,7 @@ struct Request {
     body: Vec<u8>,
 }
 
+#[cfg(test)]
 fn parse_request(buf: &[u8]) -> Request {
     let line_end = buf
         .iter()
@@ -56,10 +57,70 @@ fn json_err(stream: &mut TcpStream, status: &str, msg: &str) {
 
 // ── Request handler ───────────────────────────────────────────────────────────
 
-fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_path: Arc<PathBuf>) {
-    let mut buf = [0u8; 65536];
-    let n = stream.read(&mut buf).unwrap_or(0);
-    let req = parse_request(&buf[..n]);
+fn read_full_request(stream: &mut TcpStream) -> Request {
+    let mut raw: Vec<u8> = Vec::new();
+    let mut tmp = [0u8; 8192];
+
+    // Read until we have the full headers (\r\n\r\n).
+    loop {
+        let n = stream.read(&mut tmp).unwrap_or(0);
+        if n == 0 { break; }
+        raw.extend_from_slice(&tmp[..n]);
+        if raw.windows(4).any(|w| w == b"\r\n\r\n") { break; }
+    }
+
+    // Parse method and path from the first line.
+    let line_end = raw.iter().position(|&b| b == b'\r' || b == b'\n').unwrap_or(raw.len());
+    let first_line = std::str::from_utf8(&raw[..line_end]).unwrap_or("");
+    let mut parts = first_line.split_ascii_whitespace();
+    let method = parts.next().unwrap_or("GET").to_owned();
+    let path   = parts.next().unwrap_or("/").to_owned();
+
+    // Find where the body starts.
+    let header_end = raw.windows(4).position(|w| w == b"\r\n\r\n")
+        .map(|p| p + 4)
+        .unwrap_or(raw.len());
+
+    // Parse Content-Length from headers.
+    let headers_str = std::str::from_utf8(&raw[..header_end]).unwrap_or("");
+    let content_length: usize = headers_str
+        .lines()
+        .find(|l| l.to_ascii_lowercase().starts_with("content-length:"))
+        .and_then(|l| l.splitn(2, ':').nth(1))
+        .and_then(|v| v.trim().parse().ok())
+        .unwrap_or(0);
+
+    // Read remaining body bytes until Content-Length is satisfied.
+    let mut body = raw[header_end..].to_vec();
+    while body.len() < content_length {
+        let n = stream.read(&mut tmp).unwrap_or(0);
+        if n == 0 { break; }
+        body.extend_from_slice(&tmp[..n]);
+    }
+    body.truncate(content_length);
+
+    Request { method, path, body }
+}
+
+/// Turns a track name into a safe filename stem (e.g. "Spa – GP" → "spa_gp").
+fn track_slug(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+        .collect::<String>()
+        .split('_')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
+fn handle(
+    mut stream: TcpStream,
+    html: Arc<Vec<u8>>,
+    store: SharedStore,
+    data_path: Arc<PathBuf>,
+    layouts_dir: Arc<PathBuf>,
+) {
+    let req = read_full_request(&mut stream);
     let path = req.path.as_str();
     let method = req.method.as_str();
 
@@ -295,6 +356,49 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, store: SharedStore, data_pa
         return;
     }
 
+
+    // GET /api/track-layout/:track — load saved layout points from file
+    if method == "GET" && segs.len() == 3 && segs[0] == "api" && segs[1] == "track-layout" {
+        let file = layouts_dir.join(format!("{}.json", track_slug(segs[2])));
+        if file.exists() {
+            let content = std::fs::read(&file).unwrap_or_default();
+            json_ok(&mut stream, &content);
+        } else {
+            json_ok(&mut stream, b"null");
+        }
+        return;
+    }
+
+    // POST /api/track-layout/:track — save layout points to file
+    if method == "POST" && segs.len() == 3 && segs[0] == "api" && segs[1] == "track-layout" {
+        let file = layouts_dir.join(format!("{}.json", track_slug(segs[2])));
+        if let Err(e) = std::fs::write(&file, &req.body) {
+            json_err(&mut stream, "500 Internal Server Error", &e.to_string());
+        } else {
+            json_ok(&mut stream, b"{}");
+        }
+        return;
+    }
+
+    // POST /api/import — parse XML body, return import tab fragments as JSON
+    if method == "POST" && path == "/api/import" {
+        let xml = match std::str::from_utf8(&req.body) {
+            Ok(s) => s,
+            Err(_) => { json_err(&mut stream, "400 Bad Request", "invalid utf-8"); return; }
+        };
+        match ams2_championship::import_fragment_from_xml_str(xml) {
+            Ok((championships_html, stats_html)) => {
+                #[derive(serde::Serialize)]
+                struct Resp { championships_html: String, stats_html: String }
+                let resp = Resp { championships_html, stats_html };
+                let json = serde_json::to_vec(&resp).unwrap_or_default();
+                json_ok(&mut stream, &json);
+            }
+            Err(e) => json_err(&mut stream, "400 Bad Request", &e.to_string()),
+        }
+        return;
+    }
+
     // Default: serve the static championship HTML
     send_response(&mut stream, "200 OK", "text/html; charset=utf-8", &html);
 }
@@ -411,7 +515,7 @@ mod tests {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let port: u16 = args.get(2).and_then(|p| p.parse().ok()).unwrap_or(8080);
+    let port: u16 = args.get(1).and_then(|p| p.parse().ok()).unwrap_or(8080);
 
     // career.json lives in a "championships" subfolder next to the executable.
     let exe_dir = std::env::current_exe()
@@ -423,6 +527,12 @@ fn main() {
         eprintln!("Failed to create championships directory: {e}");
         std::process::exit(1);
     }
+    let layouts_dir = champ_dir.join("track_layouts");
+    if let Err(e) = std::fs::create_dir_all(&layouts_dir) {
+        eprintln!("Failed to create track_layouts directory: {e}");
+        std::process::exit(1);
+    }
+    let layouts_dir = Arc::new(layouts_dir);
     let career_path = champ_dir.join("ams2_career.json");
 
     let store = ams2_championship::data_store::load_store(&career_path);
@@ -437,16 +547,7 @@ fn main() {
     }
     ams2_championship::session_recorder::start(store.clone(), career_path.clone());
 
-    let html = Arc::new(match args.get(1) {
-        Some(xml_path) => match ams2_championship::build_html_from_xml(xml_path) {
-            Ok(h) => h.into_bytes(),
-            Err(e) => {
-                eprintln!("Warning: could not read XML ({e}) — SecondMonitor Import tab will be empty");
-                ams2_championship::build_base_html().into_bytes()
-            }
-        },
-        None => ams2_championship::build_base_html().into_bytes(),
-    });
+    let html = Arc::new(ams2_championship::build_base_html().into_bytes());
 
     let listener = match TcpListener::bind(format!("127.0.0.1:{port}")) {
         Ok(l) => l,
@@ -465,6 +566,7 @@ fn main() {
         let html = Arc::clone(&html);
         let store = store.clone();
         let data_path = Arc::clone(&data_path);
-        std::thread::spawn(move || handle(stream, html, store, data_path));
+        let layouts_dir = Arc::clone(&layouts_dir);
+        std::thread::spawn(move || handle(stream, html, store, data_path, layouts_dir));
     }
 }

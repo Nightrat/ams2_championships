@@ -197,26 +197,26 @@ details.championship:not([open]) > :not(summary) { display: none; }
 .champ-body {
   display: flex;
   gap: 0;
-  padding: 1rem 1.5rem;
+  padding: 0.5rem 1rem;
   flex-wrap: wrap;
 }
 
 .standings-panel {
-  min-width: 260px;
+  min-width: 160px;
   flex: 0 0 auto;
-  margin-right: 1.5rem;
+  margin-right: 1rem;
 }
 
-.results-panel { flex: 1 1 auto; min-width: 0; }
+.results-panel { flex: 0 0 100%; min-width: 0; margin-top: 0.5rem; }
 
 .standings-panel h3,
 .results-panel h3 {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #e74c3c;
-  margin-bottom: 0.6rem;
-  padding-bottom: 0.3rem;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.25rem;
   border-bottom: 1px solid #2a2a4a;
 }
 
@@ -225,13 +225,14 @@ table { border-collapse: collapse; width: 100%; }
 
 .standings-table td,
 .standings-table th {
-  padding: 0.35rem 0.6rem;
+  padding: 0.18rem 0.4rem;
   text-align: left;
   border-bottom: 1px solid #1e1e38;
+  font-size: 0.8rem;
 }
 
 .standings-table th {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   color: #7f8c8d;
   background: #0f0f25;
@@ -240,9 +241,10 @@ table { border-collapse: collapse; width: 100%; }
 
 .standings-table tr:hover { background: #1a1a35; }
 
-.standings-table .pos { text-align: center; width: 2.5rem; color: #95a5a6; font-size: 0.8rem; }
-.standings-table .pts { text-align: right; font-weight: 700; color: #e0e0f0; width: 3rem; }
-.standings-table .car { color: #888; font-size: 0.82rem; }
+.standings-table .pos { text-align: center; width: 1.6rem; color: #95a5a6; font-size: 0.75rem; }
+.standings-table .pts { text-align: right; font-weight: 700; color: #e0e0f0; width: 2rem; }
+.standings-table .car { color: #888; font-size: 0.78rem; }
+.result-car { color: #8e44ad; font-size: 0.7rem; font-style: italic; margin-left: 0.3rem; }
 
 /* Player rows */
 .player-row { background: #1a1a00 !important; }
@@ -300,12 +302,12 @@ table { border-collapse: collapse; width: 100%; }
 /* Events detail */
 .events-detail {
   border-top: 1px solid #2a2a4a;
-  padding: 0 1.5rem;
+  padding: 0 0.5rem;
 }
 
 .events-detail summary {
-  padding: 0.75rem 0;
-  font-size: 0.82rem;
+  padding: 0.45rem 0;
+  font-size: 0.78rem;
   color: #95a5a6;
   cursor: pointer;
   user-select: none;
@@ -318,8 +320,8 @@ table { border-collapse: collapse; width: 100%; }
 .events-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 0.75rem 0 1rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0 0.6rem;
 }
 
 .event-card {
@@ -447,6 +449,9 @@ table { border-collapse: collapse; width: 100%; }
 
 /* Live Session tab */
 .live-section { padding: 1.5rem 2rem; }
+.live-body { display: flex; align-items: flex-start; gap: 1rem; margin-top: 0.75rem; }
+.track-map { flex: 0 0 280px; height: 280px; background: #0a0a14; border-radius: 6px; border: 1px solid #2a2a3e; }
+.grid-scroll { flex: 1 1 auto; overflow-x: auto; }
 
 .live-status {
   display: inline-flex;
@@ -680,8 +685,8 @@ table { border-collapse: collapse; width: 100%; }
 }
 
 /* Round session sub-row (career Championships view) */
-.round-session { margin-bottom: 0.5rem; }
-.round-session-label { font-size: 0.8rem; color: #95a5a6; margin-bottom: 0.25rem; }
+.round-session { margin-bottom: 0.3rem; }
+.round-session-label { font-size: 0.72rem; color: #95a5a6; margin-bottom: 0.15rem; }
 
 .session-card {
   display: flex;
@@ -704,6 +709,7 @@ table { border-collapse: collapse; width: 100%; }
 .session-track  { font-weight: 600; }
 .session-date   { color: #95a5a6; }
 .session-drivers{ color: #7f8c8d; }
+.session-car    { color: #8e44ad; font-style: italic; }
 .session-winner { color: #f39c12; }
 
 .manage-sessions-panel {
@@ -773,6 +779,14 @@ table { border-collapse: collapse; width: 100%; }
 
 .manage-empty { color: #555; font-style: italic; padding: 0.75rem 0; font-size: 0.85rem; }
 .manage-danger-zone { padding: 0.75rem 1.25rem; border-top: 1px solid #2a2a4a; }
+
+/* ── Import toolbar ──────────────────────────────────────────────────────── */
+.import-toolbar      { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid #2a2a4a; }
+.import-file-label   { cursor: pointer; }
+.import-filename     { color: #bdc3c7; font-size: 0.85rem; }
+.import-status       { font-size: 0.85rem; color: #7f8c8d; }
+.import-status-ok    { color: #27ae60; }
+.import-status-err   { color: #e74c3c; }
 
 /* ── Sub-tabs (SecondMonitor Import) ─────────────────────────────────────── */
 .sub-tab-bar {

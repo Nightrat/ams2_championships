@@ -9,6 +9,40 @@
     });
   });
 
+  // ── SecondMonitor XML import ───────────────────────────────────────────────
+  var smInput = document.getElementById('sm-xml-input');
+  if (smInput) {
+    smInput.addEventListener('change', function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('sm-xml-filename').textContent = file.name;
+      var statusEl = document.getElementById('sm-xml-status');
+      statusEl.textContent = 'Processing\u2026';
+      statusEl.className = 'import-status';
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        fetch('/api/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/xml' },
+          body: ev.target.result
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            document.getElementById('subtab-championships').innerHTML = data.championships_html;
+            document.getElementById('subtab-driver-stats').innerHTML  = data.stats_html;
+            initSortableTable();
+            statusEl.textContent = 'Imported \u2713';
+            statusEl.className = 'import-status import-status-ok';
+          })
+          .catch(function () {
+            statusEl.textContent = 'Import failed';
+            statusEl.className = 'import-status import-status-err';
+          });
+      };
+      reader.readAsText(file);
+    });
+  }
+
   // ── Sub-tab switching (SecondMonitor Import) ───────────────────────────────
   document.querySelectorAll('.sub-tab-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -20,39 +54,166 @@
   });
 
   // ── Sortable stats table ───────────────────────────────────────────────────
-  var table = document.getElementById('stats-table');
-  if (!table) return;
-  var tbody = table.tBodies[0];
-  var headers = table.tHead.rows[0].cells;
-  var sortCol = 0, sortAsc = true;
+  function initSortableTable() {
+    var table = document.getElementById('stats-table');
+    if (!table) return;
+    var tbody = table.tBodies[0];
+    var headers = table.tHead.rows[0].cells;
+    var sortCol = 0, sortAsc = true;
 
-  function cellVal(row, col, type) {
-    var text = row.cells[col].textContent.trim();
-    return type === 'num' ? (parseFloat(text) || 0) : text.toLowerCase();
-  }
+    function cellVal(row, col, type) {
+      var text = row.cells[col].textContent.trim();
+      return type === 'num' ? (parseFloat(text) || 0) : text.toLowerCase();
+    }
 
-  function sort(col, type) {
-    var rows = Array.from(tbody.rows);
-    var asc = (col === sortCol) ? !sortAsc : (type === 'num' ? false : true);
-    rows.sort(function (a, b) {
-      var av = cellVal(a, col, type), bv = cellVal(b, col, type);
-      if (av < bv) return asc ? -1 : 1;
-      if (av > bv) return asc ? 1 : -1;
-      return 0;
-    });
-    rows.forEach(function (r) { tbody.appendChild(r); });
+    function sort(col, type) {
+      var rows = Array.from(tbody.rows);
+      var asc = (col === sortCol) ? !sortAsc : (type === 'num' ? false : true);
+      rows.sort(function (a, b) {
+        var av = cellVal(a, col, type), bv = cellVal(b, col, type);
+        if (av < bv) return asc ? -1 : 1;
+        if (av > bv) return asc ? 1 : -1;
+        return 0;
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+      Array.from(headers).forEach(function (th) {
+        th.classList.remove('sort-asc', 'sort-desc');
+      });
+      headers[col].classList.add(asc ? 'sort-asc' : 'sort-desc');
+      sortCol = col; sortAsc = asc;
+    }
+
     Array.from(headers).forEach(function (th) {
-      th.classList.remove('sort-asc', 'sort-desc');
+      th.addEventListener('click', function () {
+        sort(+th.dataset.col, th.dataset.type);
+      });
     });
-    headers[col].classList.add(asc ? 'sort-asc' : 'sort-desc');
-    sortCol = col; sortAsc = asc;
+  }
+  initSortableTable();
+
+  // ── Track map ──────────────────────────────────────────────────────────────
+  var trackMap = { track: null, points: null, cells: {}, accumulated: [], saved: false, loading: false };
+  var TM_CELL = 5;     // metres per grid cell for deduplication
+  var TM_MIN  = 300;   // minimum unique cells before saving
+
+  function tmCellKey(x, z) { return Math.floor(x / TM_CELL) + ',' + Math.floor(z / TM_CELL); }
+
+  function tmAddPoints(participants) {
+    participants.forEach(function (p) {
+      var key = tmCellKey(p.world_pos_x, p.world_pos_z);
+      if (!trackMap.cells[key]) {
+        trackMap.cells[key] = true;
+        trackMap.accumulated.push([p.world_pos_x, p.world_pos_z]);
+      }
+    });
   }
 
-  Array.from(headers).forEach(function (th) {
-    th.addEventListener('click', function () {
-      sort(+th.dataset.col, th.dataset.type);
+  function tmLoad(track) {
+    if (trackMap.loading) return;
+    trackMap.loading = true;
+    fetch('/api/track-layout/' + encodeURIComponent(track))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        trackMap.loading = false;
+        if (Array.isArray(data) && data.length > 50) {
+          trackMap.points = data;
+          trackMap.saved  = true;
+        }
+      })
+      .catch(function () { trackMap.loading = false; });
+  }
+
+  function tmSave(track) {
+    fetch('/api/track-layout/' + encodeURIComponent(track), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(trackMap.accumulated)
+    }).catch(function () {});
+  }
+
+  function tmRender(canvas, points, cars) {
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width, H = canvas.height;
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, W, H);
+
+    if (!points || points.length < 20) {
+      ctx.fillStyle = '#2a2a3e';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Collecting track data\u2026', W / 2, H / 2);
+      ctx.textAlign = 'left';
+      return;
+    }
+
+    var PAD = 16;
+    var minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    points.forEach(function (p) {
+      if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minZ) minZ = p[1]; if (p[1] > maxZ) maxZ = p[1];
     });
-  });
+    var rangeX = maxX - minX || 1, rangeZ = maxZ - minZ || 1;
+    var scale = Math.min((W - 2 * PAD) / rangeX, (H - 2 * PAD) / rangeZ);
+    var ox = (W - rangeX * scale) / 2 - minX * scale;
+    var oz = (H - rangeZ * scale) / 2 - minZ * scale;
+    function cx(x) { return x * scale + ox; }
+    function cz(z) { return z * scale + oz; }
+
+    // Track dots
+    ctx.fillStyle = '#3a3a5e';
+    points.forEach(function (p) { ctx.fillRect(cx(p[0]) - 2, cz(p[1]) - 2, 4, 4); });
+
+    // Car positions
+    cars.forEach(function (c) {
+      var x = cx(c.x), z = cz(c.z);
+      ctx.beginPath();
+      ctx.arc(x, z, c.isPlayer ? 5 : 3.5, 0, 2 * Math.PI);
+      ctx.fillStyle = c.isPlayer ? '#f1c40f' : '#e74c3c';
+      ctx.fill();
+      if (c.isPlayer && c.pos > 0) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillText('P' + c.pos, x + 7, z + 4);
+      }
+    });
+  }
+
+  function tmUpdate(d) {
+    var canvas = document.getElementById('track-map');
+    if (!canvas) return;
+
+    if (!d.connected || !d.track_location) {
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0a0a14';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    // Reset when track changes
+    if (trackMap.track !== d.track_location) {
+      trackMap.track       = d.track_location;
+      trackMap.points      = null;
+      trackMap.cells       = {};
+      trackMap.accumulated = [];
+      trackMap.saved       = false;
+      tmLoad(d.track_location);
+    }
+
+    if (d.participants && d.participants.length > 0) {
+      tmAddPoints(d.participants);
+    }
+
+    if (!trackMap.saved && Object.keys(trackMap.cells).length >= TM_MIN) {
+      trackMap.saved = true;
+      tmSave(d.track_location);
+    }
+
+    var renderPoints = trackMap.points || (trackMap.accumulated.length >= 20 ? trackMap.accumulated : null);
+    var cars = (d.participants || []).map(function (p) {
+      return { x: p.world_pos_x, z: p.world_pos_z, isPlayer: p.is_player, pos: p.race_position };
+    });
+    tmRender(canvas, renderPoints, cars);
+  }
 
   // ── Live Session polling ───────────────────────────────────────────────────
   var liveTimer = null;
@@ -157,6 +318,7 @@
             '<td class="live-time">' + fmtLapTime(p.last_lap_time) + '</td>' +
             '</tr>';
         }).join('');
+        tmUpdate(d);
       })
       .catch(function () { /* server unavailable (static file) — ignore */ });
   }
@@ -199,6 +361,43 @@
     return Object.keys(pts).map(function (name) {
       return { name: name, points: pts[name], wins: wins[name] };
     }).sort(function (a, b) { return b.points - a.points || b.wins - a.wins; });
+  }
+
+  function careerComputeConstructors(champ, sessions) {
+    var pts = {}, wins = {};
+    (champ.rounds || []).forEach(function (round) {
+      (round.session_ids || []).forEach(function (sid) {
+        var s = sessions.find(function (s) { return s.id === sid; });
+        if (!s || s.session_type !== 5) return;
+        s.results.forEach(function (r) {
+          var key = r.car_name || r.car_class;
+          if (!key) return;
+          if (!pts[key]) { pts[key] = 0; wins[key] = 0; }
+          if (!r.dnf) {
+            pts[key] += champ.points_system[r.race_position - 1] || 0;
+            if (r.race_position === 1) wins[key]++;
+          }
+        });
+      });
+    });
+    return Object.keys(pts).map(function (name) {
+      return { name: name, points: pts[name], wins: wins[name] };
+    }).sort(function (a, b) { return b.points - a.points || b.wins - a.wins; });
+  }
+
+  function careerConstructorsHtml(constructors) {
+    if (!constructors.length) return '<p class="manage-empty">No results yet.</p>';
+    var rows = constructors.map(function (d, i) {
+      return '<tr>' +
+        '<td class="pos">' + (i + 1) + '</td>' +
+        '<td>' + esc(d.name) + '</td>' +
+        '<td class="pts">' + d.points + '</td>' +
+        '<td class="pts">' + d.wins + '</td>' +
+        '</tr>';
+    }).join('');
+    return '<table class="standings-table">' +
+      '<thead><tr><th>Pos</th><th>Car</th><th>Pts</th><th>W</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
   }
 
   function careerStandingsHtml(standings) {
@@ -246,8 +445,11 @@
           var fl  = r.fastest_lap > 0 ? fmtLapTime(r.fastest_lap) : '\u2014';
           var dnf = r.dnf ? ' <span class="badge badge-pending">DNF</span>' : '';
           var pts = isRace ? '<td class="pts">' + (champ.points_system[r.race_position - 1] || 0) + '</td>' : '';
+          var carLabel = r.car_name
+            ? ' <span class="result-car">' + esc(r.car_name) + '</span>'
+            : '';
           return '<tr><td class="pos">' + pos + '</td>' +
-            '<td>' + esc(r.name) + dnf + '</td>' +
+            '<td>' + esc(r.name) + carLabel + dnf + '</td>' +
             pts +
             '<td class="car">' + fl + '</td></tr>';
         }).join('');
@@ -255,10 +457,11 @@
         var ptsHeader = isRace ? '<th>Pts</th>' : '';
         return '<div class="round-session">' +
           '<div class="round-session-label"><span class="session-type-badge">' + typeLabel + '</span> ' + typeName +
+            ' <span class="session-track">' + fmtTrack(s) + '</span>' +
             ' <span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
             ' <span class="session-drivers">' + s.results.length + ' drivers</span>' +
           '</div>' +
-          '<table class="standings-table"><thead><tr><th>Pos</th><th>Driver</th>' + ptsHeader + '<th>Best Lap</th></tr></thead>' +
+          '<table class="standings-table"><thead><tr><th>Pos</th><th>Driver</th>' + ptsHeader + '<th>Best</th></tr></thead>' +
           '<tbody>' + resultRows + '</tbody></table></div>';
       }).join('');
 
@@ -283,7 +486,8 @@
       return;
     }
     container.innerHTML = champs.map(function (champ, idx) {
-      var standings = careerComputeStandings(champ, sessions);
+      var standings     = careerComputeStandings(champ, sessions);
+      var constructors  = careerComputeConstructors(champ, sessions);
       var open = champ.status !== 'Finished' ? ' open' : '';
       var badgeCls = champ.status === 'Finished' ? 'badge-finished' :
                      champ.status === 'Active'   ? 'badge-active' : 'badge-pending';
@@ -299,7 +503,8 @@
           '</div>' +
         '</summary>' +
         '<div class="champ-body">' +
-          '<div class="standings-panel"><h3>Standings</h3>' + careerStandingsHtml(standings) + '</div>' +
+          '<div class="standings-panel"><h3>Driver Standings</h3>' + careerStandingsHtml(standings) + '</div>' +
+          (constructors.length ? '<div class="standings-panel"><h3>Constructor Standings</h3>' + careerConstructorsHtml(constructors) + '</div>' : '') +
           '<div class="results-panel"><h3>Rounds</h3>' + careerRoundsHtml(champ, sessions) + '</div>' +
         '</div>' +
         '</details>';
@@ -331,6 +536,10 @@
     return String(str)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function fmtTrack(s) {
+    return s.track_variation ? esc(s.track) + ' \u2013 ' + esc(s.track_variation) : esc(s.track);
   }
 
   function fmtDate(ts) {
@@ -408,8 +617,9 @@
             return '<div class="session-card">' +
               '<div class="session-card-info">' +
                 '<span class="session-type-badge">' + typeLabel + '</span>' +
-                '<span class="session-track">' + esc(s.track) + '</span>' +
+                '<span class="session-track">' + fmtTrack(s) + '</span>' +
                 '<span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
+                (s.car_name ? '<span class="session-car">' + esc(s.car_name) + '</span>' : '') +
                 '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
                 '<span class="session-winner">\u{1f3c6} ' + esc(sessionWinner(s)) + '</span>' +
               '</div>' +
@@ -524,8 +734,9 @@
       return '<div class="session-card">' +
         '<div class="session-card-info">' +
           '<span class="session-type-badge">' + typeLabel + '</span>' +
-          '<span class="session-track">' + esc(s.track) + '</span>' +
+          '<span class="session-track">' + fmtTrack(s) + '</span>' +
           '<span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
+          (s.car_name ? '<span class="session-car">' + esc(s.car_name) + '</span>' : '') +
           '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
           '<span class="session-winner">\u{1f3c6} ' + esc(sessionWinner(s)) + '</span>' +
         '</div>' +
@@ -614,7 +825,7 @@
       if (!confirm('Delete ' + unassigned.length + ' unassigned session(s)? This cannot be undone.')) return;
       fetch('/api/sessions/unassigned', { method: 'DELETE' })
         .then(function (r) { return r.json(); })
-        .then(function (d) { loadManage(); });
+        .then(function () { loadManage(); });
     });
   }
 

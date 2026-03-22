@@ -4,4 +4,5 @@ pub mod data_store;
 pub mod session_recorder;
 pub use championship_html::build_html_from_xml;
 pub use championship_html::build_base_html;
+pub use championship_html::import_fragment_from_xml_str;
 pub use championship_html::convert;

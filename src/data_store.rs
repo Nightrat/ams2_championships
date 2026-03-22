@@ -7,6 +7,10 @@ use std::sync::{Arc, RwLock};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SessionResult {
     pub name: String,
+    #[serde(default)]
+    pub car_name: String,
+    #[serde(default)]
+    pub car_class: String,
     pub race_position: u32,
     pub laps_completed: u32,
     pub fastest_lap: f32,
@@ -22,6 +26,12 @@ pub struct RecordedSession {
     /// Unix timestamp (seconds since epoch) when the session was recorded.
     pub recorded_at: u64,
     pub track: String,
+    #[serde(default)]
+    pub track_variation: String,
+    #[serde(default)]
+    pub car_name: String,
+    #[serde(default)]
+    pub car_class: String,
     /// session_state from AMS2: 1=Practice, 3=Qualify, 5=Race.
     pub session_type: u32,
     pub results: Vec<SessionResult>,
@@ -122,10 +132,15 @@ mod tests {
             id: "100".into(),
             recorded_at: 1_700_000_000,
             track: "Silverstone".into(),
+            track_variation: "Grand Prix".into(),
+            car_name: "Formula Classic Gen2".into(),
+            car_class: "Formula Classic".into(),
             session_type: 5,
             results: vec![
                 SessionResult {
                     name: "Alice".into(),
+                    car_name: "Formula Classic Gen2".into(),
+                    car_class: "Formula Classic".into(),
                     race_position: 1,
                     laps_completed: 20,
                     fastest_lap: 89.5,
@@ -134,6 +149,8 @@ mod tests {
                 },
                 SessionResult {
                     name: "Bob".into(),
+                    car_name: "Formula Classic Gen2".into(),
+                    car_class: "Formula Classic".into(),
                     race_position: 2,
                     laps_completed: 20,
                     fastest_lap: 90.0,

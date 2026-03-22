@@ -48,6 +48,8 @@ fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData) {
         .iter()
         .map(|p| SessionResult {
             name: p.name.clone(),
+            car_name: p.car_name.clone(),
+            car_class: p.car_class.clone(),
             race_position: p.race_position,
             laps_completed: p.laps_completed,
             fastest_lap: p.fastest_lap_time,
@@ -60,6 +62,9 @@ fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData) {
         id: now.to_string(),
         recorded_at: now,
         track: session.track_location.clone(),
+        track_variation: session.track_variation.clone(),
+        car_name: session.car_name.clone(),
+        car_class: session.car_class.clone(),
         session_type: session.session_state,
         results,
     };

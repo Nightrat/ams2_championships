@@ -776,38 +776,7 @@ fn generate_driver_stats_section(
     )
 }
 
-fn generate_html(
-    championships: &[ChampData],
-    stats: &[DriverStats],
-    portraits: &HashMap<String, String>,
-) -> String {
-    let nav: String = championships
-        .iter()
-        .enumerate()
-        .map(|(i, c)| {
-            let state_cls = match c.state.as_str() {
-                "Finished" => "nav-finished",
-                "Active" => "nav-active",
-                _ => "nav-pending",
-            };
-            format!(
-                r##"<li><a href="#champ-{i}" class="{state_cls}">{name} <small>{class}</small></a></li>"##,
-                i = i,
-                name = esc(&c.name),
-                class = esc(&c.class),
-                state_cls = state_cls,
-            )
-        })
-        .collect();
-
-    let sections: String = championships
-        .iter()
-        .enumerate()
-        .map(|(i, c)| generate_championship_section(i, c))
-        .collect();
-
-    let stats_section = generate_driver_stats_section(stats, portraits);
-
+fn generate_html() -> String {
     format!(
         r##"<!DOCTYPE html>
 <html lang="en">
@@ -829,16 +798,22 @@ fn generate_html(
 </header>
 <main>
   <div id="tab-import" class="tab-panel tab-panel-hidden">
+    <div class="import-toolbar">
+      <label class="manage-btn manage-btn-primary import-file-label">
+        Choose XML file&hellip;
+        <input type="file" id="sm-xml-input" accept=".xml" style="display:none">
+      </label>
+      <span id="sm-xml-filename" class="import-filename"></span>
+      <span id="sm-xml-status" class="import-status"></span>
+    </div>
     <div class="sub-tab-bar">
       <button class="sub-tab-btn sub-tab-active" data-subtab="championships">Championships</button>
       <button class="sub-tab-btn" data-subtab="driver-stats">Driver Stats</button>
     </div>
     <div id="subtab-championships" class="sub-tab-panel">
-      <nav><ul>{nav}</ul></nav>
-      {sections}
+      <p class="manage-placeholder">Choose a SecondMonitor XML file above to import championship data.</p>
     </div>
     <div id="subtab-driver-stats" class="sub-tab-panel sub-tab-panel-hidden">
-      {stats_section}
     </div>
   </div>
   <div id="tab-career" class="tab-panel tab-panel-hidden">
@@ -856,6 +831,8 @@ fn generate_html(
         <span id="live-track" class="live-track"></span>
         <span id="live-raw-states" class="live-raw-states"></span>
       </div>
+      <div class="live-body">
+      <canvas id="track-map" width="280" height="280" class="track-map"></canvas>
       <div class="grid-scroll">
         <table id="live-table" class="live-table">
           <thead>
@@ -875,6 +852,7 @@ fn generate_html(
             <tr><td colspan="9" class="live-empty">Waiting for session data&hellip;</td></tr>
           </tbody>
         </table>
+      </div>
       </div>
     </section>
   </div>
@@ -927,9 +905,6 @@ fn generate_html(
 </html>"##,
         css = CSS,
         js = JS,
-        nav = nav,
-        stats_section = stats_section,
-        sections = sections,
     )
 }
 
@@ -938,7 +913,55 @@ fn generate_html(
 /// Generate the full page with no SecondMonitor import data.
 /// Used when the server is started without an XML file.
 pub fn build_base_html() -> String {
-    generate_html(&[], &[], &std::collections::HashMap::new())
+    generate_html()
+}
+
+/// Parse raw XML and return (championships_html, stats_html) fragments for the import tab.
+pub fn import_fragment_from_xml_str(xml: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
+    let root: XmlRoot = quick_xml::de::from_str(xml)?;
+
+    let mut championships: Vec<ChampData> = root
+        .championships
+        .items
+        .into_iter()
+        .map(ChampData::from)
+        .collect();
+    championships.sort_by(|a, b| b.creation_date.cmp(&a.creation_date));
+
+    let stats = compute_driver_stats(&championships);
+    println!("Fetching driver portraits from Wikipedia...");
+    let portraits = fetch_driver_portraits(&stats);
+    println!("Found portraits for {}/{} drivers.", portraits.len(), stats.len());
+
+    let nav: String = championships
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let state_cls = match c.state.as_str() {
+                "Finished" => "nav-finished",
+                "Active"   => "nav-active",
+                _          => "nav-pending",
+            };
+            format!(
+                r##"<li><a href="#champ-{i}" class="{state_cls}">{name} <small>{class}</small></a></li>"##,
+                i = i,
+                name = esc(&c.name),
+                class = esc(&c.class),
+                state_cls = state_cls,
+            )
+        })
+        .collect();
+
+    let sections: String = championships
+        .iter()
+        .enumerate()
+        .map(|(i, c)| generate_championship_section(i, c))
+        .collect();
+
+    println!("Generated {} championship(s).", championships.len());
+    let championships_html = format!("<nav><ul>{nav}</ul></nav>\n{sections}");
+    let stats_html = generate_driver_stats_section(&stats, &portraits);
+    Ok((championships_html, stats_html))
 }
 
 pub fn build_html_from_xml(xml_path: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -963,7 +986,7 @@ pub fn build_html_from_xml(xml_path: &str) -> Result<String, Box<dyn std::error:
         stats.len()
     );
 
-    let html = generate_html(&championships, &stats, &portraits);
+    let html = generate_html();
     println!("Generated {} championship(s).", championships.len());
     Ok(html)
 }
