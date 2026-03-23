@@ -831,28 +831,40 @@ fn generate_html() -> String {
         <span id="live-track" class="live-track"></span>
         <span id="live-raw-states" class="live-raw-states"></span>
       </div>
-      <div class="live-body">
-      <canvas id="track-map" width="280" height="280" class="track-map"></canvas>
-      <div class="grid-scroll">
-        <table id="live-table" class="live-table">
-          <thead>
-            <tr>
-              <th>Pos</th>
-              <th>Driver</th>
-              <th>Lap</th>
-              <th>Gap</th>
-              <th>S1</th>
-              <th>S2</th>
-              <th>S3</th>
-              <th>Best Lap</th>
-              <th>Last Lap</th>
-            </tr>
-          </thead>
-          <tbody id="live-tbody">
-            <tr><td colspan="9" class="live-empty">Waiting for session data&hellip;</td></tr>
-          </tbody>
-        </table>
+      <nav class="live-subnav">
+        <button class="live-subtab live-subtab-active" data-sub="timing">Timing</button>
+        <button class="live-subtab" data-sub="setup">Telemetry</button>
+      </nav>
+      <div id="live-sub-timing" class="live-subpanel">
+        <div class="live-body">
+          <canvas id="track-map" width="280" height="280" class="track-map"></canvas>
+          <div class="grid-scroll">
+            <table id="live-table" class="live-table">
+              <thead>
+                <tr>
+                  <th data-col="0" data-type="num">Pos</th>
+                  <th data-col="1" data-type="str">Driver</th>
+                  <th data-col="2" data-type="num">Lap</th>
+                  <th data-col="3" data-type="gap">Gap</th>
+                  <th data-col="4" data-type="time">S1</th>
+                  <th data-col="5" data-type="time">S2</th>
+                  <th data-col="6" data-type="time">S3</th>
+                  <th data-col="7" data-type="time">Best Lap</th>
+                  <th data-col="8" data-type="time">Last Lap</th>
+                  <th data-col="9" data-type="num">Top km/h</th>
+                </tr>
+              </thead>
+              <tbody id="live-tbody">
+                <tr><td colspan="10" class="live-empty">Waiting for session data&hellip;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+      <div id="live-sub-setup" class="live-subpanel live-subpanel-hidden">
+        <div id="setup-panel" class="setup-panel">
+          <div class="setup-no-data">Connect to AMS2 to see telemetry.</div>
+        </div>
       </div>
     </section>
   </div>

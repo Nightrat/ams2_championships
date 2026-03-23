@@ -30,6 +30,40 @@ pub struct ParticipantData {
     pub world_pos_z: f32,
 }
 
+/// Player car telemetry from the AMS2 shared memory (player's car only).
+/// Wheel order for all arrays: FL=0, FR=1, RL=2, RR=3.
+#[derive(Serialize, Clone)]
+pub struct PlayerTelemetry {
+    /// Left-edge tyre temperature, °C.
+    pub tyre_temp_left:    [f32; 4],
+    /// Centre-tread tyre temperature, °C.
+    pub tyre_temp_center:  [f32; 4],
+    /// Right-edge tyre temperature, °C.
+    pub tyre_temp_right:   [f32; 4],
+    /// Tyre wear 0–1 (0 = new, 1 = fully worn).
+    pub tyre_wear:         [f32; 4],
+    /// Tyre air pressure, PSI.
+    pub tyre_pressure:     [f32; 4],
+    /// Brake disc temperature, °C.
+    pub brake_temp:        [f32; 4],
+    /// Suspension travel, metres.
+    pub suspension_travel: [f32; 4],
+    /// Ride height per corner, cm.
+    pub ride_height:       [f32; 4],
+    /// Filtered throttle 0–1.
+    pub throttle:   f32,
+    /// Filtered brake 0–1.
+    pub brake_input: f32,
+    /// Filtered steering −1…+1.
+    pub steering:   f32,
+    /// Speed m/s.
+    pub speed:      f32,
+    /// Engine RPM.
+    pub rpm:        f32,
+    /// Current gear (negative = reverse, 0 = neutral).
+    pub gear:       i32,
+}
+
 /// Snapshot of the current AMS2 session state.
 #[derive(Serialize, Clone)]
 pub struct LiveSessionData {
@@ -47,6 +81,7 @@ pub struct LiveSessionData {
     /// Player's car class name (mCarClassName).
     pub car_class: String,
     pub participants: Vec<ParticipantData>,
+    pub player_telemetry: PlayerTelemetry,
 }
 
 fn disconnected() -> LiveSessionData {
@@ -62,6 +97,18 @@ fn disconnected() -> LiveSessionData {
         car_name: String::new(),
         car_class: String::new(),
         participants: vec![],
+        player_telemetry: PlayerTelemetry {
+            tyre_temp_left:    [0.0; 4],
+            tyre_temp_center:  [0.0; 4],
+            tyre_temp_right:   [0.0; 4],
+            tyre_wear:         [0.0; 4],
+            tyre_pressure:     [0.0; 4],
+            brake_temp:        [0.0; 4],
+            suspension_travel: [0.0; 4],
+            ride_height:       [0.0; 4],
+            throttle: 0.0, brake_input: 0.0, steering: 0.0,
+            speed: 0.0, rpm: 0.0, gear: 0,
+        },
     }
 }
 
@@ -127,6 +174,22 @@ pub fn read_live_session() -> LiveSessionData {
     // float mLastLapTimes[64]         //  9200  (256)
     const OFF_CAR_NAMES:       usize = 11056; // char mCarNames[64][64]
     const OFF_CAR_CLASS_NAMES: usize = 15152; // char mCarClassNames[64][64]
+    // ── Player car telemetry ──────────────────────────────────────────────────
+    const OFF_SPEED:              usize = 6848;  // float mSpeed (m/s)
+    const OFF_RPM:                usize = 6852;  // float mRpm
+    const OFF_BRAKE_INPUT:        usize = 6860;  // float mBrake (filtered)
+    const OFF_THROTTLE:           usize = 6864;  // float mThrottle (filtered)
+    const OFF_STEERING:           usize = 6872;  // float mSteering (filtered)
+    const OFF_GEAR:               usize = 6876;  // int mGear
+    const OFF_TYRE_WEAR:          usize = 7136;  // float mTyreWear[4]
+    const OFF_BRAKE_TEMP:         usize = 7184;  // float mBrakeTempCelsius[4]
+    const OFF_SUSPENSION_TRAVEL:  usize = 7340;  // float mSuspensionTravel[4] (metres)
+    const OFF_TYRE_PRESSURE:      usize = 7372;  // float mAirPressure[4] (PSI)
+    // AMS2-specific additions (not in original PC2 header):
+    const OFF_TYRE_TEMP_LEFT:     usize = 20584; // float mTyreTempLeft[4] (°C)
+    const OFF_TYRE_TEMP_CENTER:   usize = 20600; // float mTyreTempCenter[4] (°C)
+    const OFF_TYRE_TEMP_RIGHT:    usize = 20616; // float mTyreTempRight[4] (°C)
+    const OFF_RIDE_HEIGHT:        usize = 20636; // float mRideHeight[4] (cm)
     const OFF_CUR_S1: usize = 7408;
     const OFF_CUR_S2: usize = 7664;
     const OFF_CUR_S3: usize = 7920;
@@ -160,6 +223,9 @@ pub fn read_live_session() -> LiveSessionData {
     const P_LAPS_DONE: usize = 88;
     const P_CUR_LAP: usize = 92;
 
+    unsafe fn rf32x4(b: *const u8, off: usize) -> [f32; 4] {
+        [rf32(b, off), rf32(b, off + 4), rf32(b, off + 8), rf32(b, off + 12)]
+    }
     unsafe fn ru8(b: *const u8, off: usize) -> u8 {
         *b.add(off)
     }
@@ -191,6 +257,22 @@ pub fn read_live_session() -> LiveSessionData {
         }
         let ptr = mapped.Value as *const u8;
 
+        let player_telemetry = PlayerTelemetry {
+            tyre_temp_left:    rf32x4(ptr, OFF_TYRE_TEMP_LEFT),
+            tyre_temp_center:  rf32x4(ptr, OFF_TYRE_TEMP_CENTER),
+            tyre_temp_right:   rf32x4(ptr, OFF_TYRE_TEMP_RIGHT),
+            tyre_wear:         rf32x4(ptr, OFF_TYRE_WEAR),
+            tyre_pressure:     rf32x4(ptr, OFF_TYRE_PRESSURE),
+            brake_temp:        rf32x4(ptr, OFF_BRAKE_TEMP),
+            suspension_travel: rf32x4(ptr, OFF_SUSPENSION_TRAVEL),
+            ride_height:       rf32x4(ptr, OFF_RIDE_HEIGHT),
+            throttle:    rf32(ptr, OFF_THROTTLE),
+            brake_input: rf32(ptr, OFF_BRAKE_INPUT),
+            steering:    rf32(ptr, OFF_STEERING),
+            speed:       rf32(ptr, OFF_SPEED),
+            rpm:         rf32(ptr, OFF_RPM),
+            gear:        ri32(ptr, OFF_GEAR),
+        };
         let game_state = ru32(ptr, OFF_GAME_STATE);
         let session_state = ru32(ptr, OFF_SESSION_STATE);
         let race_state = ru32(ptr, OFF_RACE_STATE);
@@ -262,6 +344,7 @@ pub fn read_live_session() -> LiveSessionData {
             car_name,
             car_class,
             participants,
+            player_telemetry,
         }
     }
 }
