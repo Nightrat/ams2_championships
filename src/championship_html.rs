@@ -791,7 +791,7 @@ fn generate_html() -> String {
   <h1>AMS2 Career Championships</h1>
   <div class="tab-bar">
     <button class="tab-btn tab-active" data-tab="live">&#9679; Live Session</button>
-    <button class="tab-btn" data-tab="career">&#127942; Championships</button>
+    <button class="tab-btn" data-tab="career">&#127942; Career</button>
     <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
     <button class="tab-btn" data-tab="import">SecondMonitor Import</button>
   </div>
@@ -817,7 +817,16 @@ fn generate_html() -> String {
     </div>
   </div>
   <div id="tab-career" class="tab-panel tab-panel-hidden">
-    <div id="career-container"></div>
+    <div class="sub-tab-bar">
+      <button class="sub-tab-btn sub-tab-active" data-career-sub="champs">Championships</button>
+      <button class="sub-tab-btn" data-career-sub="stats">Driver Stats</button>
+    </div>
+    <div id="career-sub-champs" class="sub-tab-panel">
+      <div id="career-container"></div>
+    </div>
+    <div id="career-sub-stats" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-stats-container"></div>
+    </div>
   </div>
   <div id="tab-live" class="tab-panel">
     <section class="live-section">

@@ -43,52 +43,50 @@
     });
   }
 
-  // ── Sub-tab switching (SecondMonitor Import) ───────────────────────────────
-  document.querySelectorAll('.sub-tab-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.sub-tab-btn').forEach(function (b) { b.classList.remove('sub-tab-active'); });
-      document.querySelectorAll('.sub-tab-panel').forEach(function (p) { p.classList.add('sub-tab-panel-hidden'); });
-      btn.classList.add('sub-tab-active');
-      document.getElementById('subtab-' + btn.dataset.subtab).classList.remove('sub-tab-panel-hidden');
+  // ── Sub-tab switching (scoped per parent tab) ─────────────────────────────
+  function initSubTabs(parentId, btnAttr, panelPrefix) {
+    var parent = document.getElementById(parentId);
+    if (!parent) return;
+    parent.querySelectorAll('.sub-tab-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        parent.querySelectorAll('.sub-tab-btn').forEach(function (b) { b.classList.remove('sub-tab-active'); });
+        parent.querySelectorAll('.sub-tab-panel').forEach(function (p) { p.classList.add('sub-tab-panel-hidden'); });
+        btn.classList.add('sub-tab-active');
+        document.getElementById(panelPrefix + btn.dataset[btnAttr]).classList.remove('sub-tab-panel-hidden');
+      });
     });
-  });
+  }
+  initSubTabs('tab-import', 'subtab', 'subtab-');
+  initSubTabs('tab-career', 'careerSub', 'career-sub-');
 
   // ── Sortable stats table ───────────────────────────────────────────────────
-  function initSortableTable() {
-    var table = document.getElementById('stats-table');
+  function initSortableTableEl(table) {
     if (!table) return;
     var tbody = table.tBodies[0];
     var headers = table.tHead.rows[0].cells;
     var sortCol = 0, sortAsc = true;
-
     function cellVal(row, col, type) {
       var text = row.cells[col].textContent.trim();
       return type === 'num' ? (parseFloat(text) || 0) : text.toLowerCase();
     }
-
     function sort(col, type) {
       var rows = Array.from(tbody.rows);
       var asc = (col === sortCol) ? !sortAsc : (type === 'num' ? false : true);
       rows.sort(function (a, b) {
         var av = cellVal(a, col, type), bv = cellVal(b, col, type);
-        if (av < bv) return asc ? -1 : 1;
-        if (av > bv) return asc ? 1 : -1;
-        return 0;
+        return av < bv ? (asc ? -1 : 1) : av > bv ? (asc ? 1 : -1) : 0;
       });
       rows.forEach(function (r) { tbody.appendChild(r); });
-      Array.from(headers).forEach(function (th) {
-        th.classList.remove('sort-asc', 'sort-desc');
-      });
+      Array.from(headers).forEach(function (th) { th.classList.remove('sort-asc', 'sort-desc'); });
       headers[col].classList.add(asc ? 'sort-asc' : 'sort-desc');
       sortCol = col; sortAsc = asc;
     }
-
     Array.from(headers).forEach(function (th) {
-      th.addEventListener('click', function () {
-        sort(+th.dataset.col, th.dataset.type);
-      });
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', function () { sort(+th.dataset.col, th.dataset.type); });
     });
   }
+  function initSortableTable() { initSortableTableEl(document.getElementById('stats-table')); }
   initSortableTable();
 
   // ── Live table sort ────────────────────────────────────────────────────────
@@ -779,12 +777,72 @@
     }).join('');
   }
 
+  function renderCareerStats(champs, sessions) {
+    var container = document.getElementById('career-stats-container');
+    if (!container) return;
+    var ds = {};  // name → { races, wins, top3, top10, dnf, totalPos, champWins }
+    champs.forEach(function (champ) {
+      var standings = careerComputeStandings(champ, sessions);
+      var winner = (champ.status === 'Finished' && standings.length) ? standings[0].name : null;
+      if (winner) { if (!ds[winner]) ds[winner] = { races: 0, wins: 0, top3: 0, top10: 0, dnf: 0, totalPos: 0, champWins: 0 }; ds[winner].champWins++; }
+      (champ.rounds || []).forEach(function (round) {
+        (round.session_ids || []).forEach(function (sid) {
+          var sess = sessions.find(function (s) { return s.id === sid; });
+          if (!sess || sess.session_type !== 5) return;
+          sess.results.forEach(function (r) {
+            var name = r.name;
+            if (!ds[name]) ds[name] = { races: 0, wins: 0, top3: 0, top10: 0, dnf: 0, totalPos: 0, champWins: 0 };
+            ds[name].races++;
+            if (r.dnf) { ds[name].dnf++; }
+            if (!r.dnf) {
+              if (r.race_position === 1) ds[name].wins++;
+              if (r.race_position <= 3) ds[name].top3++;
+              if (r.race_position <= 10) ds[name].top10++;
+            }
+            ds[name].totalPos += r.race_position;
+          });
+        });
+      });
+    });
+    var rows = Object.keys(ds).map(function (name) {
+      var d = ds[name];
+      return { name: name, races: d.races, wins: d.wins, top3: d.top3, top10: d.top10,
+               dnf: d.dnf, champWins: d.champWins, avgPos: d.races ? (d.totalPos / d.races).toFixed(1) : '\u2014' };
+    });
+    rows.sort(function (a, b) { return b.wins - a.wins || b.races - a.races; });
+    var thead = '<tr>' +
+      '<th class="stat-name sort-asc" data-col="0" data-type="str">Driver</th>' +
+      '<th class="stat-num" data-col="1" data-type="num">Races</th>' +
+      '<th class="stat-num" data-col="2" data-type="num">Wins</th>' +
+      '<th class="stat-num" data-col="3" data-type="num">Top 3</th>' +
+      '<th class="stat-num" data-col="4" data-type="num">Top 10</th>' +
+      '<th class="stat-num" data-col="5" data-type="num">DNF</th>' +
+      '<th class="stat-num" data-col="6" data-type="num">Champ Wins</th>' +
+      '<th class="stat-num" data-col="7" data-type="num">Avg Pos</th>' +
+      '</tr>';
+    var tbody = rows.map(function (r) {
+      return '<tr><td class="stat-name">' + esc(r.name) + '</td>' +
+        '<td class="stat-num">' + r.races + '</td>' +
+        '<td class="stat-num">' + r.wins + '</td>' +
+        '<td class="stat-num">' + r.top3 + '</td>' +
+        '<td class="stat-num">' + r.top10 + '</td>' +
+        '<td class="stat-num">' + (r.dnf || 0) + '</td>' +
+        '<td class="stat-num">' + r.champWins + '</td>' +
+        '<td class="stat-num">' + r.avgPos + '</td></tr>';
+    }).join('');
+    container.innerHTML = '<table class="stats-table sortable" id="career-stats-table">' +
+      '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table>';
+    initSortableTableEl(document.getElementById('career-stats-table'));
+  }
+
   function loadCareerChampionships() {
     Promise.all([
       fetch('/api/championships').then(function (r) { return r.json(); }),
       fetch('/api/sessions').then(function (r) { return r.json(); })
     ]).then(function (results) {
-      renderCareerChampionships(results[0] || [], results[1] || []);
+      var champs = results[0] || [], sessions = results[1] || [];
+      renderCareerChampionships(champs, sessions);
+      renderCareerStats(champs, sessions);
     }).catch(function () {
       var el = document.getElementById('career-container');
       if (el) el.innerHTML = '<div class="manage-placeholder" style="padding:2rem">Career data requires the server binary.</div>';
