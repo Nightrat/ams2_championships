@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -93,6 +94,175 @@ pub fn load_store(path: &PathBuf) -> SharedStore {
     Arc::new(RwLock::new(data))
 }
 
+// ── Career computation ────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct StandingsEntry {
+    pub name: String,
+    pub points: i32,
+    pub wins: u32,
+}
+
+/// Round with sessions already resolved from IDs.
+#[derive(Serialize)]
+pub struct RoundView {
+    pub sessions: Vec<RecordedSession>,
+}
+
+#[derive(Serialize)]
+pub struct ChampionshipView {
+    pub id: String,
+    pub name: String,
+    pub status: String,
+    pub points_system: Vec<i32>,
+    pub manufacturer_scoring: bool,
+    pub driver_standings: Vec<StandingsEntry>,
+    pub constructor_standings: Vec<StandingsEntry>,
+    pub rounds: Vec<RoundView>,
+}
+
+#[derive(Serialize)]
+pub struct DriverStat {
+    pub name: String,
+    pub races: u32,
+    pub wins: u32,
+    pub top3: u32,
+    pub top10: u32,
+    pub dnf: u32,
+    pub champ_wins: u32,
+    pub avg_pos: f32,
+}
+
+#[derive(Serialize)]
+pub struct CareerResponse {
+    pub championships: Vec<ChampionshipView>,
+    pub driver_stats: Vec<DriverStat>,
+}
+
+fn resolve_sessions<'a>(ids: &[String], sessions: &'a [RecordedSession]) -> Vec<&'a RecordedSession> {
+    ids.iter().filter_map(|id| sessions.iter().find(|s| s.id == *id)).collect()
+}
+
+fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<StandingsEntry> {
+    let mut pts: HashMap<String, i32> = HashMap::new();
+    let mut wins: HashMap<String, u32> = HashMap::new();
+    for round in &champ.rounds {
+        for s in resolve_sessions(&round.session_ids, sessions) {
+            if s.session_type != 5 { continue; }
+            for r in &s.results {
+                pts.entry(r.name.clone()).or_insert(0);
+                wins.entry(r.name.clone()).or_insert(0);
+                if !r.dnf {
+                    let pos = r.race_position as usize;
+                    if pos > 0 && pos <= champ.points_system.len() {
+                        *pts.get_mut(&r.name).unwrap() += champ.points_system[pos - 1];
+                    }
+                    if r.race_position == 1 {
+                        *wins.get_mut(&r.name).unwrap() += 1;
+                    }
+                }
+            }
+        }
+    }
+    let mut out: Vec<StandingsEntry> = pts.into_iter().map(|(name, points)| StandingsEntry {
+        points, wins: wins.get(&name).copied().unwrap_or(0), name,
+    }).collect();
+    out.sort_by(|a, b| b.points.cmp(&a.points).then(b.wins.cmp(&a.wins)));
+    out
+}
+
+fn constructors(champ: &Championship, sessions: &[RecordedSession]) -> Vec<StandingsEntry> {
+    let mut pts: HashMap<String, i32> = HashMap::new();
+    let mut wins: HashMap<String, u32> = HashMap::new();
+    for round in &champ.rounds {
+        for s in resolve_sessions(&round.session_ids, sessions) {
+            if s.session_type != 5 { continue; }
+            for r in &s.results {
+                let key = if !r.car_name.is_empty() { &r.car_name }
+                          else if !r.car_class.is_empty() { &r.car_class }
+                          else { continue };
+                pts.entry(key.clone()).or_insert(0);
+                wins.entry(key.clone()).or_insert(0);
+                if !r.dnf {
+                    let pos = r.race_position as usize;
+                    if pos > 0 && pos <= champ.points_system.len() {
+                        *pts.get_mut(key).unwrap() += champ.points_system[pos - 1];
+                    }
+                    if r.race_position == 1 {
+                        *wins.get_mut(key).unwrap() += 1;
+                    }
+                }
+            }
+        }
+    }
+    let mut out: Vec<StandingsEntry> = pts.into_iter().map(|(name, points)| StandingsEntry {
+        points, wins: wins.get(&name).copied().unwrap_or(0), name,
+    }).collect();
+    out.sort_by(|a, b| b.points.cmp(&a.points).then(b.wins.cmp(&a.wins)));
+    out
+}
+
+pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> CareerResponse {
+    #[derive(Default)]
+    struct Accum { races: u32, wins: u32, top3: u32, top10: u32, dnf: u32, champ_wins: u32, total_pos: u32 }
+    let mut accum: HashMap<String, Accum> = HashMap::new();
+    let mut championships: Vec<ChampionshipView> = Vec::new();
+
+    for champ in champs {
+        let driver_standings = standings(champ, sessions);
+        let constructor_standings = constructors(champ, sessions);
+
+        if champ.status == "Finished" {
+            if let Some(w) = driver_standings.first() {
+                accum.entry(w.name.clone()).or_default().champ_wins += 1;
+            }
+        }
+
+        let mut rounds: Vec<RoundView> = Vec::new();
+        for round in &champ.rounds {
+            let mut rsessions: Vec<RecordedSession> = resolve_sessions(&round.session_ids, sessions)
+                .into_iter().cloned().collect();
+            rsessions.sort_by_key(|s| s.session_type);
+
+            for s in &rsessions {
+                if s.session_type != 5 { continue; }
+                for r in &s.results {
+                    let a = accum.entry(r.name.clone()).or_default();
+                    a.races += 1;
+                    if r.dnf { a.dnf += 1; }
+                    else {
+                        if r.race_position == 1 { a.wins += 1; }
+                        if r.race_position <= 3 { a.top3 += 1; }
+                        if r.race_position <= 10 { a.top10 += 1; }
+                    }
+                    a.total_pos += r.race_position;
+                }
+            }
+            rounds.push(RoundView { sessions: rsessions });
+        }
+
+        championships.push(ChampionshipView {
+            id: champ.id.clone(),
+            name: champ.name.clone(),
+            status: champ.status.clone(),
+            points_system: champ.points_system.clone(),
+            manufacturer_scoring: champ.manufacturer_scoring,
+            driver_standings,
+            constructor_standings,
+            rounds,
+        });
+    }
+
+    let mut driver_stats: Vec<DriverStat> = accum.into_iter().map(|(name, a)| DriverStat {
+        avg_pos: if a.races > 0 { a.total_pos as f32 / a.races as f32 } else { 0.0 },
+        name, races: a.races, wins: a.wins, top3: a.top3, top10: a.top10,
+        dnf: a.dnf, champ_wins: a.champ_wins,
+    }).collect();
+    driver_stats.sort_by(|a, b| b.wins.cmp(&a.wins).then(b.races.cmp(&a.races)));
+
+    CareerResponse { championships, driver_stats }
+}
+
 pub fn persist(store: &SharedStore, path: &PathBuf) {
     let data = store.read().unwrap();
     let content = serde_json::to_string_pretty(&*data).unwrap_or_default();
@@ -102,180 +272,5 @@ pub fn persist(store: &SharedStore, path: &PathBuf) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    /// Returns a unique temp path that does not yet exist.
-    fn tmp() -> PathBuf {
-        let ns = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .subsec_nanos();
-        std::env::temp_dir().join(format!("ams2_test_{ns}.json"))
-    }
-
-    fn sample_championship() -> Championship {
-        Championship {
-            id: "1".into(),
-            name: "Formula Test".into(),
-            status: "Active".into(),
-            points_system: vec![25, 18, 15, 12, 10],
-            manufacturer_scoring: false,
-            rounds: vec![Round { session_ids: vec!["100".into()] }],
-            session_ids: vec!["100".into()],
-        }
-    }
-
-    fn sample_session() -> RecordedSession {
-        RecordedSession {
-            id: "100".into(),
-            recorded_at: 1_700_000_000,
-            track: "Silverstone".into(),
-            track_variation: "Grand Prix".into(),
-            car_name: "Formula Classic Gen2".into(),
-            car_class: "Formula Classic".into(),
-            session_type: 5,
-            results: vec![
-                SessionResult {
-                    name: "Alice".into(),
-                    car_name: "Formula Classic Gen2".into(),
-                    car_class: "Formula Classic".into(),
-                    race_position: 1,
-                    laps_completed: 20,
-                    fastest_lap: 89.5,
-                    last_lap: 90.1,
-                    dnf: false,
-                },
-                SessionResult {
-                    name: "Bob".into(),
-                    car_name: "Formula Classic Gen2".into(),
-                    car_class: "Formula Classic".into(),
-                    race_position: 2,
-                    laps_completed: 20,
-                    fastest_lap: 90.0,
-                    last_lap: 91.0,
-                    dnf: false,
-                },
-            ],
-        }
-    }
-
-    // ── load_store ────────────────────────────────────────────────────────────
-
-    #[test]
-    fn test_load_store_nonexistent_file_returns_empty_default() {
-        let path = tmp();
-        let store = load_store(&path);
-        let data = store.read().unwrap();
-        assert!(data.sessions.is_empty());
-        assert!(data.championships.is_empty());
-    }
-
-    #[test]
-    fn test_load_store_invalid_json_returns_empty_default() {
-        let path = tmp();
-        fs::write(&path, "not { valid } json %%%").unwrap();
-        let store = load_store(&path);
-        let data = store.read().unwrap();
-        assert!(data.sessions.is_empty());
-        fs::remove_file(&path).ok();
-    }
-
-    #[test]
-    fn test_load_store_empty_object_returns_empty_default() {
-        let path = tmp();
-        fs::write(&path, "{}").unwrap();
-        let store = load_store(&path);
-        let data = store.read().unwrap();
-        assert!(data.sessions.is_empty());
-        assert!(data.championships.is_empty());
-        fs::remove_file(&path).ok();
-    }
-
-    // ── persist ───────────────────────────────────────────────────────────────
-
-    #[test]
-    fn test_persist_and_reload_championship() {
-        let path = tmp();
-        let store = load_store(&path);
-        store.write().unwrap().championships.push(sample_championship());
-        persist(&store, &path);
-
-        let store2 = load_store(&path);
-        let data = store2.read().unwrap();
-        assert_eq!(data.championships.len(), 1);
-        assert_eq!(data.championships[0].name, "Formula Test");
-        assert_eq!(data.championships[0].points_system, vec![25, 18, 15, 12, 10]);
-        // session_ids is skip_serializing; rounds persist instead
-        assert_eq!(data.championships[0].rounds.len(), 1);
-        assert_eq!(data.championships[0].rounds[0].session_ids, vec!["100"]);
-        fs::remove_file(&path).ok();
-    }
-
-    #[test]
-    fn test_persist_and_reload_session() {
-        let path = tmp();
-        let store = load_store(&path);
-        store.write().unwrap().sessions.push(sample_session());
-        persist(&store, &path);
-
-        let store2 = load_store(&path);
-        let data = store2.read().unwrap();
-        assert_eq!(data.sessions.len(), 1);
-        assert_eq!(data.sessions[0].track, "Silverstone");
-        assert_eq!(data.sessions[0].results.len(), 2);
-        assert_eq!(data.sessions[0].results[0].name, "Alice");
-        assert_eq!(data.sessions[0].results[0].fastest_lap, 89.5);
-        assert!(!data.sessions[0].results[0].dnf);
-        fs::remove_file(&path).ok();
-    }
-
-    #[test]
-    fn test_persist_overwrites_previous_contents() {
-        let path = tmp();
-        let store = load_store(&path);
-        store.write().unwrap().championships.push(sample_championship());
-        persist(&store, &path);
-
-        // Add a second championship and persist again.
-        let mut c2 = sample_championship();
-        c2.id = "2".into();
-        c2.name = "Second Champ".into();
-        store.write().unwrap().championships.push(c2);
-        persist(&store, &path);
-
-        let store3 = load_store(&path);
-        assert_eq!(store3.read().unwrap().championships.len(), 2);
-        fs::remove_file(&path).ok();
-    }
-
-    #[test]
-    fn test_persist_writes_valid_json() {
-        let path = tmp();
-        let store = load_store(&path);
-        store.write().unwrap().sessions.push(sample_session());
-        persist(&store, &path);
-
-        let raw = fs::read_to_string(&path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
-        assert!(parsed.get("sessions").is_some());
-        assert!(parsed.get("championships").is_some());
-        fs::remove_file(&path).ok();
-    }
-
-    #[test]
-    fn test_dnf_result_round_trips() {
-        let path = tmp();
-        let store = load_store(&path);
-        let mut session = sample_session();
-        session.results[1].dnf = true;
-        store.write().unwrap().sessions.push(session);
-        persist(&store, &path);
-
-        let store2 = load_store(&path);
-        let data = store2.read().unwrap();
-        assert!(data.sessions[0].results[1].dnf);
-        fs::remove_file(&path).ok();
-    }
-}
+#[path = "data_store_tests.rs"]
+mod tests;
