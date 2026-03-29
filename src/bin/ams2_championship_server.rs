@@ -205,7 +205,7 @@ fn handle_websocket(mut stream: TcpStream, headers: &str) {
             Ok(json) => { if ws_send_text(&mut stream, &json).is_err() { break; } }
             Err(_)   => break,
         }
-        std::thread::sleep(std::time::Duration::from_millis(300));
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 }
 
@@ -485,6 +485,15 @@ fn handle(
 
     // POST /api/track-layout/:track — save layout points to file
     if method == "POST" && segs.len() == 3 && segs[0] == "api" && segs[1] == "track-layout" {
+        // Reject payloads with too few points (must have at least 300 entries).
+        let count = serde_json::from_slice::<serde_json::Value>(&req.body)
+            .ok()
+            .and_then(|v| v.as_array().map(|a| a.len()))
+            .unwrap_or(0);
+        if count < 300 {
+            json_err(&mut stream, "400 Bad Request", "too few points");
+            return;
+        }
         let file = layouts_dir.join(format!("{}.json", track_slug(segs[2])));
         if let Err(e) = std::fs::write(&file, &req.body) {
             json_err(&mut stream, "500 Internal Server Error", &e.to_string());

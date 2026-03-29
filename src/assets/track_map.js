@@ -24,7 +24,7 @@ function tmLoad(track) {
       trackMap.loading = false;
       if (Array.isArray(data) && data.length > 50) {
         trackMap.points = data;
-        trackMap.saved  = true;
+        trackMap.saved  = data.length >= TM_MIN;
       }
     })
     .catch(function () { trackMap.loading = false; });

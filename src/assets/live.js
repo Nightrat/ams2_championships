@@ -117,16 +117,24 @@ function processLiveData(d) {
       }
       var now = Date.now();
       d.participants.forEach(function (p) {
-        var prev = lastPosPoll[p.name];
-        if (prev) {
-          var dt = (now - prev.t) / 1000;
-          if (dt > 0) {
-            var dx = p.world_pos_x - prev.x, dz = p.world_pos_z - prev.z;
-            var kmh = Math.sqrt(dx * dx + dz * dz) / dt * 3.6;
-            if (kmh < 450 && (!(p.name in topSpeeds) || kmh > topSpeeds[p.name])) topSpeeds[p.name] = kmh;
+        var kmh;
+        if (p.is_player && d.player_telemetry && d.player_telemetry.speed >= 0) {
+          // Use AMS2's own speed sensor (m/s → km/h) for the player — more accurate than position deltas.
+          kmh = d.player_telemetry.speed * 3.6;
+        } else {
+          var prev = lastPosPoll[p.name];
+          if (prev) {
+            var dt = (now - prev.t) / 1000;
+            if (dt > 0) {
+              var dx = p.world_pos_x - prev.x, dz = p.world_pos_z - prev.z;
+              kmh = Math.sqrt(dx * dx + dz * dz) / dt * 3.6;
+            }
           }
         }
         lastPosPoll[p.name] = { x: p.world_pos_x, z: p.world_pos_z, t: now };
+        if (kmh !== undefined && kmh < 450 && (!(p.name in topSpeeds) || kmh > topSpeeds[p.name])) {
+          topSpeeds[p.name] = kmh;
+        }
       });
 
       // ── Gap to fastest lap ────────────────────────────────────────────────
