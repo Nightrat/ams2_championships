@@ -6,6 +6,8 @@
 
 A motorsport career tracker for Automobilista 2. It records race results directly from the AMS2 shared memory API, lets you organise them into championships, and displays everything in a browser-based UI with a real-time live timing overlay.
 
+> **Note:** The majority of the code in this repository was written with the assistance of [Claude](https://claude.ai) (Anthropic AI).
+
 ## Features
 
 - **Session recorder** — automatically captures race results at session end from the AMS2 shared memory API; no external tool required
