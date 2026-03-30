@@ -59,7 +59,7 @@ fn generate_html() -> String {
                 <tr>
                   <th data-col="0" data-type="num">Pos</th>
                   <th data-col="1" data-type="str">Driver</th>
-                  <th data-col="2" data-type="num">Lap</th>
+                  <th data-col="2" data-type="num">Laps</th>
                   <th data-col="3" data-type="gap">Gap</th>
                   <th data-col="4" data-type="time">S1</th>
                   <th data-col="5" data-type="time">S2</th>

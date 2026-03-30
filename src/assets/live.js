@@ -178,7 +178,7 @@ function processLiveData(d) {
         return '<tr' + rowCls + '>' +
           '<td class="live-pos">'  + pos + '</td>' +
           '<td class="live-name">' + p.name + nameSuffix + '</td>' +
-          '<td class="live-num">'  + p.current_lap + '</td>' +
+          '<td class="live-num">'  + p.laps_completed + '</td>' +
           '<td class="live-gap">'  + fmtGap(p) + '</td>' +
           '<td class="live-time">' + fmtSector(p.cur_s1, p.best_s1, bestS1) + '</td>' +
           '<td class="live-time">' + fmtSector(p.cur_s2, p.best_s2, bestS2) + '</td>' +

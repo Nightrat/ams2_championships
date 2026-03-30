@@ -63,6 +63,7 @@ function careerRoundsHtml(champ) {
         return '<tr><td class="pos">' + pos + '</td>' +
           '<td>' + esc(r.name) + carLabel + dnf + '</td>' +
           pts +
+          '<td class="pts">' + (r.laps_completed || 0) + '</td>' +
           '<td class="car">' + fl + '</td></tr>';
       }).join('');
 
@@ -73,7 +74,7 @@ function careerRoundsHtml(champ) {
           ' <span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
           ' <span class="session-drivers">' + s.results.length + ' drivers</span>' +
         '</div>' +
-        '<table class="standings-table"><thead><tr><th>Pos</th><th>Driver</th>' + ptsHeader + '<th>Best</th></tr></thead>' +
+        '<table class="standings-table"><thead><tr><th>Pos</th><th>Driver</th>' + ptsHeader + '<th>Laps</th><th>Best</th></tr></thead>' +
         '<tbody>' + resultRows + '</tbody></table></div>';
     }).join('');
 
