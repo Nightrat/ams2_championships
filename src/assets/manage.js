@@ -157,13 +157,12 @@ function renderChampDetail(id) {
 }
 
 function renderAvailableSessions(champId) {
-  var champ = manageState.champs.find(function (c) { return c.id === champId; });
   var assignedIds = [];
-  if (champ) {
-    (champ.rounds || []).forEach(function (round) {
+  manageState.champs.forEach(function (c) {
+    (c.rounds || []).forEach(function (round) {
       (round.session_ids || []).forEach(function (sid) { assignedIds.push(sid); });
     });
-  }
+  });
   var ridx = manageState.currentRidx || 0;
   var available = manageState.sessions.filter(function (s) { return !assignedIds.includes(s.id); });
   var el = document.getElementById('available-sessions');
