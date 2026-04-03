@@ -370,13 +370,15 @@ fn test_compute_career_race_stats_accumulated() {
     let resp = compute_career(&[champ], &sessions);
     let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
     assert_eq!(alice.races, 1);
-    assert_eq!(alice.wins, 1);
-    assert_eq!(alice.top3, 1);
+    assert_eq!(alice.p1, 1);
+    assert_eq!(alice.p2, 0);
+    assert_eq!(alice.p3, 0);
     assert_eq!(alice.top10, 1);
     assert_eq!(alice.dnf, 0);
     let bob = resp.driver_stats.iter().find(|d| d.name == "Bob").unwrap();
-    assert_eq!(bob.wins, 0);
-    assert_eq!(bob.top3, 1);
+    assert_eq!(bob.p1, 0);
+    assert_eq!(bob.p2, 1);
+    assert_eq!(bob.p3, 0);
 }
 
 #[test]
@@ -390,8 +392,9 @@ fn test_compute_career_dnf_not_counted_in_wins_or_top3() {
     let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
     assert_eq!(alice.races, 1);
     assert_eq!(alice.dnf, 1);
-    assert_eq!(alice.wins, 0);
-    assert_eq!(alice.top3, 0);
+    assert_eq!(alice.p1, 0);
+    assert_eq!(alice.p2, 0);
+    assert_eq!(alice.p3, 0);
     assert_eq!(alice.top10, 0);
 }
 

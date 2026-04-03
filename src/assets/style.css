@@ -379,6 +379,7 @@ table { border-collapse: collapse; width: 100%; }
 
 .stats-table .stat-name { min-width: 160px; }
 .stats-table .stat-num  { text-align: right; font-weight: 600; color: #e0e0f0; min-width: 60px; }
+.stats-table .stat-group-start { border-left: 2px solid #3a3a5c; }
 
 .driver-portrait {
   width: 32px;

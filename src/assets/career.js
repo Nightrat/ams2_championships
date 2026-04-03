@@ -126,28 +126,44 @@ function renderCareerStats(driverStats) {
   var container = document.getElementById('career-stats-container');
   if (!container) return;
   var rows = (driverStats || []).map(function (d) {
-    return { name: d.name, races: d.races, wins: d.wins, top3: d.top3, top10: d.top10,
-             dnf: d.dnf, champWins: d.champ_wins, avgPos: d.races ? d.avg_pos.toFixed(1) : '\u2014' };
+    return { name: d.name, races: d.races, p1: d.p1, p2: d.p2, p3: d.p3, top10: d.top10,
+             dnf: d.dnf, qualiP1: d.quali_p1, qualiP2: d.quali_p2, qualiP3: d.quali_p3, qualiTop10: d.quali_top10,
+             champWins: d.champ_wins, champP2: d.champ_p2, champP3: d.champ_p3,
+             avgPos: d.races ? d.avg_pos.toFixed(1) : '\u2014' };
   });
   var thead = '<tr>' +
     '<th class="stat-name sort-asc" data-col="0" data-type="str">Driver</th>' +
     '<th class="stat-num" data-col="1" data-type="num">Races</th>' +
-    '<th class="stat-num" data-col="2" data-type="num">Wins</th>' +
-    '<th class="stat-num" data-col="3" data-type="num">Top 3</th>' +
-    '<th class="stat-num" data-col="4" data-type="num">Top 10</th>' +
-    '<th class="stat-num" data-col="5" data-type="num">DNF</th>' +
-    '<th class="stat-num" data-col="6" data-type="num">Champ Wins</th>' +
-    '<th class="stat-num" data-col="7" data-type="num">Avg Pos</th>' +
+    '<th class="stat-num" data-col="2" data-type="num">1st</th>' +
+    '<th class="stat-num" data-col="3" data-type="num">2nd</th>' +
+    '<th class="stat-num" data-col="4" data-type="num">3rd</th>' +
+    '<th class="stat-num" data-col="5" data-type="num">Top 10</th>' +
+    '<th class="stat-num" data-col="6" data-type="num">Avg Pos</th>' +
+    '<th class="stat-num" data-col="7" data-type="num">DNF</th>' +
+    '<th class="stat-num stat-group-start" data-col="8" data-type="num">Q Pole</th>' +
+    '<th class="stat-num" data-col="9" data-type="num">Q 2nd</th>' +
+    '<th class="stat-num" data-col="10" data-type="num">Q 3rd</th>' +
+    '<th class="stat-num" data-col="11" data-type="num">Q Top 10</th>' +
+    '<th class="stat-num stat-group-start" data-col="12" data-type="num">C 1st</th>' +
+    '<th class="stat-num" data-col="13" data-type="num">C 2nd</th>' +
+    '<th class="stat-num" data-col="14" data-type="num">C 3rd</th>' +
     '</tr>';
   var tbody = rows.map(function (r) {
     return '<tr><td class="stat-name">' + esc(r.name) + '</td>' +
       '<td class="stat-num">' + r.races + '</td>' +
-      '<td class="stat-num">' + r.wins + '</td>' +
-      '<td class="stat-num">' + r.top3 + '</td>' +
+      '<td class="stat-num">' + r.p1 + '</td>' +
+      '<td class="stat-num">' + r.p2 + '</td>' +
+      '<td class="stat-num">' + r.p3 + '</td>' +
       '<td class="stat-num">' + r.top10 + '</td>' +
+      '<td class="stat-num">' + r.avgPos + '</td>' +
       '<td class="stat-num">' + (r.dnf || 0) + '</td>' +
-      '<td class="stat-num">' + r.champWins + '</td>' +
-      '<td class="stat-num">' + r.avgPos + '</td></tr>';
+      '<td class="stat-num stat-group-start">' + (r.qualiP1 || 0) + '</td>' +
+      '<td class="stat-num">' + (r.qualiP2 || 0) + '</td>' +
+      '<td class="stat-num">' + (r.qualiP3 || 0) + '</td>' +
+      '<td class="stat-num">' + (r.qualiTop10 || 0) + '</td>' +
+      '<td class="stat-num stat-group-start">' + (r.champWins || 0) + '</td>' +
+      '<td class="stat-num">' + (r.champP2 || 0) + '</td>' +
+      '<td class="stat-num">' + (r.champP3 || 0) + '</td></tr>';
   }).join('');
   container.innerHTML = '<table class="stats-table sortable" id="career-stats-table">' +
     '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table>';

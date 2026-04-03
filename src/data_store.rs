@@ -138,11 +138,18 @@ pub struct ChampionshipView {
 pub struct DriverStat {
     pub name: String,
     pub races: u32,
-    pub wins: u32,
-    pub top3: u32,
+    pub p1: u32,
+    pub p2: u32,
+    pub p3: u32,
     pub top10: u32,
     pub dnf: u32,
+    pub quali_p1: u32,
+    pub quali_p2: u32,
+    pub quali_p3: u32,
+    pub quali_top10: u32,
     pub champ_wins: u32,
+    pub champ_p2: u32,
+    pub champ_p3: u32,
     pub avg_pos: f32,
 }
 
@@ -217,7 +224,7 @@ fn constructors(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Stand
 
 pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> CareerResponse {
     #[derive(Default)]
-    struct Accum { races: u32, wins: u32, top3: u32, top10: u32, dnf: u32, champ_wins: u32, total_pos: u32 }
+    struct Accum { races: u32, p1: u32, p2: u32, p3: u32, top10: u32, dnf: u32, quali_p1: u32, quali_p2: u32, quali_p3: u32, quali_top10: u32, champ_wins: u32, champ_p2: u32, champ_p3: u32, total_pos: u32 }
     let mut accum: HashMap<String, Accum> = HashMap::new();
     let mut championships: Vec<ChampionshipView> = Vec::new();
 
@@ -226,8 +233,14 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
         let constructor_standings = constructors(champ, sessions);
 
         if champ.status == ChampionshipStatus::Final {
-            if let Some(w) = driver_standings.first() {
+            if let Some(w) = driver_standings.get(0) {
                 accum.entry(w.name.clone()).or_default().champ_wins += 1;
+            }
+            if let Some(w) = driver_standings.get(1) {
+                accum.entry(w.name.clone()).or_default().champ_p2 += 1;
+            }
+            if let Some(w) = driver_standings.get(2) {
+                accum.entry(w.name.clone()).or_default().champ_p3 += 1;
             }
         }
 
@@ -238,17 +251,24 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
             rsessions.sort_by_key(|s| s.session_type);
 
             for s in &rsessions {
-                if s.session_type != 5 { continue; }
                 for r in &s.results {
                     let a = accum.entry(r.name.clone()).or_default();
-                    a.races += 1;
-                    if r.dnf { a.dnf += 1; }
-                    else {
-                        if r.race_position == 1 { a.wins += 1; }
-                        if r.race_position <= 3 { a.top3 += 1; }
-                        if r.race_position <= 10 { a.top10 += 1; }
+                    if s.session_type == 5 {
+                        a.races += 1;
+                        if r.dnf { a.dnf += 1; }
+                        else {
+                            if r.race_position == 1 { a.p1 += 1; }
+                            if r.race_position == 2 { a.p2 += 1; }
+                            if r.race_position == 3 { a.p3 += 1; }
+                            if r.race_position <= 10 { a.top10 += 1; }
+                        }
+                        a.total_pos += r.race_position;
+                    } else if s.session_type == 3 {
+                        if r.race_position == 1  { a.quali_p1 += 1; }
+                        if r.race_position == 2  { a.quali_p2 += 1; }
+                        if r.race_position == 3  { a.quali_p3 += 1; }
+                        if r.race_position <= 10 { a.quali_top10 += 1; }
                     }
-                    a.total_pos += r.race_position;
                 }
             }
             rounds.push(RoundView { sessions: rsessions });
@@ -268,10 +288,11 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
 
     let mut driver_stats: Vec<DriverStat> = accum.into_iter().map(|(name, a)| DriverStat {
         avg_pos: if a.races > 0 { a.total_pos as f32 / a.races as f32 } else { 0.0 },
-        name, races: a.races, wins: a.wins, top3: a.top3, top10: a.top10,
-        dnf: a.dnf, champ_wins: a.champ_wins,
+        name, races: a.races, p1: a.p1, p2: a.p2, p3: a.p3, top10: a.top10,
+        dnf: a.dnf, quali_p1: a.quali_p1, quali_p2: a.quali_p2, quali_p3: a.quali_p3, quali_top10: a.quali_top10,
+        champ_wins: a.champ_wins, champ_p2: a.champ_p2, champ_p3: a.champ_p3,
     }).collect();
-    driver_stats.sort_by(|a, b| b.wins.cmp(&a.wins).then(b.races.cmp(&a.races)));
+    driver_stats.sort_by(|a, b| b.p1.cmp(&a.p1).then(b.p2.cmp(&a.p2)).then(b.races.cmp(&a.races)));
 
     CareerResponse { championships, driver_stats }
 }
