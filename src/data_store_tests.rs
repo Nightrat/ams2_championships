@@ -14,7 +14,7 @@ fn sample_championship() -> Championship {
     Championship {
         id: "1".into(),
         name: "Formula Test".into(),
-        status: "Active".into(),
+        status: ChampionshipStatus::Active,
         points_system: vec![25, 18, 15, 12, 10],
         manufacturer_scoring: false,
         rounds: vec![Round { session_ids: vec!["100".into()] }],
@@ -203,7 +203,7 @@ fn test_load_store_migrates_legacy_session_ids_to_rounds() {
 
 fn make_champ(pts: Vec<i32>, sessions: &[&str]) -> Championship {
     Championship {
-        id: "c1".into(), name: "Test".into(), status: "Active".into(),
+        id: "c1".into(), name: "Test".into(), status: ChampionshipStatus::Active,
         points_system: pts,
         manufacturer_scoring: false,
         rounds: sessions.iter().map(|&id| Round { session_ids: vec![id.into()] }).collect(),
@@ -398,10 +398,10 @@ fn test_compute_career_dnf_not_counted_in_wins_or_top3() {
 #[test]
 fn test_compute_career_champ_wins_only_for_finished() {
     let mut active = make_champ(vec![25, 18], &["r1"]);
-    active.status = "Active".into();
+    active.status = ChampionshipStatus::Active;
     let mut finished = make_champ(vec![25, 18], &["r2"]);
     finished.id = "c2".into();
-    finished.status = "Final".into();
+    finished.status = ChampionshipStatus::Final;
     let sessions = vec![
         make_session("r1", 5, vec![("Alice", 1, false, ""), ("Bob", 2, false, "")]),
         make_session("r2", 5, vec![("Alice", 1, false, ""), ("Bob", 2, false, "")]),
