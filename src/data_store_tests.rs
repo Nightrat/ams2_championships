@@ -401,14 +401,14 @@ fn test_compute_career_champ_wins_only_for_finished() {
     active.status = "Active".into();
     let mut finished = make_champ(vec![25, 18], &["r2"]);
     finished.id = "c2".into();
-    finished.status = "Finished".into();
+    finished.status = "Final".into();
     let sessions = vec![
         make_session("r1", 5, vec![("Alice", 1, false, ""), ("Bob", 2, false, "")]),
         make_session("r2", 5, vec![("Alice", 1, false, ""), ("Bob", 2, false, "")]),
     ];
     let resp = compute_career(&[active, finished], &sessions);
     let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
-    assert_eq!(alice.champ_wins, 1); // only the Finished one counts
+    assert_eq!(alice.champ_wins, 1); // only the Final one counts
 }
 
 #[test]

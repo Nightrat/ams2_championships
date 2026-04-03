@@ -155,9 +155,9 @@ main { padding: 1.5rem 2rem; }
   letter-spacing: 0.05em;
 }
 
-.badge-finished { background: #1e4d2b; color: #2ecc71; border: 1px solid #2ecc71; }
-.badge-active   { background: #4d3000; color: #f39c12; border: 1px solid #f39c12; }
-.badge-pending  { background: #2a2a2a; color: #95a5a6; border: 1px solid #95a5a6; }
+.badge-final    { background: #1e4d2b; color: #2ecc71; border: 1px solid #2ecc71; }
+.badge-progress { background: #4d3000; color: #f39c12; border: 1px solid #f39c12; }
+.badge-active   { background: #2a2a2a; color: #95a5a6; border: 1px solid #95a5a6; }
 
 .class-badge {
   background: #2a1a3a;
@@ -618,17 +618,11 @@ table { border-collapse: collapse; width: 100%; }
 }
 .champ-list-item:hover { background: #1e1e32; }
 .champ-list-item.selected { background: #1e1e3a; border-left: 3px solid #e74c3c; }
-.champ-list-name { font-size: 0.88rem; }
-.champ-status {
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.15rem 0.45rem;
-  border-radius: 3px;
-  text-transform: uppercase;
-}
-.status-active   { background: #1a4a2a; color: #2ecc71; }
-.status-finished { background: #1a2a4a; color: #5dade2; }
-.status-pending  { background: #2a2a1a; color: #f39c12; }
+.champ-list-name { font-size: 0.88rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.champ-list-status { font-size: 0.75rem; padding: 0.1rem 0.2rem; flex-shrink: 0; border: none; border-radius: 3px; cursor: pointer; }
+.status-final    { background: #1a4a2a; color: #2ecc71; }
+.status-progress { background: #1a2a4a; color: #5dade2; }
+.status-active   { background: #2a2a1a; color: #f39c12; }
 
 .manage-right {
   overflow-y: auto;
@@ -966,9 +960,9 @@ table { border-collapse: collapse; width: 100%; }
   /* Misc */
   .manage-empty, .manage-placeholder { color: #888 !important; font-style: italic; }
   .result-car { color: #555 !important; font-size: 7.5pt; }
-  .badge-pending { border-color: #c0392b !important; }
-  .badge-active  { border-color: #27ae60 !important; }
-  .badge-finished{ border-color: #2980b9 !important; }
+  .badge-active   { border-color: #c0392b !important; }
+  .badge-progress { border-color: #27ae60 !important; }
+  .badge-final    { border-color: #2980b9 !important; }
 
   a { text-decoration: none; color: inherit !important; }
 }

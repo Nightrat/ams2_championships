@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use ams2_championship::ams2_shared_memory::read_live_session;
-use ams2_championship::data_store::{Championship, SharedStore, persist, compute_career};
+use ams2_championship::data_store::{Championship, ChampionshipStatus, SharedStore, persist, compute_career};
 
 // ── HTTP primitives ───────────────────────────────────────────────────────────
 
@@ -284,7 +284,7 @@ fn handle(
         let champ = Championship {
             id,
             name: body.name,
-            status: "Active".into(),
+            status: ChampionshipStatus::Active,
             points_system: if body.points_system.is_empty() {
                 vec![25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
             } else {
@@ -329,7 +329,7 @@ fn handle(
         #[derive(serde::Deserialize)]
         struct Body {
             name: Option<String>,
-            status: Option<String>,
+            status: Option<ChampionshipStatus>,
             points_system: Option<Vec<i32>>,
             manufacturer_scoring: Option<bool>,
         }
@@ -338,10 +338,19 @@ fn handle(
             return;
         };
         let mut data = store.write().unwrap();
-        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+        if !data.championships.iter().any(|c| c.id == id) {
             json_err(&mut stream, "404 Not Found", "not found");
             return;
-        };
+        }
+        // Only one championship may be Active at a time.
+        if body.status == Some(ChampionshipStatus::Active) {
+            for c in data.championships.iter_mut() {
+                if c.id != id && c.status == ChampionshipStatus::Active {
+                    c.status = ChampionshipStatus::Progress;
+                }
+            }
+        }
+        let champ = data.championships.iter_mut().find(|c| c.id == id).unwrap();
         if let Some(name) = body.name { champ.name = name; }
         if let Some(status) = body.status { champ.status = status; }
         if let Some(ps) = body.points_system { champ.points_system = ps; }

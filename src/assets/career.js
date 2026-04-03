@@ -99,9 +99,9 @@ function renderCareerChampionships(champs) {
     return;
   }
   container.innerHTML = champs.map(function (champ, idx) {
-    var open = champ.status !== 'Finished' ? ' open' : '';
-    var badgeCls = champ.status === 'Finished' ? 'badge-finished' :
-                   champ.status === 'Active'   ? 'badge-active' : 'badge-pending';
+    var open = champ.status !== 'Final' ? ' open' : '';
+    var badgeCls = champ.status === 'Final'    ? 'badge-final' :
+                   champ.status === 'Progress' ? 'badge-progress' : 'badge-active';
     return '<details id="career-champ-' + idx + '" class="championship"' + open + '>' +
       '<summary class="champ-header">' +
         '<div class="champ-title">' +

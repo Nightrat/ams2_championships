@@ -57,7 +57,7 @@ fn test_parse_post_with_json_body() {
 
 #[test]
 fn test_parse_patch_with_body() {
-    let body = b"{\"status\":\"Finished\"}";
+    let body = b"{\"status\":\"Final\"}";
     let header = format!(
         "PATCH /api/championships/99 HTTP/1.1\r\nContent-Length: {}\r\n\r\n",
         body.len()

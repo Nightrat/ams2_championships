@@ -45,13 +45,26 @@ pub struct Round {
     pub session_ids: Vec<String>,
 }
 
+/// Lifecycle state of a championship.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "PascalCase")]
+pub enum ChampionshipStatus {
+    /// Not yet started.
+    #[default]
+    Active,
+    /// Rounds are in progress.
+    Progress,
+    /// All rounds completed — winner determined.
+    Final,
+}
+
 /// User-created championship grouping a set of rounds.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Championship {
     pub id: String,
     pub name: String,
-    /// "Pending", "Active", or "Finished".
-    pub status: String,
+    #[serde(default)]
+    pub status: ChampionshipStatus,
     /// Points awarded for positions 1, 2, 3, … (may be shorter than field size).
     pub points_system: Vec<i32>,
     /// Whether to compute and display constructor (manufacturer) standings.
@@ -113,7 +126,7 @@ pub struct RoundView {
 pub struct ChampionshipView {
     pub id: String,
     pub name: String,
-    pub status: String,
+    pub status: ChampionshipStatus,
     pub points_system: Vec<i32>,
     pub manufacturer_scoring: bool,
     pub driver_standings: Vec<StandingsEntry>,
@@ -212,7 +225,7 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
         let driver_standings = standings(champ, sessions);
         let constructor_standings = constructors(champ, sessions);
 
-        if champ.status == "Finished" {
+        if champ.status == ChampionshipStatus::Final {
             if let Some(w) = driver_standings.first() {
                 accum.entry(w.name.clone()).or_default().champ_wins += 1;
             }

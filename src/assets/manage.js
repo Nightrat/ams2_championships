@@ -23,13 +23,17 @@ function renderChampList() {
     el.innerHTML = '<div class="manage-empty">No championships yet.</div>';
     return;
   }
+  function statusColourClass(status) {
+    return status === 'Final' ? 'status-final' : status === 'Progress' ? 'status-progress' : 'status-active';
+  }
   el.innerHTML = manageState.champs.map(function (c) {
     var sel = c.id === manageState.selectedId ? ' selected' : '';
-    var statusCls = c.status === 'Active' ? 'status-active' :
-                    c.status === 'Finished' ? 'status-finished' : 'status-pending';
+    var opts = ['Active', 'Progress', 'Final'].map(function (s) {
+      return '<option' + (s === c.status ? ' selected' : '') + '>' + s + '</option>';
+    }).join('');
     return '<div class="champ-list-item' + sel + '" data-id="' + esc(c.id) + '">' +
       '<span class="champ-list-name">' + esc(c.name) + '</span>' +
-      '<span class="champ-status ' + statusCls + '">' + esc(c.status) + '</span>' +
+      '<select class="champ-list-status ' + statusColourClass(c.status) + '" data-cid="' + esc(c.id) + '">' + opts + '</select>' +
       '</div>';
   }).join('');
   el.querySelectorAll('.champ-list-item').forEach(function (item) {
@@ -37,6 +41,14 @@ function renderChampList() {
       manageState.selectedId = item.dataset.id;
       renderChampList();
       renderChampDetail(item.dataset.id);
+    });
+  });
+  el.querySelectorAll('.champ-list-status').forEach(function (sel) {
+    sel.addEventListener('click', function (e) { e.stopPropagation(); });
+    sel.addEventListener('change', function (e) {
+      e.stopPropagation();
+      sel.className = 'champ-list-status ' + statusColourClass(sel.value);
+      patchChamp(sel.dataset.cid, { status: sel.value });
     });
   });
 }
@@ -88,11 +100,6 @@ function renderChampDetail(id) {
       '<button class="manage-btn manage-btn-danger champ-delete-btn" data-id="' + esc(champ.id) + '">Delete</button>' +
     '</div>' +
     '<div class="champ-detail-meta">' +
-      '<label>Status&nbsp;<select class="manage-select champ-status-select" data-id="' + esc(champ.id) + '">' +
-        ['Pending', 'Active', 'Finished'].map(function (s) {
-          return '<option' + (s === champ.status ? ' selected' : '') + '>' + s + '</option>';
-        }).join('') +
-      '</select></label>' +
       '<label>Points&nbsp;<input class="manage-input champ-points-input" value="' + esc(champ.points_system.join(',')) + '" data-id="' + esc(champ.id) + '" size="32" title="Comma-separated points per finishing position"></label>' +
       '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
     '</div>' +
@@ -105,9 +112,6 @@ function renderChampDetail(id) {
 
   right.querySelector('.champ-name-input').addEventListener('blur', function () {
     patchChamp(champ.id, { name: this.value });
-  });
-  right.querySelector('.champ-status-select').addEventListener('change', function () {
-    patchChamp(champ.id, { status: this.value });
   });
   right.querySelector('.champ-points-input').addEventListener('blur', function () {
     var pts = this.value.split(',')

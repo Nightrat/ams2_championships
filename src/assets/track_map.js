@@ -62,9 +62,9 @@ function tmRender(canvas, points, cars) {
   var rangeX = maxX - minX || 1, rangeZ = maxZ - minZ || 1;
   var scale = Math.min((W - 2 * PAD) / rangeX, (H - 2 * PAD) / rangeZ);
   var ox = (W - rangeX * scale) / 2 - minX * scale;
-  var oz = (H - rangeZ * scale) / 2 - minZ * scale;
+  var oz = (H - rangeZ * scale) / 2 + maxZ * scale;
   function cx(x) { return x * scale + ox; }
-  function cz(z) { return z * scale + oz; }
+  function cz(z) { return -z * scale + oz; }
 
   // Track dots
   ctx.fillStyle = '#3a3a5e';
