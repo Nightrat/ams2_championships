@@ -62,6 +62,8 @@ pub struct PlayerTelemetry {
     pub rpm:        f32,
     /// Current gear (negative = reverse, 0 = neutral).
     pub gear:       i32,
+    /// Tyre compound name per wheel (FL, FR, RL, RR).
+    pub tyre_compound: [String; 4],
 }
 
 /// Snapshot of the current AMS2 session state.
@@ -108,6 +110,7 @@ fn disconnected() -> LiveSessionData {
             ride_height:       [0.0; 4],
             throttle: 0.0, brake_input: 0.0, steering: 0.0,
             speed: 0.0, rpm: 0.0, gear: 0,
+            tyre_compound: [String::new(), String::new(), String::new(), String::new()],
         },
     }
 }
@@ -186,6 +189,7 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_SUSPENSION_TRAVEL:  usize = 7340;  // float mSuspensionTravel[4] (metres)
     const OFF_TYRE_PRESSURE:      usize = 7372;  // float mAirPressure[4] (PSI)
     // AMS2-specific additions (not in original PC2 header):
+    const OFF_TYRE_COMPOUND:      usize = 19388; // char mTyreCompound[4][40]
     const OFF_TYRE_TEMP_LEFT:     usize = 20584; // float mTyreTempLeft[4] (°C)
     const OFF_TYRE_TEMP_CENTER:   usize = 20600; // float mTyreTempCenter[4] (°C)
     const OFF_TYRE_TEMP_RIGHT:    usize = 20616; // float mTyreTempRight[4] (°C)
@@ -272,6 +276,12 @@ pub fn read_live_session() -> LiveSessionData {
             speed:       rf32(ptr, OFF_SPEED),
             rpm:         rf32(ptr, OFF_RPM),
             gear:        ri32(ptr, OFF_GEAR),
+            tyre_compound: [
+                rstr(ptr, OFF_TYRE_COMPOUND,        40),
+                rstr(ptr, OFF_TYRE_COMPOUND + 40,   40),
+                rstr(ptr, OFF_TYRE_COMPOUND + 80,   40),
+                rstr(ptr, OFF_TYRE_COMPOUND + 120,  40),
+            ],
         };
         let game_state = ru32(ptr, OFF_GAME_STATE);
         let session_state = ru32(ptr, OFF_SESSION_STATE);

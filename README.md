@@ -18,14 +18,13 @@ A motorsport career tracker for Automobilista 2. It records race results directl
 
 ## Features
 
-- **Session recorder** — automatically captures race results at session end from the AMS2 shared memory API; no external tool required
-- **Championship management** — create championships, assign recorded sessions to rounds, set points systems (F1 modern/classic or custom), toggle constructor scoring, and track status (Pending / Active / Finished)
-- **Championship standings** — per-championship driver and constructor standings computed from race results, with collapsible round-by-round detail
-- **Career statistics** — aggregated stats across all championships: races, wins, top-3/10 finishes, DNFs, championship wins, and average finishing position
-- **Live session overlay** — real-time timing table pushed over WebSocket from the AMS2 shared memory API: position, lap count, gap to fastest, sector times (S1/S2/S3), best lap, last lap, and top speed for all active participants
-- **Telemetry panel** — per-driver tyre temperatures/wear, brake temperatures, and setup recommendations
-- **Track map** — canvas-based track layout built from positional data, with live car positions
-- **PDF export** — download a print-ready PDF of the career standings via the browser's native print dialog
+- **Session recorder** — automatically captures race and qualifying results at session end from the AMS2 shared memory API; no external tool required
+- **Championship management** — create championships, assign recorded sessions to rounds, set points systems (F1 modern/classic or custom), toggle constructor scoring, and track status (Active / Progress / Final)
+- **Championship standings** — master-detail view with per-championship driver and constructor standings, collapsible round-by-round results (qualifying and race)
+- **Career statistics** — aggregated stats across all championships: race starts, podium splits (1st/2nd/3rd), top-10 finishes, average finishing position, DNFs, qualifying results (pole/2nd/3rd/top-10), and championship standings finishes (1st/2nd/3rd)
+- **Live session overlay** — real-time timing table pushed over WebSocket at 5 Hz from AMS2 shared memory: position, laps, gap to fastest, sector times, best/last lap, top speed, and tyre compound for the player
+- **Telemetry panel** — player tyre temperatures (inner/mid/outer per corner), tyre wear/pressure, brake temperatures, suspension travel, and automatic setup recommendations based on a rolling 20-sample average
+- **PDF export** — download a print-ready PDF of all championships with all round details expanded
 
 ## Requirements
 
@@ -63,7 +62,7 @@ Open `http://127.0.0.1:8080/` in a browser. Press **Ctrl+C** to stop.
 | Tab | Content |
 |---|---|
 | **Live Session** | Real-time timing table and telemetry panel, updated via WebSocket from AMS2 shared memory |
-| **Career** | Driver standings and round-by-round results for each championship; aggregated driver stats |
+| **Career** | Championships sub-tab (master-detail view) and Driver Stats sub-tab with aggregated career statistics |
 | **Manage** | Create championships, assign recorded sessions to rounds, edit points systems and status |
 
 ### Live Session columns
@@ -72,12 +71,13 @@ Open `http://127.0.0.1:8080/` in a browser. Press **Ctrl+C** to stop.
 |---|---|
 | Pos | Current race/session position |
 | Driver | Participant name |
-| Lap | Current lap number |
+| Laps | Laps completed |
 | Gap | Delta to the overall fastest lap set in the session |
 | S1 / S2 / S3 | Sector times — current lap sector when available, personal best otherwise. **Purple** = overall fastest sector; **green** = driver's personal best |
 | Best Lap | Driver's fastest lap of the session |
 | Last Lap | Driver's most recently completed lap time |
 | Top km/h | Highest recorded speed (capped at 450 km/h to filter teleport spikes) |
+| Tyre | Player's current tyre compound (e.g. Soft / Medium / Hard) |
 
 ### Career Driver Stats columns
 
@@ -85,19 +85,19 @@ Open `http://127.0.0.1:8080/` in a browser. Press **Ctrl+C** to stop.
 |---|---|
 | Driver | Name |
 | Races | Total race starts |
-| Wins | First-place finishes |
-| Top 3 | Podium finishes |
-| Top 10 | Points-zone finishes |
+| 1st / 2nd / 3rd | Race podium finishes by position |
+| Top 10 | Points-zone race finishes |
+| Avg Pos | Average finishing position across all races |
 | DNF | Did-not-finish races |
-| Champ Wins | Championship titles |
-| Avg Pos | Average finishing position |
+| Q Pole / Q 2nd / Q 3rd / Q Top 10 | Qualifying results by position |
+| C 1st / C 2nd / C 3rd | Championship final standings finishes (Final championships only) |
 
 ## Career data
 
 Career data is stored as JSON in `championships/ams2_career.json` next to the server executable. The file is created automatically on first run and updated after every recorded race. It contains two top-level arrays:
 
-- **`sessions`** — each recorded race: track, timestamp, session type, and per-driver results (position, laps, fastest lap, last lap, DNF flag)
-- **`championships`** — each user-created championship: name, status, points system, constructor scoring flag, and the ordered list of rounds (each round contains one or more session IDs)
+- **`sessions`** — each recorded session: track, timestamp, session type, and per-driver results (position, laps, fastest lap, last lap, DNF flag, car name)
+- **`championships`** — each user-created championship: name, status (`Active` / `Progress` / `Final`), points system, constructor scoring flag, and the ordered list of rounds (each round contains one or more session IDs)
 
 ## REST API
 
@@ -113,7 +113,7 @@ Career data is stored as JSON in `championships/ams2_career.json` next to the se
 | `POST` | `/api/championships/:id/rounds/:r/sessions/:sid` | Assign a session to a round |
 | `DELETE` | `/api/championships/:id/sessions/:sid` | Remove a session assignment |
 | `GET` | `/live` | Current AMS2 session state snapshot (JSON) |
-| `WS` | `/ws` | WebSocket endpoint — pushes live session JSON every 300 ms |
+| `WS` | `/ws` | WebSocket endpoint — pushes live session JSON every 200 ms |
 
 ## Development
 
@@ -146,16 +146,16 @@ src/
   data_store.rs                  # Career data model, JSON persistence, standings/career computation
   data_store_tests.rs            # Unit tests for data_store (via #[path])
   session_recorder.rs            # Background thread: detects race end, captures results
+  vehicle_scanner.rs             # Scans AMS2 Vehicles directory to extract car numbers and team names
   server_tests.rs                # Unit tests for the server binary (via #[path])
   assets/
     style.css                    # Embedded at compile time via include_str!
     utils.js                     # Shared helpers: formatting, sorting, tab switching
-    live.js                      # Live timing and telemetry rendering
-    career.js                    # Career championships and stats rendering
+    live.js                      # Live timing table rendering and WebSocket connection
+    career.js                    # Career championships (master-detail) and driver stats rendering
     manage.js                    # Manage tab CRUD
-    track_map.js                 # Canvas track map
-    telemetry.js                 # Setup/telemetry panel
-    main.js                      # Tab init and sub-tab wiring
+    telemetry.js                 # Telemetry panel: tyre/brake temps, setup recommendations
+    main.js                      # Tab init, sub-tab wiring, vehicle map fetch
   bin/
     ams2_championship_server.rs  # HTTP server, REST API, WebSocket, session recorder startup
 ```

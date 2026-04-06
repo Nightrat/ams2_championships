@@ -28,7 +28,11 @@ fn generate_html() -> String {
       <button id="career-pdf-btn" class="career-pdf-btn">&#128438; Download PDF</button>
     </div>
     <div id="career-sub-champs" class="sub-tab-panel">
-      <div id="career-container"></div>
+      <div class="champ-master-detail">
+        <div id="career-champ-list" class="champ-list"></div>
+        <div id="career-champ-list-resize" class="champ-list-resize"></div>
+        <div id="career-champ-detail" class="champ-detail"></div>
+      </div>
     </div>
     <div id="career-sub-stats" class="sub-tab-panel sub-tab-panel-hidden">
       <div id="career-stats-container"></div>
@@ -52,7 +56,6 @@ fn generate_html() -> String {
       </nav>
       <div id="live-sub-timing" class="live-subpanel">
         <div class="live-body">
-          <canvas id="track-map" width="280" height="280" class="track-map"></canvas>
           <div class="grid-scroll">
             <table id="live-table" class="live-table">
               <thead>
@@ -67,10 +70,11 @@ fn generate_html() -> String {
                   <th data-col="7" data-type="time">Best Lap</th>
                   <th data-col="8" data-type="time">Last Lap</th>
                   <th data-col="9" data-type="num">Top km/h</th>
+                  <th data-col="10" data-type="str">Tyre</th>
                 </tr>
               </thead>
               <tbody id="live-tbody">
-                <tr><td colspan="10" class="live-empty">Waiting for session data&hellip;</td></tr>
+                <tr><td colspan="11" class="live-empty">Waiting for session data&hellip;</td></tr>
               </tbody>
             </table>
           </div>
@@ -127,7 +131,6 @@ fn generate_html() -> String {
   </div>
 </main>
 <script>{js_utils}</script>
-<script>{js_track_map}</script>
 <script>{js_telemetry}</script>
 <script>{js_live}</script>
 <script>{js_career}</script>
@@ -137,7 +140,6 @@ fn generate_html() -> String {
 </html>"##,
         css          = CSS,
         js_utils     = JS_UTILS,
-        js_track_map = JS_TRACK_MAP,
         js_telemetry = JS_TELEMETRY,
         js_live      = JS_LIVE,
         js_career    = JS_CAREER,
@@ -159,7 +161,6 @@ const CSS: &str = include_str!("assets/style.css");
 // ── Scripts ──────────────────────────────────────────────────────────────────
 
 const JS_UTILS:     &str = include_str!("assets/utils.js");
-const JS_TRACK_MAP: &str = include_str!("assets/track_map.js");
 const JS_TELEMETRY: &str = include_str!("assets/telemetry.js");
 const JS_LIVE:      &str = include_str!("assets/live.js");
 const JS_CAREER:    &str = include_str!("assets/career.js");

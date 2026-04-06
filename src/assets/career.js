@@ -35,7 +35,7 @@ function careerRoundsHtml(champ) {
   if (!rounds.length) return '<p class="manage-empty">No rounds assigned yet.</p>';
 
   var rows = rounds.map(function (round, rIdx) {
-    var roundSessions = round.sessions || [];
+    var roundSessions = (round.sessions || []).filter(function (s) { return s.session_type !== 1; });
     if (!roundSessions.length) return '';
 
     var raceSess = roundSessions.find(function (s) { return s.session_type === 5; });
@@ -91,35 +91,64 @@ function careerRoundsHtml(champ) {
     : '<p class="manage-empty">No rounds assigned yet.</p>';
 }
 
+var careerChamps = [];
+var selectedChampIdx = -1;
+
+function champDetailHtml(champ) {
+  var badgeCls = champ.status === 'Final'    ? 'badge-final' :
+                 champ.status === 'Progress' ? 'badge-progress' : 'badge-active';
+  return '<div class="champ-detail-header">' +
+      '<h2>' + esc(champ.name) + '</h2>' +
+      '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span>' +
+    '</div>' +
+    '<div class="champ-body">' +
+      '<div class="standings-panel"><h3>Driver Standings</h3>' + careerStandingsHtml(champ.driver_standings) + '</div>' +
+      (champ.constructor_standings.length ? '<div class="standings-panel"><h3>Constructor Standings</h3>' + careerConstructorsHtml(champ.constructor_standings) + '</div>' : '') +
+      '<div class="results-panel"><h3>Rounds</h3>' + careerRoundsHtml(champ) + '</div>' +
+    '</div>';
+}
+
+function selectChamp(idx) {
+  selectedChampIdx = idx;
+  var list = document.getElementById('career-champ-list');
+  if (list) list.querySelectorAll('.champ-list-item').forEach(function (el) {
+    el.classList.toggle('champ-list-item-active', +el.dataset.idx === idx);
+  });
+  var detail = document.getElementById('career-champ-detail');
+  if (!detail) return;
+  if (idx < 0 || idx >= careerChamps.length) {
+    detail.innerHTML = '<div class="champ-detail-empty">Select a championship.</div>';
+  } else {
+    detail.innerHTML = champDetailHtml(careerChamps[idx]);
+  }
+}
+
 function renderCareerChampionships(champs) {
-  var container = document.getElementById('career-container');
-  if (!container) return;
-  if (!champs.length) {
-    container.innerHTML = '<div class="manage-placeholder" style="padding:2rem">No championships yet \u2014 create one in the Manage tab.</div>';
+  careerChamps = champs || [];
+  var list = document.getElementById('career-champ-list');
+  var detail = document.getElementById('career-champ-detail');
+  if (!list || !detail) return;
+  if (!careerChamps.length) {
+    list.innerHTML = '<div class="manage-placeholder" style="padding:1.5rem">No championships yet.</div>';
+    detail.innerHTML = '';
     return;
   }
-  container.innerHTML = champs.map(function (champ, idx) {
-    var open = champ.status !== 'Final' ? ' open' : '';
+  list.innerHTML = careerChamps.map(function (champ, idx) {
     var badgeCls = champ.status === 'Final'    ? 'badge-final' :
                    champ.status === 'Progress' ? 'badge-progress' : 'badge-active';
-    return '<details id="career-champ-' + idx + '" class="championship"' + open + '>' +
-      '<summary class="champ-header">' +
-        '<div class="champ-title">' +
-          '<h2>' + esc(champ.name) + '</h2>' +
-          '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span>' +
-        '</div>' +
-        '<div class="champ-meta">' +
-          '<span>Points: ' + esc(champ.points_system.slice(0, 5).join('\u2013') + (champ.points_system.length > 5 ? '\u2026' : '')) + '</span>' +
-          '<span>Rounds: ' + (champ.rounds || []).length + '</span>' +
-        '</div>' +
-      '</summary>' +
-      '<div class="champ-body">' +
-        '<div class="standings-panel"><h3>Driver Standings</h3>' + careerStandingsHtml(champ.driver_standings) + '</div>' +
-        (champ.constructor_standings.length ? '<div class="standings-panel"><h3>Constructor Standings</h3>' + careerConstructorsHtml(champ.constructor_standings) + '</div>' : '') +
-        '<div class="results-panel"><h3>Rounds</h3>' + careerRoundsHtml(champ) + '</div>' +
+    return '<div class="champ-list-item" data-idx="' + idx + '">' +
+      '<div class="champ-list-name">' + esc(champ.name) + '</div>' +
+      '<div class="champ-list-meta">' +
+        '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span>' +
+        '<span class="champ-list-rounds">' + (champ.rounds || []).length + ' rounds</span>' +
       '</div>' +
-      '</details>';
+    '</div>';
   }).join('');
+  list.querySelectorAll('.champ-list-item').forEach(function (el) {
+    el.addEventListener('click', function () { selectChamp(+el.dataset.idx); });
+  });
+  // Auto-select first
+  selectChamp(0);
 }
 
 function renderCareerStats(driverStats) {
@@ -176,7 +205,7 @@ function loadCareerChampionships() {
       renderCareerChampionships(career.championships || []);
       renderCareerStats(career.driver_stats || []);
     }).catch(function () {
-      var el = document.getElementById('career-container');
+      var el = document.getElementById('career-champ-detail');
       if (el) el.innerHTML = '<div class="manage-placeholder" style="padding:2rem">Career data requires the server binary.</div>';
     });
 }
@@ -187,20 +216,67 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
   });
 });
 
+// ── Champ list resize handle ──────────────────────────────────────────────────
+(function () {
+  var handle = document.getElementById('career-champ-list-resize');
+  var list   = document.getElementById('career-champ-list');
+  if (!handle || !list) return;
+  var dragging = false, startX, startW;
+  handle.addEventListener('mousedown', function (e) {
+    dragging = true;
+    startX = e.clientX;
+    startW = list.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!dragging) return;
+    var w = Math.min(480, Math.max(100, startW + (e.clientX - startX)));
+    list.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', function () {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+}());
+
 // ── PDF download ──────────────────────────────────────────────────────────────
 var careerPdfBtn = document.getElementById('career-pdf-btn');
 if (careerPdfBtn) {
   careerPdfBtn.addEventListener('click', function () {
-    // Ensure data is loaded before printing
-    loadCareerChampionships();
+    if (!careerChamps.length) { loadCareerChampionships(); return; }
 
-    // Expand all <details> so rounds are visible in the PDF
-    var detailsEls = document.querySelectorAll('#tab-career details');
-    var wasOpen = Array.from(detailsEls).map(function (d) { return d.open; });
-    detailsEls.forEach(function (d) { d.open = true; });
+    // Build a flat print view of all championships with all round details open
+    var badgeMap = { Final: 'badge-final', Progress: 'badge-progress', Active: 'badge-active' };
+    var printHtml = careerChamps.map(function (champ) {
+      var badgeCls = badgeMap[champ.status] || 'badge-active';
+      return '<div class="championship" style="break-inside:avoid-page">' +
+        '<div class="champ-header" style="padding:0.6rem 1rem">' +
+          '<div class="champ-title"><h2>' + esc(champ.name) + '</h2>' +
+            '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span></div>' +
+        '</div>' +
+        '<div class="champ-body">' +
+          '<div class="standings-panel"><h3>Driver Standings</h3>' + careerStandingsHtml(champ.driver_standings) + '</div>' +
+          (champ.constructor_standings.length ? '<div class="standings-panel"><h3>Constructor Standings</h3>' + careerConstructorsHtml(champ.constructor_standings) + '</div>' : '') +
+          '<div class="results-panel"><h3>Rounds</h3>' + careerRoundsHtml(champ) + '</div>' +
+        '</div></div>';
+    }).join('');
+
+    var subPanel = document.getElementById('career-sub-champs');
+    var origHtml = subPanel.innerHTML;
+    subPanel.innerHTML = '<div style="padding:1rem">' + printHtml + '</div>';
+
+    // Expand all round <details>
+    subPanel.querySelectorAll('details').forEach(function (d) { d.open = true; });
 
     window.onafterprint = function () {
-      detailsEls.forEach(function (d, i) { d.open = wasOpen[i]; });
+      subPanel.innerHTML = origHtml;
+      // Re-attach list click handlers
+      renderCareerChampionships(careerChamps);
       window.onafterprint = null;
     };
 

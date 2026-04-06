@@ -205,7 +205,7 @@ fn handle_websocket(mut stream: TcpStream, headers: &str) {
             Ok(json) => { if ws_send_text(&mut stream, &json).is_err() { break; } }
             Err(_)   => break,
         }
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(200));
     }
 }
 

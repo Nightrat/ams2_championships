@@ -90,7 +90,7 @@ function processLiveData(d) {
         statusEl.className = 'live-status live-disconnected';
         statusTxt.textContent = 'Not connected \u2014 start AMS2 to see live data';
         infoEl.style.visibility = 'hidden';
-        liveBody.innerHTML = '<tr><td colspan="10" class="live-empty">Waiting for session data\u2026</td></tr>';
+        liveBody.innerHTML = '<tr><td colspan="11" class="live-empty">Waiting for session data\u2026</td></tr>';
         return;
       }
 
@@ -105,7 +105,7 @@ function processLiveData(d) {
       infoEl.style.visibility = '';
 
       if (!d.participants || d.participants.length === 0) {
-        liveBody.innerHTML = '<tr><td colspan="10" class="live-empty">No active participants</td></tr>';
+        liveBody.innerHTML = '<tr><td colspan="11" class="live-empty">No active participants</td></tr>';
         return;
       }
 
@@ -186,10 +186,10 @@ function processLiveData(d) {
           '<td class="live-time">' + fmtLapTime(p.fastest_lap_time) + '</td>' +
           '<td class="live-time">' + fmtLapTime(p.last_lap_time) + '</td>' +
           '<td class="live-num">'  + (topSpeeds[p.name] ? Math.round(topSpeeds[p.name]) : '\u2014') + '</td>' +
+          '<td class="live-tyre">' + (p.is_player && d.player_telemetry ? esc(d.player_telemetry.tyre_compound[0]) || '\u2014' : '\u2014') + '</td>' +
           '</tr>';
       }).join('');
       applyLiveSort();
-      tmUpdate(d);
       updateSetupPanel(d);
 }
 

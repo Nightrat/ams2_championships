@@ -8,6 +8,8 @@ function loadManage() {
   ]).then(function (results) {
     manageState.champs = results[0] || [];
     manageState.sessions = results[1] || [];
+    var active = manageState.champs.find(function (c) { return c.status === 'Active'; });
+    manageState.selectedId = active ? active.id : (manageState.champs[0] ? manageState.champs[0].id : null);
     renderChampList();
     if (manageState.selectedId) renderChampDetail(manageState.selectedId);
   }).catch(function () {
