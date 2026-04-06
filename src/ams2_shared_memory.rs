@@ -28,6 +28,10 @@ pub struct ParticipantData {
     pub world_pos_x: f32,
     /// World Z position in metres (horizontal plane with X).
     pub world_pos_z: f32,
+    /// Race interval to the car directly ahead, in seconds. -1.0 = leader, 0.0 = not applicable.
+    pub interval_gap_secs: f32,
+    /// Whole laps behind the car directly ahead (0 = same lap).
+    pub interval_gap_laps: u32,
 }
 
 /// Player car telemetry from the AMS2 shared memory (player's car only).
@@ -327,6 +331,8 @@ pub fn read_live_session() -> LiveSessionData {
                 last_lap_time: rf32(ptr, OFF_LAST_LAP_TIMES + stride4),
                 world_pos_x: rf32(ptr, base + P_WORLD_POS),
                 world_pos_z: rf32(ptr, base + P_WORLD_POS + 8),
+                interval_gap_secs: 0.0,
+                interval_gap_laps: 0,
             });
         }
         // Sort by race position; unset (0) positions go to the end
@@ -338,6 +344,35 @@ pub fn read_live_session() -> LiveSessionData {
                 (x, y) => x.cmp(&y),
             }
         });
+
+        // ── Race interval (gap to car directly ahead) ─────────────────────────
+        // Only meaningful during a race session (session_state == 5).
+        if session_state == 5 && track_length > 0.0 {
+            // Total distance covered: laps + fractional lap from current_lap_distance.
+            let distances: Vec<f32> = participants.iter().map(|p| {
+                let frac = (p.current_lap_distance / track_length).clamp(0.0, 1.0);
+                p.laps_completed as f32 + frac
+            }).collect();
+
+            // Leader's reference lap time for converting fraction → seconds.
+            let ref_lap = participants.first().map(|p| {
+                if p.fastest_lap_time > 0.0 { p.fastest_lap_time }
+                else if p.last_lap_time > 0.0 { p.last_lap_time }
+                else { 0.0 }
+            }).unwrap_or(0.0);
+
+            for i in 0..participants.len() {
+                if i == 0 {
+                    participants[i].interval_gap_secs = -1.0; // sentinel: leader
+                } else {
+                    let gap_dist = (distances[i - 1] - distances[i]).max(0.0);
+                    let gap_laps = gap_dist.floor() as u32;
+                    let gap_frac = gap_dist - gap_laps as f32;
+                    participants[i].interval_gap_laps = gap_laps;
+                    participants[i].interval_gap_secs = if ref_lap > 0.0 { gap_frac * ref_lap } else { 0.0 };
+                }
+            }
+        }
 
         UnmapViewOfFile(mapped);
         CloseHandle(handle);

@@ -185,6 +185,8 @@ pub struct TrackStat {
     pub races: u32,
     pub qualifyings: u32,
     pub best_lap: f32,
+    pub best_lap_driver: String,
+    pub best_lap_car: String,
     pub last_visited: u64,
 }
 
@@ -349,7 +351,7 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
 
     // ── Track stats — computed from all sessions, not scoped to championships ──
     #[derive(Default)]
-    struct TrackAccum { races: u32, qualifyings: u32, best_lap: f32, last_visited: u64 }
+    struct TrackAccum { races: u32, qualifyings: u32, best_lap: f32, best_lap_driver: String, best_lap_car: String, last_visited: u64 }
     let mut track_accum: HashMap<(String, String), TrackAccum> = HashMap::new();
     for s in sessions {
         let key = (s.track.clone(), s.track_variation.clone());
@@ -360,12 +362,15 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
         for r in &s.results {
             if r.fastest_lap > 0.0 && (a.best_lap <= 0.0 || r.fastest_lap < a.best_lap) {
                 a.best_lap = r.fastest_lap;
+                a.best_lap_driver = r.name.clone();
+                a.best_lap_car = if !r.car_name.is_empty() { r.car_name.clone() } else { r.car_class.clone() };
             }
         }
     }
     let mut track_stats: Vec<TrackStat> = track_accum.into_iter().map(|((track, track_variation), a)| TrackStat {
         track, track_variation, races: a.races, qualifyings: a.qualifyings,
-        best_lap: a.best_lap, last_visited: a.last_visited,
+        best_lap: a.best_lap, best_lap_driver: a.best_lap_driver, best_lap_car: a.best_lap_car,
+        last_visited: a.last_visited,
     }).collect();
     track_stats.sort_by(|a, b| b.last_visited.cmp(&a.last_visited));
 

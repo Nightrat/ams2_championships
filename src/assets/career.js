@@ -212,7 +212,9 @@ function renderTrackStats(trackStats) {
     '<th class="stat-num" data-col="1" data-type="num">Races</th>' +
     '<th class="stat-num" data-col="2" data-type="num">Qualifyings</th>' +
     '<th class="stat-num" data-col="3" data-type="time">Best Lap</th>' +
-    '<th class="stat-num" data-col="4" data-type="str">Last Visited</th>' +
+    '<th class="stat-name" data-col="4" data-type="str">Record Holder</th>' +
+    '<th class="stat-name" data-col="5" data-type="str">Car</th>' +
+    '<th class="stat-num" data-col="6" data-type="str">Last Visited</th>' +
     '</tr>';
   var tbody = trackStats.map(function (t) {
     var name = t.track_variation && t.track_variation !== t.track
@@ -223,6 +225,8 @@ function renderTrackStats(trackStats) {
       '<td class="stat-num">' + t.races + '</td>' +
       '<td class="stat-num">' + t.qualifyings + '</td>' +
       '<td class="stat-num">' + (t.best_lap > 0 ? fmtLapTime(t.best_lap) : '\u2014') + '</td>' +
+      '<td class="stat-name">' + (t.best_lap_driver ? esc(t.best_lap_driver) : '\u2014') + '</td>' +
+      '<td class="stat-name">' + (t.best_lap_car ? esc(t.best_lap_car) : '\u2014') + '</td>' +
       '<td class="stat-num">' + fmtDate(t.last_visited) + '</td>' +
     '</tr>';
   }).join('');

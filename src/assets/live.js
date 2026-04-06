@@ -90,7 +90,7 @@ function processLiveData(d) {
         statusEl.className = 'live-status live-disconnected';
         statusTxt.textContent = 'Not connected \u2014 start AMS2 to see live data';
         infoEl.style.visibility = 'hidden';
-        liveBody.innerHTML = '<tr><td colspan="11" class="live-empty">Waiting for session data\u2026</td></tr>';
+        liveBody.innerHTML = '<tr><td colspan="12" class="live-empty">Waiting for session data\u2026</td></tr>';
         return;
       }
 
@@ -105,7 +105,7 @@ function processLiveData(d) {
       infoEl.style.visibility = '';
 
       if (!d.participants || d.participants.length === 0) {
-        liveBody.innerHTML = '<tr><td colspan="11" class="live-empty">No active participants</td></tr>';
+        liveBody.innerHTML = '<tr><td colspan="12" class="live-empty">No active participants</td></tr>';
         return;
       }
 
@@ -136,6 +136,14 @@ function processLiveData(d) {
           topSpeeds[p.name] = kmh;
         }
       });
+
+      // ── Interval (gap to car ahead) — computed in Rust ───────────────────
+      function fmtInterval(p) {
+        if (p.interval_gap_secs < 0) return '<span class="live-gap-leader">Leader</span>';
+        if (p.interval_gap_secs === 0 && p.interval_gap_laps === 0) return '<span class="no-time">\u2014</span>';
+        if (p.interval_gap_laps > 0) return '+' + p.interval_gap_laps + (p.interval_gap_laps === 1 ? ' Lap' : ' Laps');
+        return '+' + p.interval_gap_secs.toFixed(3);
+      }
 
       // ── Gap to fastest lap ────────────────────────────────────────────────
       var bestLap = 0;
@@ -179,6 +187,7 @@ function processLiveData(d) {
           '<td class="live-pos">'  + pos + '</td>' +
           '<td class="live-name">' + p.name + nameSuffix + '</td>' +
           '<td class="live-num">'  + p.laps_completed + '</td>' +
+          '<td class="live-gap">'  + fmtInterval(p) + '</td>' +
           '<td class="live-gap">'  + fmtGap(p) + '</td>' +
           '<td class="live-time">' + fmtSector(p.cur_s1, p.best_s1, bestS1) + '</td>' +
           '<td class="live-time">' + fmtSector(p.cur_s2, p.best_s2, bestS2) + '</td>' +

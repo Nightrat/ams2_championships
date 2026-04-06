@@ -461,3 +461,256 @@ fn test_compute_career_sessions_resolved_into_rounds() {
     assert_eq!(resp.championships[0].rounds[0].sessions.len(), 1);
     assert_eq!(resp.championships[0].rounds[0].sessions[0].id, "r1");
 }
+
+// ── points_earned in SessionResultView ───────────────────────────────────────
+
+#[test]
+fn test_compute_career_points_earned_in_result_view() {
+    let champ = make_champ(vec![25, 18, 15], &["r1"]);
+    let sessions = vec![make_session("r1", 5, vec![
+        ("Alice", 1, false, ""),
+        ("Bob",   2, false, ""),
+        ("Carol", 3, false, ""),
+    ])];
+    let resp = compute_career(&[champ], &sessions);
+    let race = &resp.championships[0].rounds[0].sessions[0];
+    let alice = race.results.iter().find(|r| r.name == "Alice").unwrap();
+    let bob   = race.results.iter().find(|r| r.name == "Bob").unwrap();
+    let carol = race.results.iter().find(|r| r.name == "Carol").unwrap();
+    assert_eq!(alice.points_earned, 25);
+    assert_eq!(bob.points_earned, 18);
+    assert_eq!(carol.points_earned, 15);
+}
+
+#[test]
+fn test_compute_career_dnf_earns_no_points_in_view() {
+    let champ = make_champ(vec![25, 18], &["r1"]);
+    let sessions = vec![make_session("r1", 5, vec![
+        ("Alice", 1, true,  ""), // DNF
+        ("Bob",   2, false, ""),
+    ])];
+    let resp = compute_career(&[champ], &sessions);
+    let race = &resp.championships[0].rounds[0].sessions[0];
+    let alice = race.results.iter().find(|r| r.name == "Alice").unwrap();
+    assert_eq!(alice.points_earned, 0);
+}
+
+#[test]
+fn test_compute_career_position_beyond_points_earns_zero_in_view() {
+    let champ = make_champ(vec![25, 18], &["r1"]);
+    let sessions = vec![make_session("r1", 5, vec![
+        ("Alice", 1, false, ""),
+        ("Bob",   2, false, ""),
+        ("Carol", 3, false, ""), // P3 but only 2 positions in points system
+    ])];
+    let resp = compute_career(&[champ], &sessions);
+    let race = &resp.championships[0].rounds[0].sessions[0];
+    let carol = race.results.iter().find(|r| r.name == "Carol").unwrap();
+    assert_eq!(carol.points_earned, 0);
+}
+
+// ── qualifying position stats ─────────────────────────────────────────────────
+
+#[test]
+fn test_compute_career_quali_podium_positions() {
+    let champ = make_champ(vec![25], &["q1", "r1"]);
+    let sessions = vec![
+        make_session("q1", 3, vec![
+            ("Alice", 1, false, ""),
+            ("Bob",   2, false, ""),
+            ("Carol", 3, false, ""),
+        ]),
+        make_session("r1", 5, vec![
+            ("Alice", 1, false, ""),
+            ("Bob",   2, false, ""),
+            ("Carol", 3, false, ""),
+        ]),
+    ];
+    let resp = compute_career(&[champ], &sessions);
+    let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
+    let bob   = resp.driver_stats.iter().find(|d| d.name == "Bob").unwrap();
+    let carol = resp.driver_stats.iter().find(|d| d.name == "Carol").unwrap();
+    assert_eq!(alice.quali_p1, 1); assert_eq!(alice.quali_p2, 0); assert_eq!(alice.quali_p3, 0);
+    assert_eq!(bob.quali_p1,   0); assert_eq!(bob.quali_p2,   1); assert_eq!(bob.quali_p3,   0);
+    assert_eq!(carol.quali_p1, 0); assert_eq!(carol.quali_p2, 0); assert_eq!(carol.quali_p3, 1);
+}
+
+#[test]
+fn test_compute_career_quali_top10_boundary() {
+    let champ = make_champ(vec![25], &["q1"]);
+    let sessions = vec![make_session("q1", 3, vec![
+        ("Alice",  1, false, ""),
+        ("Bob",   10, false, ""),
+        ("Carol", 11, false, ""), // just outside top 10
+    ])];
+    let resp = compute_career(&[champ], &sessions);
+    let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
+    let bob   = resp.driver_stats.iter().find(|d| d.name == "Bob").unwrap();
+    let carol = resp.driver_stats.iter().find(|d| d.name == "Carol").unwrap();
+    assert_eq!(alice.quali_top10, 1);
+    assert_eq!(bob.quali_top10,   1);
+    assert_eq!(carol.quali_top10, 0);
+}
+
+#[test]
+fn test_compute_career_quali_not_counted_as_race() {
+    let champ = make_champ(vec![25], &["q1"]);
+    let sessions = vec![make_session("q1", 3, vec![("Alice", 1, false, "")])];
+    let resp = compute_career(&[champ], &sessions);
+    let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
+    assert_eq!(alice.races, 0);
+    assert_eq!(alice.p1,    0);
+    assert_eq!(alice.quali_p1, 1);
+}
+
+// ── champ_p2 / champ_p3 ──────────────────────────────────────────────────────
+
+#[test]
+fn test_compute_career_champ_p2_p3_for_final_championship() {
+    let mut champ = make_champ(vec![25, 18, 15], &["r1"]);
+    champ.status = ChampionshipStatus::Final;
+    let sessions = vec![make_session("r1", 5, vec![
+        ("Alice", 1, false, ""),
+        ("Bob",   2, false, ""),
+        ("Carol", 3, false, ""),
+    ])];
+    let resp = compute_career(&[champ], &sessions);
+    let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
+    let bob   = resp.driver_stats.iter().find(|d| d.name == "Bob").unwrap();
+    let carol = resp.driver_stats.iter().find(|d| d.name == "Carol").unwrap();
+    assert_eq!(alice.champ_wins, 1); assert_eq!(alice.champ_p2, 0); assert_eq!(alice.champ_p3, 0);
+    assert_eq!(bob.champ_wins,   0); assert_eq!(bob.champ_p2,   1); assert_eq!(bob.champ_p3,   0);
+    assert_eq!(carol.champ_wins, 0); assert_eq!(carol.champ_p2, 0); assert_eq!(carol.champ_p3, 1);
+}
+
+#[test]
+fn test_compute_career_champ_standings_not_counted_for_active() {
+    let champ = make_champ(vec![25, 18, 15], &["r1"]);
+    // status defaults to Active
+    let sessions = vec![make_session("r1", 5, vec![
+        ("Alice", 1, false, ""),
+        ("Bob",   2, false, ""),
+        ("Carol", 3, false, ""),
+    ])];
+    let resp = compute_career(&[champ], &sessions);
+    let alice = resp.driver_stats.iter().find(|d| d.name == "Alice").unwrap();
+    let bob   = resp.driver_stats.iter().find(|d| d.name == "Bob").unwrap();
+    let carol = resp.driver_stats.iter().find(|d| d.name == "Carol").unwrap();
+    assert_eq!(alice.champ_wins, 0);
+    assert_eq!(bob.champ_p2,     0);
+    assert_eq!(carol.champ_p3,   0);
+}
+
+// ── track_stats ───────────────────────────────────────────────────────────────
+
+/// Helper: a race session at a specific track/timestamp with (name, pos, fastest_lap, car_name).
+fn make_track_session(id: &str, session_type: u32, track: &str, variation: &str, recorded_at: u64,
+                      results: Vec<(&str, u32, f32, &str)>) -> RecordedSession {
+    RecordedSession {
+        id: id.into(), recorded_at,
+        track: track.into(), track_variation: variation.into(),
+        car_name: "".into(), car_class: "".into(),
+        session_type,
+        results: results.into_iter().map(|(name, pos, fl, car)| SessionResult {
+            name: name.into(), car_name: car.into(), car_class: "".into(),
+            race_position: pos, laps_completed: 10, fastest_lap: fl, last_lap: 0.0, dnf: false,
+        }).collect(),
+    }
+}
+
+#[test]
+fn test_track_stats_race_and_qualifying_counts() {
+    let sessions = vec![
+        make_track_session("r1", 5, "Silverstone", "GP", 1000, vec![("Alice", 1, 90.0, "Car")]),
+        make_track_session("q1", 3, "Silverstone", "GP",  900, vec![("Alice", 1, 89.5, "Car")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    assert_eq!(resp.track_stats.len(), 1);
+    let ts = &resp.track_stats[0];
+    assert_eq!(ts.track, "Silverstone");
+    assert_eq!(ts.races, 1);
+    assert_eq!(ts.qualifyings, 1);
+}
+
+#[test]
+fn test_track_stats_best_lap_driver_and_car() {
+    let sessions = vec![make_track_session("r1", 5, "Spa", "GP", 1000, vec![
+        ("Alice", 1, 120.0, "Ferrari"),
+        ("Bob",   2, 118.5, "McLaren"), // Bob sets the fastest lap
+    ])];
+    let resp = compute_career(&[], &sessions);
+    let ts = &resp.track_stats[0];
+    assert!((ts.best_lap - 118.5).abs() < 0.001);
+    assert_eq!(ts.best_lap_driver, "Bob");
+    assert_eq!(ts.best_lap_car,    "McLaren");
+}
+
+#[test]
+fn test_track_stats_best_lap_car_class_fallback() {
+    let mut sess = make_track_session("r1", 5, "Monza", "GP", 1000,
+                                      vec![("Alice", 1, 90.0, "")]);
+    sess.results[0].car_class = "GT3".into();
+    let resp = compute_career(&[], &[sess]);
+    assert_eq!(resp.track_stats[0].best_lap_car, "GT3");
+}
+
+#[test]
+fn test_track_stats_best_lap_updated_across_sessions() {
+    let sessions = vec![
+        make_track_session("r1", 5, "Spa", "GP", 1000, vec![("Alice", 1, 120.0, "Ferrari")]),
+        make_track_session("r2", 5, "Spa", "GP", 2000, vec![("Bob",   1, 118.0, "McLaren")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    assert_eq!(resp.track_stats.len(), 1);
+    let ts = &resp.track_stats[0];
+    assert_eq!(ts.races, 2);
+    assert!((ts.best_lap - 118.0).abs() < 0.001);
+    assert_eq!(ts.best_lap_driver, "Bob");
+    assert_eq!(ts.best_lap_car,    "McLaren");
+}
+
+#[test]
+fn test_track_stats_track_variation_is_separate_key() {
+    let sessions = vec![
+        make_track_session("r1", 5, "Silverstone", "GP",       1000, vec![("Alice", 1, 90.0, "")]),
+        make_track_session("r2", 5, "Silverstone", "National", 2000, vec![("Alice", 1, 70.0, "")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    assert_eq!(resp.track_stats.len(), 2);
+}
+
+#[test]
+fn test_track_stats_sorted_by_last_visited_desc() {
+    let sessions = vec![
+        make_track_session("r1", 5, "Silverstone", "GP", 1000, vec![("Alice", 1, 90.0, "")]),
+        make_track_session("r2", 5, "Monza",       "GP", 2000, vec![("Alice", 1, 85.0, "")]),
+        make_track_session("r3", 5, "Spa",         "GP",  500, vec![("Alice", 1, 95.0, "")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    assert_eq!(resp.track_stats[0].track, "Monza");
+    assert_eq!(resp.track_stats[1].track, "Silverstone");
+    assert_eq!(resp.track_stats[2].track, "Spa");
+}
+
+#[test]
+fn test_track_stats_last_visited_is_most_recent_session() {
+    let sessions = vec![
+        make_track_session("r1", 5, "Spa", "GP", 1000, vec![("Alice", 1, 90.0, "")]),
+        make_track_session("r2", 5, "Spa", "GP", 3000, vec![("Bob",   1, 95.0, "")]),
+        make_track_session("r3", 5, "Spa", "GP", 2000, vec![("Carol", 1, 88.0, "")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    assert_eq!(resp.track_stats[0].last_visited, 3000);
+}
+
+#[test]
+fn test_track_stats_practice_not_counted_as_race_or_qualifying() {
+    let sessions = vec![
+        make_track_session("p1", 1, "Spa", "GP", 1000, vec![("Alice", 1, 90.0, "")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    assert_eq!(resp.track_stats.len(), 1);
+    let ts = &resp.track_stats[0];
+    assert_eq!(ts.races,      0);
+    assert_eq!(ts.qualifyings, 0);
+}

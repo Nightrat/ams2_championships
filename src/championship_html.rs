@@ -67,18 +67,19 @@ fn generate_html() -> String {
                   <th data-col="0" data-type="num">Pos</th>
                   <th data-col="1" data-type="str">Driver</th>
                   <th data-col="2" data-type="num">Laps</th>
-                  <th data-col="3" data-type="gap">Gap</th>
-                  <th data-col="4" data-type="time">S1</th>
-                  <th data-col="5" data-type="time">S2</th>
-                  <th data-col="6" data-type="time">S3</th>
-                  <th data-col="7" data-type="time">Best Lap</th>
-                  <th data-col="8" data-type="time">Last Lap</th>
-                  <th data-col="9" data-type="num">Top km/h</th>
-                  <th data-col="10" data-type="str">Tyre</th>
+                  <th data-col="3" data-type="gap">Interval</th>
+                  <th data-col="4" data-type="gap">Gap</th>
+                  <th data-col="5" data-type="time">S1</th>
+                  <th data-col="6" data-type="time">S2</th>
+                  <th data-col="7" data-type="time">S3</th>
+                  <th data-col="8" data-type="time">Best Lap</th>
+                  <th data-col="9" data-type="time">Last Lap</th>
+                  <th data-col="10" data-type="num">Top km/h</th>
+                  <th data-col="11" data-type="str">Tyre</th>
                 </tr>
               </thead>
               <tbody id="live-tbody">
-                <tr><td colspan="11" class="live-empty">Waiting for session data&hellip;</td></tr>
+                <tr><td colspan="12" class="live-empty">Waiting for session data&hellip;</td></tr>
               </tbody>
             </table>
           </div>
