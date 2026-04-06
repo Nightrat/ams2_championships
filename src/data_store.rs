@@ -116,10 +116,35 @@ pub struct StandingsEntry {
     pub wins: u32,
 }
 
+/// Session result enriched with points earned (for display in career view).
+#[derive(Serialize)]
+pub struct SessionResultView {
+    pub name: String,
+    pub car_name: String,
+    pub car_class: String,
+    pub race_position: u32,
+    pub laps_completed: u32,
+    pub fastest_lap: f32,
+    pub last_lap: f32,
+    pub dnf: bool,
+    pub points_earned: i32,
+}
+
+/// Recorded session with results enriched for the career view.
+#[derive(Serialize)]
+pub struct SessionView {
+    pub id: String,
+    pub recorded_at: u64,
+    pub track: String,
+    pub track_variation: String,
+    pub session_type: u32,
+    pub results: Vec<SessionResultView>,
+}
+
 /// Round with sessions already resolved from IDs.
 #[derive(Serialize)]
 pub struct RoundView {
-    pub sessions: Vec<RecordedSession>,
+    pub sessions: Vec<SessionView>,
 }
 
 #[derive(Serialize)]
@@ -246,14 +271,20 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
 
         let mut rounds: Vec<RoundView> = Vec::new();
         for round in &champ.rounds {
-            let mut rsessions: Vec<RecordedSession> = resolve_sessions(&round.session_ids, sessions)
-                .into_iter().cloned().collect();
+            let mut rsessions: Vec<&RecordedSession> = resolve_sessions(&round.session_ids, sessions);
             rsessions.sort_by_key(|s| s.session_type);
 
+            let mut session_views: Vec<SessionView> = Vec::new();
             for s in &rsessions {
+                let is_race = s.session_type == 5;
+                let mut result_views: Vec<SessionResultView> = Vec::new();
                 for r in &s.results {
                     let a = accum.entry(r.name.clone()).or_default();
-                    if s.session_type == 5 {
+                    let points_earned = if is_race && !r.dnf {
+                        let pos = r.race_position as usize;
+                        if pos > 0 && pos <= champ.points_system.len() { champ.points_system[pos - 1] } else { 0 }
+                    } else { 0 };
+                    if is_race {
                         a.races += 1;
                         if r.dnf { a.dnf += 1; }
                         else {
@@ -269,9 +300,20 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
                         if r.race_position == 3  { a.quali_p3 += 1; }
                         if r.race_position <= 10 { a.quali_top10 += 1; }
                     }
+                    result_views.push(SessionResultView {
+                        name: r.name.clone(), car_name: r.car_name.clone(),
+                        car_class: r.car_class.clone(), race_position: r.race_position,
+                        laps_completed: r.laps_completed, fastest_lap: r.fastest_lap,
+                        last_lap: r.last_lap, dnf: r.dnf, points_earned,
+                    });
                 }
+                session_views.push(SessionView {
+                    id: s.id.clone(), recorded_at: s.recorded_at, track: s.track.clone(),
+                    track_variation: s.track_variation.clone(), session_type: s.session_type,
+                    results: result_views,
+                });
             }
-            rounds.push(RoundView { sessions: rsessions });
+            rounds.push(RoundView { sessions: session_views });
         }
 
         championships.push(ChampionshipView {

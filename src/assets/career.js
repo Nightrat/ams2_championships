@@ -56,7 +56,7 @@ function careerRoundsHtml(champ) {
         var pos = r.race_position > 0 ? r.race_position : (idx + 1);
         var fl  = r.fastest_lap > 0 ? fmtLapTime(r.fastest_lap) : '\u2014';
         var dnf = (isRace && r.dnf) ? ' <span class="badge badge-pending">DNF</span>' : '';
-        var pts = isRace ? '<td class="pts">' + (champ.points_system[r.race_position - 1] || 0) + '</td>' : '';
+        var pts = isRace ? '<td class="pts">' + (r.points_earned || 0) + '</td>' : '';
         var carLabel = r.car_name
           ? ' <span class="result-car">' + esc(r.car_name) + '</span>'
           : '';
