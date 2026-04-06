@@ -147,8 +147,9 @@ function renderCareerChampionships(champs) {
   list.querySelectorAll('.champ-list-item').forEach(function (el) {
     el.addEventListener('click', function () { selectChamp(+el.dataset.idx); });
   });
-  // Auto-select first
-  selectChamp(0);
+  // Auto-select Active championship, fall back to first
+  var activeIdx = careerChamps.findIndex(function (c) { return c.status === 'Active'; });
+  selectChamp(activeIdx >= 0 ? activeIdx : 0);
 }
 
 function renderCareerStats(driverStats) {
