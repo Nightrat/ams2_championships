@@ -200,11 +200,43 @@ function renderCareerStats(driverStats) {
   initSortableTableEl(document.getElementById('career-stats-table'));
 }
 
+function renderTrackStats(trackStats) {
+  var container = document.getElementById('career-tracks-container');
+  if (!container) return;
+  if (!(trackStats || []).length) {
+    container.innerHTML = '<div class="manage-placeholder" style="padding:2rem">No sessions recorded yet.</div>';
+    return;
+  }
+  var thead = '<tr>' +
+    '<th class="stat-name sort-asc" data-col="0" data-type="str">Track</th>' +
+    '<th class="stat-num" data-col="1" data-type="num">Races</th>' +
+    '<th class="stat-num" data-col="2" data-type="num">Qualifyings</th>' +
+    '<th class="stat-num" data-col="3" data-type="time">Best Lap</th>' +
+    '<th class="stat-num" data-col="4" data-type="str">Last Visited</th>' +
+    '</tr>';
+  var tbody = trackStats.map(function (t) {
+    var name = t.track_variation && t.track_variation !== t.track
+      ? esc(t.track) + ' <span class="session-track-var">' + esc(t.track_variation) + '</span>'
+      : esc(t.track);
+    return '<tr>' +
+      '<td class="stat-name">' + name + '</td>' +
+      '<td class="stat-num">' + t.races + '</td>' +
+      '<td class="stat-num">' + t.qualifyings + '</td>' +
+      '<td class="stat-num">' + (t.best_lap > 0 ? fmtLapTime(t.best_lap) : '\u2014') + '</td>' +
+      '<td class="stat-num">' + fmtDate(t.last_visited) + '</td>' +
+    '</tr>';
+  }).join('');
+  container.innerHTML = '<table class="stats-table sortable" id="career-tracks-table">' +
+    '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table>';
+  initSortableTableEl(document.getElementById('career-tracks-table'));
+}
+
 function loadCareerChampionships() {
   fetch('/api/career').then(function (r) { return r.json(); })
     .then(function (career) {
       renderCareerChampionships(career.championships || []);
       renderCareerStats(career.driver_stats || []);
+      renderTrackStats(career.track_stats || []);
     }).catch(function () {
       var el = document.getElementById('career-champ-detail');
       if (el) el.innerHTML = '<div class="manage-placeholder" style="padding:2rem">Career data requires the server binary.</div>';

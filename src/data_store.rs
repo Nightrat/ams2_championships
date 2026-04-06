@@ -179,9 +179,20 @@ pub struct DriverStat {
 }
 
 #[derive(Serialize)]
+pub struct TrackStat {
+    pub track: String,
+    pub track_variation: String,
+    pub races: u32,
+    pub qualifyings: u32,
+    pub best_lap: f32,
+    pub last_visited: u64,
+}
+
+#[derive(Serialize)]
 pub struct CareerResponse {
     pub championships: Vec<ChampionshipView>,
     pub driver_stats: Vec<DriverStat>,
+    pub track_stats: Vec<TrackStat>,
 }
 
 fn resolve_sessions<'a>(ids: &[String], sessions: &'a [RecordedSession]) -> Vec<&'a RecordedSession> {
@@ -336,7 +347,29 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
     }).collect();
     driver_stats.sort_by(|a, b| b.p1.cmp(&a.p1).then(b.p2.cmp(&a.p2)).then(b.races.cmp(&a.races)));
 
-    CareerResponse { championships, driver_stats }
+    // ── Track stats — computed from all sessions, not scoped to championships ──
+    #[derive(Default)]
+    struct TrackAccum { races: u32, qualifyings: u32, best_lap: f32, last_visited: u64 }
+    let mut track_accum: HashMap<(String, String), TrackAccum> = HashMap::new();
+    for s in sessions {
+        let key = (s.track.clone(), s.track_variation.clone());
+        let a = track_accum.entry(key).or_default();
+        if s.session_type == 5 { a.races += 1; }
+        if s.session_type == 3 { a.qualifyings += 1; }
+        if s.recorded_at > a.last_visited { a.last_visited = s.recorded_at; }
+        for r in &s.results {
+            if r.fastest_lap > 0.0 && (a.best_lap <= 0.0 || r.fastest_lap < a.best_lap) {
+                a.best_lap = r.fastest_lap;
+            }
+        }
+    }
+    let mut track_stats: Vec<TrackStat> = track_accum.into_iter().map(|((track, track_variation), a)| TrackStat {
+        track, track_variation, races: a.races, qualifyings: a.qualifyings,
+        best_lap: a.best_lap, last_visited: a.last_visited,
+    }).collect();
+    track_stats.sort_by(|a, b| b.last_visited.cmp(&a.last_visited));
+
+    CareerResponse { championships, driver_stats, track_stats }
 }
 
 pub fn persist(store: &SharedStore, path: &PathBuf) {

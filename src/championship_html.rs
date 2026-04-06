@@ -25,6 +25,7 @@ fn generate_html() -> String {
     <div class="sub-tab-bar">
       <button class="sub-tab-btn sub-tab-active" data-career-sub="champs">Championships</button>
       <button class="sub-tab-btn" data-career-sub="stats">Driver Stats</button>
+      <button class="sub-tab-btn" data-career-sub="tracks">Track Stats</button>
       <button id="career-pdf-btn" class="career-pdf-btn">&#128438; Download PDF</button>
     </div>
     <div id="career-sub-champs" class="sub-tab-panel">
@@ -36,6 +37,9 @@ fn generate_html() -> String {
     </div>
     <div id="career-sub-stats" class="sub-tab-panel sub-tab-panel-hidden">
       <div id="career-stats-container"></div>
+    </div>
+    <div id="career-sub-tracks" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-tracks-container"></div>
     </div>
   </div>
   <div id="tab-live" class="tab-panel">
