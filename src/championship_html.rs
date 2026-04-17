@@ -17,6 +17,7 @@ fn generate_html() -> String {
     <button class="tab-btn tab-active" data-tab="live">&#9679; Live Session</button>
     <button class="tab-btn" data-tab="career">&#127942; Career</button>
     <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
+    <button class="tab-btn" data-tab="config">&#9965; Config</button>
   </div>
 </header>
 <main>
@@ -53,6 +54,8 @@ fn generate_html() -> String {
         <span id="live-race-state"></span>
         <span id="live-track" class="live-track"></span>
         <span id="live-raw-states" class="live-raw-states"></span>
+        <button id="live-record-btn" class="live-record-btn" disabled title="Save the current session now">&#9210; Save Session</button>
+        <span id="live-record-msg" class="live-record-msg"></span>
       </div>
       <nav class="live-subnav">
         <button class="live-subtab live-subtab-active" data-sub="timing">Timing</button>
@@ -60,6 +63,7 @@ fn generate_html() -> String {
       </nav>
       <div id="live-sub-timing" class="live-subpanel">
         <div class="live-body">
+          <canvas id="track-map" width="280" height="280" class="track-map"></canvas>
           <div class="grid-scroll">
             <table id="live-table" class="live-table">
               <thead>
@@ -134,21 +138,79 @@ fn generate_html() -> String {
       </div>
     </div>
   </div>
+  <div id="tab-config" class="tab-panel tab-panel-hidden">
+    <div class="config-panel">
+      <h2 class="config-heading">Server Configuration</h2>
+      <p class="config-note">Changes are saved to <code>config.json</code> next to the executable.
+         Settings marked <span class="config-restart-badge">restart</span> take effect after restarting the server.</p>
+      <form id="config-form" autocomplete="off">
+        <div class="config-group">
+          <label class="config-label" for="cfg-port">Port <span class="config-restart-badge">restart</span></label>
+          <input class="config-input" id="cfg-port" name="port" type="number" min="1" max="65535" />
+          <span class="config-hint">HTTP and WebSocket port (default 8080)</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-host">Host <span class="config-restart-badge">restart</span></label>
+          <input class="config-input" id="cfg-host" name="host" type="text" />
+          <span class="config-hint">Bind address. Use <code>0.0.0.0</code> to allow LAN access (default 127.0.0.1)</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-data-file">Data file <span class="config-restart-badge">restart</span></label>
+          <input class="config-input config-input-wide" id="cfg-data-file" name="data_file" type="text" placeholder="(default: championships/ams2_career.json next to executable)" />
+          <span class="config-hint">Full path to the career JSON file. Leave empty for the default location.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-poll-ms">Poll interval (ms)</label>
+          <input class="config-input" id="cfg-poll-ms" name="poll_ms" type="number" min="50" max="5000" />
+          <span class="config-hint">Shared memory read interval for the live view (default 200 ms)</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label">Auto-record <span class="config-restart-badge">restart</span></label>
+          <div class="config-check-group">
+            <label class="config-label-check"><input id="cfg-record-practice" type="checkbox" /> Practice</label>
+            <label class="config-label-check"><input id="cfg-record-qualify"  type="checkbox" /> Qualifying</label>
+            <label class="config-label-check"><input id="cfg-record-race"     type="checkbox" /> Race</label>
+          </div>
+          <span class="config-hint">Which session types to save automatically when AMS2 is running</span>
+        </div>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
+            <input id="cfg-show-track-map" name="show_track_map" type="checkbox" />
+            Show track radar in live view
+          </label>
+          <span class="config-hint">Displays the track map canvas next to the timing table</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-track-map-max-points">Track radar max points</label>
+          <input class="config-input" id="cfg-track-map-max-points" name="track_map_max_points" type="number" min="100" max="50000" />
+          <span class="config-hint">Maximum number of unique grid cells accumulated before collection stops (default 5000)</span>
+        </div>
+        <div class="config-actions">
+          <button class="manage-btn manage-btn-primary" type="submit">Save</button>
+          <span id="config-save-msg" class="config-save-msg"></span>
+        </div>
+      </form>
+    </div>
+  </div>
 </main>
 <script>{js_utils}</script>
 <script>{js_telemetry}</script>
+<script>{js_track_map}</script>
 <script>{js_live}</script>
 <script>{js_career}</script>
 <script>{js_manage}</script>
+<script>{js_config}</script>
 <script>{js_main}</script>
 </body>
 </html>"##,
         css          = CSS,
         js_utils     = JS_UTILS,
         js_telemetry = JS_TELEMETRY,
+        js_track_map = JS_TRACK_MAP,
         js_live      = JS_LIVE,
         js_career    = JS_CAREER,
         js_manage    = JS_MANAGE,
+        js_config    = JS_CONFIG,
         js_main      = JS_MAIN,
     )
 }
@@ -167,7 +229,9 @@ const CSS: &str = include_str!("assets/style.css");
 
 const JS_UTILS:     &str = include_str!("assets/utils.js");
 const JS_TELEMETRY: &str = include_str!("assets/telemetry.js");
+const JS_TRACK_MAP: &str = include_str!("assets/track_map.js");
 const JS_LIVE:      &str = include_str!("assets/live.js");
 const JS_CAREER:    &str = include_str!("assets/career.js");
 const JS_MANAGE:    &str = include_str!("assets/manage.js");
+const JS_CONFIG:    &str = include_str!("assets/config.js");
 const JS_MAIN:      &str = include_str!("assets/main.js");

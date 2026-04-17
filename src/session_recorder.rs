@@ -88,6 +88,23 @@ fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData) {
     persist(store, path);
 }
 
+/// Capture the current live session immediately, regardless of auto-record settings.
+/// Returns an error string if nothing is worth capturing.
+pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String> {
+    let session = read_live_session();
+    if !session.connected {
+        return Err("AMS2 is not connected".into());
+    }
+    if session.num_participants == 0 {
+        return Err("No active participants".into());
+    }
+    if !matches!(session.session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE) {
+        return Err("No active session".into());
+    }
+    capture(store, path, &session);
+    Ok(())
+}
+
 fn should_capture(cached: &LiveSessionData) -> bool {
     if cached.num_participants == 0 {
         return false;
@@ -113,7 +130,7 @@ fn should_capture(cached: &LiveSessionData) -> bool {
 ///   Race   — when the race is finished the user can only leave session which leads to a disconnect (in SP he can also restart the session, meaning he throws away the current cached result).
 ///   P / Q  — session_state changes (P→Q, Q→Race lobby)
 ///   Any    — disconnect while session was active
-pub fn start(store: SharedStore, path: PathBuf) {
+pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qualify: bool, record_race: bool) {
     std::thread::spawn(move || {
         let mut prev_session_state: u32 = 0;
         // Rolling snapshot — updated whenever in a capturable session with participants,
@@ -125,9 +142,18 @@ pub fn start(store: SharedStore, path: PathBuf) {
 
             let session = read_live_session();
 
+            let should_record = |state: u32| -> bool {
+                match state {
+                    SESSION_PRACTICE => record_practice,
+                    SESSION_QUALIFY  => record_qualify,
+                    SESSION_RACE     => record_race,
+                    _                => false,
+                }
+            };
+
             if !session.connected {
                 if let Some(ref cached) = session_cache {
-                    if should_capture(cached) {
+                    if should_capture(cached) && should_record(cached.session_state) {
                         capture(&store, &path, cached);
                     }
                 }
@@ -142,8 +168,8 @@ pub fn start(store: SharedStore, path: PathBuf) {
             }
 
             if prev_session_state != session_state {
-                  if let Some(ref cached) = session_cache {
-                    if should_capture(cached) {
+                if let Some(ref cached) = session_cache {
+                    if should_capture(cached) && should_record(cached.session_state) {
                         capture(&store, &path, cached);
                     }
                 }

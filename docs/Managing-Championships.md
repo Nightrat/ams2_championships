@@ -29,7 +29,7 @@ With a championship selected:
 
 - **Rename** — click the name to edit it inline
 - **Change points system** — select a new preset or enter custom values
-- **Change status** — set to Pending, Active, or Finished. Only Finished championships count toward championship wins in the Driver Stats.
+- **Change status** — set to **Active**, **Progress**, or **Final**. Only Final championships count toward championship standings finishes in the Driver Stats.
 
 ## Removing sessions and rounds
 

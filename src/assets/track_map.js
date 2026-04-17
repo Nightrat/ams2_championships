@@ -1,12 +1,14 @@
 // ── Track map ─────────────────────────────────────────────────────────────────
 var trackMap = { track: null, points: null, cells: {}, accumulated: [], saved: false, loading: false };
-var TM_CELL = 5;   // metres per grid cell for deduplication
-var TM_MIN  = 300; // minimum unique cells before saving
+var TM_CELL = 5;    // metres per grid cell for deduplication
+var TM_MIN  = 300;  // minimum unique cells before saving
+var TM_MAX  = 5000; // maximum unique cells to accumulate (overridden by config)
 
 function tmCellKey(x, z) { return Math.floor(x / TM_CELL) + ',' + Math.floor(z / TM_CELL); }
 
 function tmAddPoints(participants) {
   participants.forEach(function (p) {
+    if (trackMap.accumulated.length >= TM_MAX) return;
     var key = tmCellKey(p.world_pos_x, p.world_pos_z);
     if (!trackMap.cells[key]) {
       trackMap.cells[key] = true;
@@ -87,7 +89,7 @@ function tmRender(canvas, points, cars) {
 
 function tmUpdate(d) {
   var canvas = document.getElementById('track-map');
-  if (!canvas) return;
+  if (!canvas || canvas.style.display === 'none') return;
 
   if (!d.connected || !d.track_location) {
     var ctx = canvas.getContext('2d');

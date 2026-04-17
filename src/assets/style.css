@@ -308,7 +308,6 @@ table { border-collapse: collapse; width: 100%; }
 }
 
 /* Results grid */
-.grid-scroll { overflow-x: auto; }
 
 .results-grid th,
 .results-grid td {
@@ -479,8 +478,9 @@ table { border-collapse: collapse; width: 100%; }
 
 /* Live Session tab */
 .live-section { padding: 1.5rem 2rem; }
-.live-body { margin-top: 0.75rem; }
-.grid-scroll { overflow-x: auto; }
+.live-body { display: flex; gap: 1rem; margin-top: 0.75rem; align-items: flex-start; }
+.track-map { flex: 0 0 280px; height: 280px; background: #0a0a14; border-radius: 6px; border: 1px solid #2a2a3e; }
+.grid-scroll { flex: 1 1 auto; overflow-x: auto; }
 
 .live-status {
   display: inline-flex;
@@ -537,6 +537,16 @@ table { border-collapse: collapse; width: 100%; }
 
 #live-race-state { color: #f39c12; font-size: 0.78rem; }
 #live-track      { color: #95a5a6; font-size: 0.78rem; }
+.live-record-btn {
+  margin-left: auto;
+  padding: 0.2rem 0.65rem;
+  background: #1a1a2e; border: 1px solid #555; border-radius: 4px;
+  color: #bbb; font-size: 0.78rem; cursor: pointer;
+}
+.live-record-btn:hover:not(:disabled) { border-color: #e74c3c; color: #e74c3c; }
+.live-record-btn:disabled { opacity: 0.35; cursor: default; }
+.live-record-msg { font-size: 0.78rem; color: #7dcea0; }
+.live-record-msg-error { color: #e74c3c; }
 
 .live-table { border-collapse: collapse; width: auto; }
 
@@ -904,6 +914,35 @@ table { border-collapse: collapse; width: 100%; }
 
 /* Print-only title (hidden on screen) */
 .career-print-title { display: none; }
+
+/* ── Config tab ──────────────────────────────────────────────────────────────── */
+.config-panel { max-width: 640px; padding: 1.5rem 1rem; }
+.config-heading { font-size: 1.1rem; color: #e0e0e0; margin: 0 0 0.5rem; }
+.config-note { font-size: 0.82rem; color: #999; margin: 0 0 1.5rem; }
+.config-group { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1.1rem; }
+.config-group-check { flex-direction: row; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
+.config-label { font-size: 0.85rem; color: #ccc; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
+.config-label-check { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: #ccc; font-weight: 600; }
+.config-label-check input[type="checkbox"] { accent-color: #e74c3c; width: 1rem; height: 1rem; cursor: pointer; }
+.config-input {
+  background: #1e1e2e; border: 1px solid #444; border-radius: 4px;
+  color: #e0e0e0; padding: 0.35rem 0.6rem; font-size: 0.88rem;
+  width: 160px; outline: none;
+}
+.config-input:focus { border-color: #e74c3c; }
+.config-input-wide { width: 100%; max-width: 500px; }
+.config-hint { font-size: 0.78rem; color: #777; }
+.config-hint code { color: #aaa; background: #252535; padding: 0 3px; border-radius: 2px; }
+.config-restart-badge {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  background: #2a1a1a; color: #e74c3c; border: 1px solid #8b1a1a;
+  border-radius: 3px; padding: 0 4px; letter-spacing: 0.03em;
+}
+.config-check-group { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+.config-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; }
+.config-save-msg { font-size: 0.82rem; color: #aaa; }
+.config-save-msg-ok    { color: #7dcea0; }
+.config-save-msg-error { color: #e74c3c; }
 
 /* ── Print / PDF styles ──────────────────────────────────────────────────────── */
 @media print {

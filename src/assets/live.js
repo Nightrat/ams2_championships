@@ -84,17 +84,24 @@ function processLiveData(d) {
       var raceState  = document.getElementById('live-race-state');
       var trackEl    = document.getElementById('live-track');
       var rawStates  = document.getElementById('live-raw-states');
+      var recordBtn  = document.getElementById('live-record-btn');
       if (!statusEl || !liveBody) return;
 
       if (!d.connected || d.game_state < 2) {
         statusEl.className = 'live-status live-disconnected';
         statusTxt.textContent = 'Not connected \u2014 start AMS2 to see live data';
         infoEl.style.visibility = 'hidden';
+        if (recordBtn) recordBtn.disabled = true;
         liveBody.innerHTML = '<tr><td colspan="12" class="live-empty">Waiting for session data\u2026</td></tr>';
         return;
       }
 
       statusEl.className = 'live-status live-connected';
+      if (recordBtn) {
+        var hasSession = d.participants && d.participants.length > 0 &&
+          (d.session_state === 1 || d.session_state === 3 || d.session_state === 5);
+        recordBtn.disabled = !hasSession;
+      }
       statusTxt.textContent = 'Connected';
       sessType.textContent = SESSION_NAMES[d.session_state] || ('Session ' + d.session_state);
       // race_state is only meaningful for race sessions
@@ -199,6 +206,7 @@ function processLiveData(d) {
           '</tr>';
       }).join('');
       applyLiveSort();
+      tmUpdate(d);
       updateSetupPanel(d);
 }
 
@@ -227,3 +235,28 @@ function connectLiveWs() {
 }
 
 connectLiveWs();
+
+// ── Manual save session button ────────────────────────────────────────────────
+(function () {
+  var btn = document.getElementById('live-record-btn');
+  var msg = document.getElementById('live-record-msg');
+  if (!btn) return;
+  var timer = null;
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    if (msg) { msg.textContent = ''; msg.className = 'live-record-msg'; }
+    fetch('/api/record-session', { method: 'POST' })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (msg) {
+          msg.textContent = res.ok ? 'Saved.' : (res.j.error || 'Error');
+          msg.className = 'live-record-msg' + (res.ok ? '' : ' live-record-msg-error');
+        }
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () { if (msg) { msg.textContent = ''; } }, 3000);
+      })
+      .catch(function () {
+        if (msg) { msg.textContent = 'Request failed.'; msg.className = 'live-record-msg live-record-msg-error'; }
+      });
+  });
+}());
