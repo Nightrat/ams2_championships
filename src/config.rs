@@ -56,6 +56,10 @@ impl Default for Config {
     }
 }
 
+#[cfg(test)]
+#[path = "tests/config.rs"]
+mod tests;
+
 /// Load config from `path`. If the file does not exist, write defaults and return them.
 /// On parse error, print a warning and return defaults.
 pub fn load_or_create(path: &Path) -> Config {

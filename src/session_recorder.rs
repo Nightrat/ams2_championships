@@ -30,7 +30,11 @@ use ams2::{SESSION_PRACTICE, SESSION_QUALIFY, SESSION_RACE};
 
 
 
-fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData) {
+#[cfg(test)]
+#[path = "tests/session_recorder.rs"]
+mod tests;
+
+pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -105,7 +109,7 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
     Ok(())
 }
 
-fn should_capture(cached: &LiveSessionData) -> bool {
+pub(crate) fn should_capture(cached: &LiveSessionData) -> bool {
     if cached.num_participants == 0 {
         return false;
     }

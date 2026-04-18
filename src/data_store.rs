@@ -415,5 +415,5 @@ pub fn persist(store: &SharedStore, path: &PathBuf) {
 }
 
 #[cfg(test)]
-#[path = "data_store_tests.rs"]
+#[path = "tests/data_store.rs"]
 mod tests;
