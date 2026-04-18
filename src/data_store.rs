@@ -216,15 +216,15 @@ fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Standing
         for s in resolve_sessions(&round.session_ids, sessions) {
             if s.session_type != 5 { continue; }
             for r in &s.results {
-                pts.entry(r.name.clone()).or_insert(0);
+                let p = pts.entry(r.name.clone()).or_insert(0);
                 wins.entry(r.name.clone()).or_insert(0);
                 if !r.dnf {
                     let pos = r.race_position as usize;
                     if pos > 0 && pos <= champ.points_system.len() {
-                        *pts.get_mut(&r.name).unwrap() += champ.points_system[pos - 1];
+                        *p += champ.points_system[pos - 1];
                     }
                     if r.race_position == 1 {
-                        *wins.get_mut(&r.name).unwrap() += 1;
+                        *wins.entry(r.name.clone()).or_insert(0) += 1;
                     }
                 }
             }
@@ -247,15 +247,15 @@ fn constructors(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Stand
                 let key = if !r.car_name.is_empty() { &r.car_name }
                           else if !r.car_class.is_empty() { &r.car_class }
                           else { continue };
-                pts.entry(key.clone()).or_insert(0);
+                let p = pts.entry(key.clone()).or_insert(0);
                 wins.entry(key.clone()).or_insert(0);
                 if !r.dnf {
                     let pos = r.race_position as usize;
                     if pos > 0 && pos <= champ.points_system.len() {
-                        *pts.get_mut(key).unwrap() += champ.points_system[pos - 1];
+                        *p += champ.points_system[pos - 1];
                     }
                     if r.race_position == 1 {
-                        *wins.get_mut(key).unwrap() += 1;
+                        *wins.entry(key.clone()).or_insert(0) += 1;
                     }
                 }
             }
@@ -279,7 +279,7 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
         let constructor_standings = constructors(champ, sessions);
 
         if champ.status == ChampionshipStatus::Final {
-            if let Some(w) = driver_standings.get(0) {
+            if let Some(w) = driver_standings.first() {
                 accum.entry(w.name.clone()).or_default().champ_wins += 1;
             }
             if let Some(w) = driver_standings.get(1) {
@@ -358,15 +358,11 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
     driver_stats.sort_by(|a, b| b.p1.cmp(&a.p1).then(b.p2.cmp(&a.p2)).then(b.races.cmp(&a.races)));
 
     // ── Track stats — grouped by (track, variation, player car) ──────────────
+    #[derive(Default)]
     struct TrackAccum {
         races: u32, qualifyings: u32, last_visited: u64,
         // driver_name -> (best_lap_time, result_car)
         driver_bests: HashMap<String, (f32, String)>,
-    }
-    impl Default for TrackAccum {
-        fn default() -> Self {
-            TrackAccum { races: 0, qualifyings: 0, last_visited: 0, driver_bests: HashMap::new() }
-        }
     }
     let mut track_accum: HashMap<(String, String, String), TrackAccum> = HashMap::new();
     for s in sessions {

@@ -340,10 +340,6 @@ fn handle(
             return;
         };
         let mut data = store.write().unwrap();
-        if !data.championships.iter().any(|c| c.id == id) {
-            json_err(&mut stream, "404 Not Found", "not found");
-            return;
-        }
         // Only one championship may be Active at a time.
         if body.status == Some(ChampionshipStatus::Active) {
             for c in data.championships.iter_mut() {
@@ -352,7 +348,10 @@ fn handle(
                 }
             }
         }
-        let champ = data.championships.iter_mut().find(|c| c.id == id).unwrap();
+        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
         if let Some(name) = body.name { champ.name = name; }
         if let Some(status) = body.status { champ.status = status; }
         if let Some(ps) = body.points_system { champ.points_system = ps; }
