@@ -1,6 +1,7 @@
 # AMS2 Championships
 
 [![Release](https://img.shields.io/github/v/release/Nightrat/ams2_championships)](https://github.com/Nightrat/ams2_championships/releases/latest)
+[![Tests](https://github.com/Nightrat/ams2_championships/actions/workflows/rust.yml/badge.svg)](https://github.com/Nightrat/ams2_championships/actions/workflows/rust.yml)
 
 > **Download the latest release:** [ams2_championship_server.exe](https://github.com/Nightrat/ams2_championships/releases/latest/download/ams2_championship_server.exe)
 
