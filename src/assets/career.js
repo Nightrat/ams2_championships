@@ -200,23 +200,101 @@ function renderCareerStats(driverStats) {
   initSortableTableEl(document.getElementById('career-stats-table'));
 }
 
+var allTrackStats = [];
+
+function aggregateTrackStats(rows) {
+  var byKey = {};
+  rows.forEach(function (t) {
+    var key = t.track + '\x00' + t.track_variation;
+    var a = byKey[key];
+    if (!a) {
+      byKey[key] = { track: t.track, track_variation: t.track_variation, car: '',
+        races: t.races, qualifyings: t.qualifyings,
+        best_lap: t.best_lap, best_lap_driver: t.best_lap_driver, best_lap_car: t.best_lap_car,
+        second_lap: t.second_lap, second_lap_driver: t.second_lap_driver, second_lap_car: t.second_lap_car,
+        third_lap: t.third_lap, third_lap_driver: t.third_lap_driver, third_lap_car: t.third_lap_car,
+        last_visited: t.last_visited };
+      return;
+    }
+    a.races += t.races;
+    a.qualifyings += t.qualifyings;
+    if (t.last_visited > a.last_visited) a.last_visited = t.last_visited;
+    // Merge all per-driver bests across cars, keep top 3 unique drivers by lap time
+    var allLaps = [
+      { t: a.best_lap,   d: a.best_lap_driver,   c: a.best_lap_car },
+      { t: a.second_lap, d: a.second_lap_driver, c: a.second_lap_car },
+      { t: a.third_lap,  d: a.third_lap_driver,  c: a.third_lap_car },
+      { t: t.best_lap,   d: t.best_lap_driver,   c: t.best_lap_car },
+      { t: t.second_lap, d: t.second_lap_driver, c: t.second_lap_car },
+      { t: t.third_lap,  d: t.third_lap_driver,  c: t.third_lap_car },
+    ].filter(function (l) { return l.t > 0 && l.d; });
+    // Keep best lap per driver, then sort
+    var byDriver = {};
+    allLaps.forEach(function (l) {
+      if (!byDriver[l.d] || l.t < byDriver[l.d].t) byDriver[l.d] = l;
+    });
+    var top3 = Object.values(byDriver).sort(function (x, y) { return x.t - y.t; }).slice(0, 3);
+    a.best_lap          = top3[0] ? top3[0].t : 0; a.best_lap_driver   = top3[0] ? top3[0].d : ''; a.best_lap_car    = top3[0] ? top3[0].c : '';
+    a.second_lap        = top3[1] ? top3[1].t : 0; a.second_lap_driver = top3[1] ? top3[1].d : ''; a.second_lap_car  = top3[1] ? top3[1].c : '';
+    a.third_lap         = top3[2] ? top3[2].t : 0; a.third_lap_driver  = top3[2] ? top3[2].d : ''; a.third_lap_car   = top3[2] ? top3[2].c : '';
+  });
+  return Object.values(byKey);
+}
+
+function buildTrackCarFilter(trackStats) {
+  var cars = [];
+  trackStats.forEach(function (t) { if (t.car && cars.indexOf(t.car) === -1) cars.push(t.car); });
+  cars.sort();
+  return cars;
+}
+
 function renderTrackStats(trackStats) {
+  allTrackStats = trackStats || [];
   var container = document.getElementById('career-tracks-container');
   if (!container) return;
-  if (!(trackStats || []).length) {
+  if (!allTrackStats.length) {
     container.innerHTML = '<div class="manage-placeholder" style="padding:2rem">No sessions recorded yet.</div>';
     return;
   }
+
+  var cars = buildTrackCarFilter(allTrackStats);
+  var filterHtml = '<div class="track-filter-bar">' +
+    '<label class="track-filter-label">Car</label>' +
+    '<select id="track-car-filter" class="track-car-filter">' +
+    '<option value="">All Cars</option>' +
+    cars.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') +
+    '</select></div>';
+
+  container.innerHTML = filterHtml + '<div id="career-tracks-table-wrap"></div>';
+  document.getElementById('track-car-filter').addEventListener('change', function () {
+    applyTrackCarFilter(this.value);
+  });
+  applyTrackCarFilter('');
+}
+
+function fmtLapHolder(time, driver, car, showCar) {
+  if (!time || time <= 0) return '\u2014';
+  var t = fmtLapTime(time);
+  var d = driver ? ' <span class="track-lap-driver">' + esc(driver) + (showCar && car ? ' <span class="session-track-var">(' + esc(car) + ')</span>' : '') + '</span>' : '';
+  return t + d;
+}
+
+function applyTrackCarFilter(car) {
+  var rows = car ? allTrackStats.filter(function (t) { return t.car === car; }) : aggregateTrackStats(allTrackStats);
+  rows.sort(function (a, b) { return b.last_visited - a.last_visited; });
+  var showCar = !car;
+  var col = 0;
+  function th(cls, type, label) { return '<th class="' + cls + '" data-col="' + (col++) + '" data-type="' + type + '">' + label + '</th>'; }
   var thead = '<tr>' +
-    '<th class="stat-name sort-asc" data-col="0" data-type="str">Track</th>' +
-    '<th class="stat-num" data-col="1" data-type="num">Races</th>' +
-    '<th class="stat-num" data-col="2" data-type="num">Qualifyings</th>' +
-    '<th class="stat-num" data-col="3" data-type="time">Best Lap</th>' +
-    '<th class="stat-name" data-col="4" data-type="str">Record Holder</th>' +
-    '<th class="stat-name" data-col="5" data-type="str">Car</th>' +
-    '<th class="stat-num" data-col="6" data-type="str">Last Visited</th>' +
+    th('stat-name sort-asc', 'str', 'Track') +
+    th('stat-num', 'num', 'Races') +
+    th('stat-num', 'num', 'Qualifyings') +
+    th('stat-num', 'time', 'Best Lap') +
+    th('stat-num', 'time', '2nd Lap') +
+    th('stat-num', 'time', '3rd Lap') +
+    th('stat-num', 'str', 'Last Visited') +
     '</tr>';
-  var tbody = trackStats.map(function (t) {
+  var tbody = rows.map(function (t) {
     var name = t.track_variation && t.track_variation !== t.track
       ? esc(t.track) + ' <span class="session-track-var">' + esc(t.track_variation) + '</span>'
       : esc(t.track);
@@ -224,13 +302,15 @@ function renderTrackStats(trackStats) {
       '<td class="stat-name">' + name + '</td>' +
       '<td class="stat-num">' + t.races + '</td>' +
       '<td class="stat-num">' + t.qualifyings + '</td>' +
-      '<td class="stat-num">' + (t.best_lap > 0 ? fmtLapTime(t.best_lap) : '\u2014') + '</td>' +
-      '<td class="stat-name">' + (t.best_lap_driver ? esc(t.best_lap_driver) : '\u2014') + '</td>' +
-      '<td class="stat-name">' + (t.best_lap_car ? esc(t.best_lap_car) : '\u2014') + '</td>' +
+      '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.best_lap,   t.best_lap_driver,   t.best_lap_car,   showCar) + '</td>' +
+      '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.second_lap, t.second_lap_driver, t.second_lap_car, showCar) + '</td>' +
+      '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.third_lap,  t.third_lap_driver,  t.third_lap_car,  showCar) + '</td>' +
       '<td class="stat-num">' + fmtDate(t.last_visited) + '</td>' +
     '</tr>';
   }).join('');
-  container.innerHTML = '<table class="stats-table sortable" id="career-tracks-table">' +
+  var wrap = document.getElementById('career-tracks-table-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<table class="stats-table sortable" id="career-tracks-table">' +
     '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table>';
   initSortableTableEl(document.getElementById('career-tracks-table'));
 }

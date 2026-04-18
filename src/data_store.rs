@@ -182,11 +182,19 @@ pub struct DriverStat {
 pub struct TrackStat {
     pub track: String,
     pub track_variation: String,
+    /// Player's car for this group; empty string in the aggregated "all cars" view.
+    pub car: String,
     pub races: u32,
     pub qualifyings: u32,
     pub best_lap: f32,
     pub best_lap_driver: String,
     pub best_lap_car: String,
+    pub second_lap: f32,
+    pub second_lap_driver: String,
+    pub second_lap_car: String,
+    pub third_lap: f32,
+    pub third_lap_driver: String,
+    pub third_lap_car: String,
     pub last_visited: u64,
 }
 
@@ -349,28 +357,49 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
     }).collect();
     driver_stats.sort_by(|a, b| b.p1.cmp(&a.p1).then(b.p2.cmp(&a.p2)).then(b.races.cmp(&a.races)));
 
-    // ── Track stats — computed from all sessions, not scoped to championships ──
-    #[derive(Default)]
-    struct TrackAccum { races: u32, qualifyings: u32, best_lap: f32, best_lap_driver: String, best_lap_car: String, last_visited: u64 }
-    let mut track_accum: HashMap<(String, String), TrackAccum> = HashMap::new();
+    // ── Track stats — grouped by (track, variation, player car) ──────────────
+    struct TrackAccum {
+        races: u32, qualifyings: u32, last_visited: u64,
+        // driver_name -> (best_lap_time, result_car)
+        driver_bests: HashMap<String, (f32, String)>,
+    }
+    impl Default for TrackAccum {
+        fn default() -> Self {
+            TrackAccum { races: 0, qualifyings: 0, last_visited: 0, driver_bests: HashMap::new() }
+        }
+    }
+    let mut track_accum: HashMap<(String, String, String), TrackAccum> = HashMap::new();
     for s in sessions {
-        let key = (s.track.clone(), s.track_variation.clone());
+        let car = if !s.car_name.is_empty() { s.car_name.clone() } else { s.car_class.clone() };
+        let key = (s.track.clone(), s.track_variation.clone(), car);
         let a = track_accum.entry(key).or_default();
         if s.session_type == 5 { a.races += 1; }
         if s.session_type == 3 { a.qualifyings += 1; }
         if s.recorded_at > a.last_visited { a.last_visited = s.recorded_at; }
         for r in &s.results {
-            if r.fastest_lap > 0.0 && (a.best_lap <= 0.0 || r.fastest_lap < a.best_lap) {
-                a.best_lap = r.fastest_lap;
-                a.best_lap_driver = r.name.clone();
-                a.best_lap_car = if !r.car_name.is_empty() { r.car_name.clone() } else { r.car_class.clone() };
-            }
+            if r.fastest_lap <= 0.0 { continue; }
+            let result_car = if !r.car_name.is_empty() { r.car_name.clone() } else { r.car_class.clone() };
+            let entry = a.driver_bests.entry(r.name.clone()).or_insert((f32::MAX, String::new()));
+            if r.fastest_lap < entry.0 { *entry = (r.fastest_lap, result_car); }
         }
     }
-    let mut track_stats: Vec<TrackStat> = track_accum.into_iter().map(|((track, track_variation), a)| TrackStat {
-        track, track_variation, races: a.races, qualifyings: a.qualifyings,
-        best_lap: a.best_lap, best_lap_driver: a.best_lap_driver, best_lap_car: a.best_lap_car,
-        last_visited: a.last_visited,
+    fn lap_slot(driver_bests: &HashMap<String, (f32, String)>, rank: usize) -> (f32, String, String) {
+        let mut sorted: Vec<(&String, &(f32, String))> = driver_bests.iter().collect();
+        sorted.sort_by(|a, b| a.1.0.partial_cmp(&b.1.0).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.get(rank).map(|(name, (t, c))| (*t, (*name).clone(), c.clone()))
+            .unwrap_or((0.0, String::new(), String::new()))
+    }
+    let mut track_stats: Vec<TrackStat> = track_accum.into_iter().map(|((track, track_variation, car), a)| {
+        let (best_lap, best_lap_driver, best_lap_car)     = lap_slot(&a.driver_bests, 0);
+        let (second_lap, second_lap_driver, second_lap_car) = lap_slot(&a.driver_bests, 1);
+        let (third_lap, third_lap_driver, third_lap_car)  = lap_slot(&a.driver_bests, 2);
+        TrackStat {
+            track, track_variation, car, races: a.races, qualifyings: a.qualifyings,
+            best_lap, best_lap_driver, best_lap_car,
+            second_lap, second_lap_driver, second_lap_car,
+            third_lap, third_lap_driver, third_lap_car,
+            last_visited: a.last_visited,
+        }
     }).collect();
     track_stats.sort_by(|a, b| b.last_visited.cmp(&a.last_visited));
 

@@ -604,12 +604,18 @@ fn test_compute_career_champ_standings_not_counted_for_active() {
 // ── track_stats ───────────────────────────────────────────────────────────────
 
 /// Helper: a race session at a specific track/timestamp with (name, pos, fastest_lap, car_name).
+/// session_car is the player's car at the session level (used for per-car track stats grouping).
 fn make_track_session(id: &str, session_type: u32, track: &str, variation: &str, recorded_at: u64,
                       results: Vec<(&str, u32, f32, &str)>) -> RecordedSession {
+    make_track_session_car(id, session_type, track, variation, recorded_at, "", results)
+}
+
+fn make_track_session_car(id: &str, session_type: u32, track: &str, variation: &str, recorded_at: u64,
+                          session_car: &str, results: Vec<(&str, u32, f32, &str)>) -> RecordedSession {
     RecordedSession {
         id: id.into(), recorded_at,
         track: track.into(), track_variation: variation.into(),
-        car_name: "".into(), car_class: "".into(),
+        car_name: session_car.into(), car_class: "".into(),
         session_type,
         results: results.into_iter().map(|(name, pos, fl, car)| SessionResult {
             name: name.into(), car_name: car.into(), car_class: "".into(),
@@ -713,4 +719,63 @@ fn test_track_stats_practice_not_counted_as_race_or_qualifying() {
     let ts = &resp.track_stats[0];
     assert_eq!(ts.races,      0);
     assert_eq!(ts.qualifyings, 0);
+}
+
+#[test]
+fn test_track_stats_top3_laps_ranked_by_driver_best() {
+    let sessions = vec![make_track_session("r1", 5, "Spa", "GP", 1000, vec![
+        ("Alice", 1, 90.0, "Ferrari"),  // best for Alice
+        ("Bob",   2, 88.0, "McLaren"),  // best for Bob
+        ("Carol", 3, 92.0, "Williams"), // best for Carol
+        ("Dave",  4, 85.0, "RedBull"),  // best for Dave — fastest overall
+    ])];
+    let resp = compute_career(&[], &sessions);
+    let ts = &resp.track_stats[0];
+    assert!((ts.best_lap   - 85.0).abs() < 0.001); assert_eq!(ts.best_lap_driver,   "Dave");
+    assert!((ts.second_lap - 88.0).abs() < 0.001); assert_eq!(ts.second_lap_driver, "Bob");
+    assert!((ts.third_lap  - 90.0).abs() < 0.001); assert_eq!(ts.third_lap_driver,  "Alice");
+}
+
+#[test]
+fn test_track_stats_top3_uses_per_driver_best_across_sessions() {
+    let sessions = vec![
+        make_track_session("r1", 5, "Spa", "GP", 1000, vec![("Alice", 1, 90.0, "Ferrari")]),
+        make_track_session("r2", 5, "Spa", "GP", 2000, vec![("Alice", 1, 88.5, "Ferrari"), ("Bob", 2, 89.0, "McLaren")]),
+    ];
+    // Alice appears in both sessions; her per-driver best is 88.5
+    let resp = compute_career(&[], &sessions);
+    let ts = &resp.track_stats[0];
+    assert!((ts.best_lap   - 88.5).abs() < 0.001); assert_eq!(ts.best_lap_driver,   "Alice");
+    assert!((ts.second_lap - 89.0).abs() < 0.001); assert_eq!(ts.second_lap_driver, "Bob");
+    assert_eq!(ts.third_lap, 0.0);
+}
+
+#[test]
+fn test_track_stats_fewer_than_3_drivers_fills_zeros() {
+    let sessions = vec![make_track_session("r1", 5, "Spa", "GP", 1000, vec![
+        ("Alice", 1, 90.0, "Ferrari"),
+    ])];
+    let resp = compute_career(&[], &sessions);
+    let ts = &resp.track_stats[0];
+    assert!((ts.best_lap - 90.0).abs() < 0.001);
+    assert_eq!(ts.second_lap, 0.0);
+    assert_eq!(ts.third_lap,  0.0);
+}
+
+#[test]
+fn test_track_stats_different_session_cars_are_separate_entries() {
+    let sessions = vec![
+        make_track_session_car("r1", 5, "Spa", "GP", 1000, "Ferrari",  vec![("Alice", 1, 90.0, "Ferrari")]),
+        make_track_session_car("r2", 5, "Spa", "GP", 2000, "McLaren",  vec![("Alice", 1, 88.0, "McLaren")]),
+        make_track_session_car("r3", 5, "Spa", "GP", 3000, "Ferrari",  vec![("Alice", 1, 89.5, "Ferrari")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    // Two cars → two entries for Spa
+    assert_eq!(resp.track_stats.len(), 2);
+    let ferrari = resp.track_stats.iter().find(|t| t.car == "Ferrari").unwrap();
+    let mclaren = resp.track_stats.iter().find(|t| t.car == "McLaren").unwrap();
+    assert_eq!(ferrari.races, 2);
+    assert_eq!(mclaren.races, 1);
+    assert!((ferrari.best_lap - 89.5).abs() < 0.001);
+    assert!((mclaren.best_lap - 88.0).abs() < 0.001);
 }

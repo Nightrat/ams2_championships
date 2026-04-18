@@ -537,6 +537,21 @@ table { border-collapse: collapse; width: 100%; }
 
 #live-race-state { color: #f39c12; font-size: 0.78rem; }
 #live-track      { color: #95a5a6; font-size: 0.78rem; }
+.track-lap-cell { white-space: nowrap; }
+.track-lap-driver { color: #888; font-size: 0.78rem; margin-left: 0.3rem; }
+
+.track-filter-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.75rem; background: #0d0d1a; border-bottom: 1px solid #2a2a3e;
+}
+.track-filter-label { font-size: 0.78rem; color: #888; }
+.track-car-filter {
+  background: #1a1a2e; border: 1px solid #3a3a5c; border-radius: 4px;
+  color: #ccc; font-size: 0.82rem; padding: 0.2rem 0.5rem; cursor: pointer;
+  min-width: 180px;
+}
+.track-car-filter:focus { outline: none; border-color: #7b68ee; }
+
 .live-record-btn {
   margin-left: auto;
   padding: 0.2rem 0.65rem;
