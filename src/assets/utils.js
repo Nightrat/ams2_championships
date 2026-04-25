@@ -1,3 +1,13 @@
+// ── Championship sort: Active first, then Progress, then Final; alpha within group ──
+var CHAMP_STATUS_ORDER = { Active: 0, Progress: 1, Final: 2 };
+function sortChamps(champs) {
+  return champs.slice().sort(function (a, b) {
+    var ao = CHAMP_STATUS_ORDER[a.status] ?? 3;
+    var bo = CHAMP_STATUS_ORDER[b.status] ?? 3;
+    return ao !== bo ? ao - bo : a.name.localeCompare(b.name);
+  });
+}
+
 // ── Shared constants ──────────────────────────────────────────────────────────
 var SESSION_TYPE_LABELS = { 1: 'P', 3: 'Q', 5: 'R' };
 var SESSION_TYPE_NAMES  = { 1: 'Practice', 3: 'Qualify', 5: 'Race' };

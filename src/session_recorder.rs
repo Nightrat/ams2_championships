@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::ams2_shared_memory::{read_live_session, LiveSessionData};
-use crate::data_store::{persist, RecordedSession, SessionResult, SharedStore};
+use crate::data_store::{persist, LapChartEntry, RecordedSession, SessionResult, SharedStore};
 
 #[allow(dead_code)]
 mod ams2 {
@@ -34,7 +34,7 @@ use ams2::{SESSION_PRACTICE, SESSION_QUALIFY, SESSION_RACE};
 #[path = "tests/session_recorder.rs"]
 mod tests;
 
-pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData) {
+pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData, lap_chart: Vec<LapChartEntry>) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -71,6 +71,7 @@ pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSession
         car_class: session.car_class.clone(),
         session_type: session.session_state,
         results,
+        lap_chart,
     };
 
     let type_name = match session.session_state {
@@ -105,7 +106,7 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
     if !matches!(session.session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE) {
         return Err("No active session".into());
     }
-    capture(store, path, &session);
+    capture(store, path, &session, vec![]);
     Ok(())
 }
 
@@ -140,6 +141,9 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
         // Rolling snapshot — updated whenever in a capturable session with participants,
         // regardless of game_state (P/Q use game=4, not game=2).
         let mut session_cache: Option<LiveSessionData> = None;
+        // Lap-by-lap position chart accumulated during a race session.
+        let mut lap_chart: Vec<LapChartEntry> = vec![];
+        let mut leader_laps: u32 = 0;
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
@@ -158,11 +162,13 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             if !session.connected {
                 if let Some(ref cached) = session_cache {
                     if should_capture(cached) && should_record(cached.session_state) {
-                        capture(&store, &path, cached);
+                        capture(&store, &path, cached, std::mem::take(&mut lap_chart));
                     }
                 }
                 prev_session_state = 0;
                 session_cache = None;
+                lap_chart.clear();
+                leader_laps = 0;
                 continue;
             }
 
@@ -174,11 +180,29 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             if prev_session_state != session_state {
                 if let Some(ref cached) = session_cache {
                     if should_capture(cached) && should_record(cached.session_state) {
-                        capture(&store, &path, cached);
+                        capture(&store, &path, cached, std::mem::take(&mut lap_chart));
                     }
                 }
                 session_cache = None;
+                lap_chart.clear();
+                leader_laps = 0;
                 prev_session_state = session_state;
+            }
+
+            // ── Accumulate per-lap positions during a race ────────────────────
+            if session_state == SESSION_RACE && session.num_participants > 0 {
+                let max_laps = session.participants.iter().map(|p| p.laps_completed).max().unwrap_or(0);
+                if max_laps > leader_laps {
+                    // A new lap was completed — snapshot every participant's position.
+                    leader_laps = max_laps;
+                    for p in &session.participants {
+                        lap_chart.push(LapChartEntry {
+                            lap: max_laps,
+                            driver: p.name.clone(),
+                            position: p.race_position,
+                        });
+                    }
+                }
             }
 
             // ── Always refresh the rolling cache ─────────────────────────────
@@ -190,7 +214,6 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             } else if !matches!(session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE) {
                 session_cache = None;
             }
-            
         }
     });
 }

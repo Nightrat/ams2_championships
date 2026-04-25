@@ -345,7 +345,7 @@ fn test_route_delete_unassigned_sessions_removes_orphans() {
                 id: (*id).into(), recorded_at: 1000,
                 track: "Spa".into(), track_variation: "GP".into(),
                 car_name: String::new(), car_class: String::new(),
-                session_type: 5, results: vec![],
+                session_type: 5, results: vec![], lap_chart: vec![],
             });
         }
     }

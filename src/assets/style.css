@@ -774,6 +774,20 @@ table { border-collapse: collapse; width: 100%; }
 .round-session { margin-bottom: 0.3rem; }
 .round-session-label { font-size: 0.72rem; color: #95a5a6; margin-bottom: 0.15rem; }
 
+/* Lap chart */
+.lap-chart-wrap { margin-top: 0.6rem; }
+.lap-chart-label { font-size: 0.72rem; color: #95a5a6; margin-bottom: 0.25rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.lap-chart-scroll { overflow-x: auto; }
+.lap-chart-table { border-collapse: collapse; font-size: 0.7rem; }
+.lap-chart-table th, .lap-chart-table td { padding: 2px 5px; text-align: center; border: 1px solid #1e1e3a; }
+.lc-driver-h, .lc-driver { text-align: left; white-space: nowrap; color: #ccc; font-weight: 500; min-width: 7rem; }
+.lc-lap { color: #666; font-weight: 400; min-width: 1.6rem; }
+.lc-cell { color: #777; }
+.lc-cell.lap-p1 { background: #b8860b; color: #fff; font-weight: 700; }
+.lc-cell.lap-p2 { background: #4a4a6a; color: #ddd; font-weight: 600; }
+.lc-cell.lap-p3 { background: #5a3a1a; color: #ddd; font-weight: 600; }
+.lc-cell.lap-top { color: #aaa; }
+
 .session-card {
   display: flex;
   justify-content: space-between;

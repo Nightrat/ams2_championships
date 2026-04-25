@@ -4,6 +4,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+/// One driver's position on a specific completed lap.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LapChartEntry {
+    pub lap: u32,
+    pub driver: String,
+    pub position: u32,
+}
+
 /// Final result for one participant in a recorded session.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SessionResult {
@@ -36,6 +44,8 @@ pub struct RecordedSession {
     /// session_state from AMS2: 1=Practice, 3=Qualify, 5=Race.
     pub session_type: u32,
     pub results: Vec<SessionResult>,
+    #[serde(default)]
+    pub lap_chart: Vec<LapChartEntry>,
 }
 
 /// A championship round — groups one or more sessions (Practice / Qualify / Race).
@@ -139,6 +149,7 @@ pub struct SessionView {
     pub track_variation: String,
     pub session_type: u32,
     pub results: Vec<SessionResultView>,
+    pub lap_chart: Vec<LapChartEntry>,
 }
 
 /// Round with sessions already resolved from IDs.
@@ -332,6 +343,7 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
                     id: s.id.clone(), recorded_at: s.recorded_at, track: s.track.clone(),
                     track_variation: s.track_variation.clone(), session_type: s.session_type,
                     results: result_views,
+                    lap_chart: s.lap_chart.clone(),
                 });
             }
             rounds.push(RoundView { sessions: session_views });

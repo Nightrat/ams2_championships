@@ -53,6 +53,7 @@ fn sample_session() -> RecordedSession {
                 dnf: false,
             },
         ],
+        lap_chart: vec![],
     }
 }
 
@@ -221,6 +222,7 @@ fn make_session(id: &str, session_type: u32, results: Vec<(&str, u32, bool, &str
             name: name.into(), car_name: car.into(), car_class: "".into(),
             race_position: pos, laps_completed: 10, fastest_lap: 0.0, last_lap: 0.0, dnf,
         }).collect(),
+        lap_chart: vec![],
     }
 }
 
@@ -621,6 +623,7 @@ fn make_track_session_car(id: &str, session_type: u32, track: &str, variation: &
             name: name.into(), car_name: car.into(), car_class: "".into(),
             race_position: pos, laps_completed: 10, fastest_lap: fl, last_lap: 0.0, dnf: false,
         }).collect(),
+        lap_chart: vec![],
     }
 }
 

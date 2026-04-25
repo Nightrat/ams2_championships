@@ -30,6 +30,53 @@ function careerStandingsHtml(standings) {
     '<tbody>' + rows + '</tbody></table>';
 }
 
+function lapChartHtml(s) {
+  var chart = s.lap_chart || [];
+  if (!chart.length) return '';
+
+  // Collect laps and build byDriverLap[driver][lap] = position
+  var laps = [];
+  var byDriverLap = {};
+  chart.forEach(function (e) {
+    if (laps.indexOf(e.lap) === -1) laps.push(e.lap);
+    if (!byDriverLap[e.driver]) byDriverLap[e.driver] = {};
+    byDriverLap[e.driver][e.lap] = e.position;
+  });
+  laps.sort(function (a, b) { return a - b; });
+
+  // Order drivers by their final race position
+  var drivers = s.results.slice()
+    .sort(function (a, b) { return a.race_position - b.race_position; })
+    .map(function (r) { return r.name; });
+
+  function posClass(pos, total) {
+    if (pos === 1) return ' lap-p1';
+    if (pos === 2) return ' lap-p2';
+    if (pos === 3) return ' lap-p3';
+    if (pos <= Math.ceil(total / 2)) return ' lap-top';
+    return '';
+  }
+
+  var n = drivers.length;
+  var lapHeaders = laps.map(function (l) { return '<th class="lc-lap">' + l + '</th>'; }).join('');
+  var bodyRows = drivers.map(function (d) {
+    var cells = laps.map(function (l) {
+      var pos = byDriverLap[d] && byDriverLap[d][l];
+      if (!pos) return '<td class="lc-cell"></td>';
+      return '<td class="lc-cell' + posClass(pos, n) + '">' + pos + '</td>';
+    }).join('');
+    return '<tr><td class="lc-driver">' + esc(d) + '</td>' + cells + '</tr>';
+  }).join('');
+
+  return '<div class="lap-chart-wrap">' +
+    '<div class="lap-chart-label">Lap Chart</div>' +
+    '<div class="lap-chart-scroll">' +
+    '<table class="lap-chart-table">' +
+    '<thead><tr><th class="lc-driver-h">Driver</th>' + lapHeaders + '</tr></thead>' +
+    '<tbody>' + bodyRows + '</tbody>' +
+    '</table></div></div>';
+}
+
 function careerRoundsHtml(champ) {
   var rounds = champ.rounds || [];
   if (!rounds.length) return '<p class="manage-empty">No rounds assigned yet.</p>';
@@ -75,7 +122,9 @@ function careerRoundsHtml(champ) {
           ' <span class="session-drivers">' + s.results.length + ' drivers</span>' +
         '</div>' +
         '<table class="standings-table"><thead><tr><th>Pos</th><th>Driver</th>' + ptsHeader + '<th>Laps</th><th>Best</th></tr></thead>' +
-        '<tbody>' + resultRows + '</tbody></table></div>';
+        '<tbody>' + resultRows + '</tbody></table>' +
+        (isRace ? lapChartHtml(s) : '') +
+        '</div>';
     }).join('');
 
     return '<details class="events-detail">' +
@@ -124,7 +173,7 @@ function selectChamp(idx) {
 }
 
 function renderCareerChampionships(champs) {
-  careerChamps = champs || [];
+  careerChamps = sortChamps(champs || []);
   var list = document.getElementById('career-champ-list');
   var detail = document.getElementById('career-champ-detail');
   if (!list || !detail) return;

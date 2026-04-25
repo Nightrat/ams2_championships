@@ -286,7 +286,7 @@ fn handle(
         let champ = Championship {
             id,
             name: body.name,
-            status: ChampionshipStatus::Active,
+            status: ChampionshipStatus::Progress,
             points_system: if body.points_system.is_empty() {
                 vec![25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
             } else {

@@ -6,7 +6,7 @@ function loadManage() {
     fetch('/api/championships').then(function (r) { return r.json(); }),
     fetch('/api/sessions').then(function (r) { return r.json(); })
   ]).then(function (results) {
-    manageState.champs = results[0] || [];
+    manageState.champs = sortChamps(results[0] || []);
     manageState.sessions = results[1] || [];
     var active = manageState.champs.find(function (c) { return c.status === 'Active'; });
     manageState.selectedId = active ? active.id : (manageState.champs[0] ? manageState.champs[0].id : null);
