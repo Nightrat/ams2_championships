@@ -14,6 +14,18 @@
             "problemMatcher": "$rustc"
         },
         {
+            "label": "cargo build release",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["build","--release"],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$rustc"
+        },
+        {
             "label": "cargo test",
             "type": "shell",
             "command": "cargo",

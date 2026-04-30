@@ -1,5 +1,5 @@
 // ── Track map ─────────────────────────────────────────────────────────────────
-var trackMap = { track: null, points: null, cells: {}, accumulated: [], saved: false, loading: false };
+var trackMap = { track: null, points: null, cells: {}, accumulated: [], savedCount: 0, loading: false };
 var TM_CELL = 5;    // metres per grid cell for deduplication
 var TM_MIN  = 300;  // minimum unique cells before saving
 var TM_MAX  = 5000; // maximum unique cells to accumulate (overridden by config)
@@ -8,7 +8,7 @@ function tmCellKey(x, z) { return Math.floor(x / TM_CELL) + ',' + Math.floor(z /
 
 function tmAddPoints(participants) {
   participants.forEach(function (p) {
-    if (trackMap.accumulated.length >= TM_MAX) return;
+    if (Object.keys(trackMap.cells).length >= TM_MAX) return;
     var key = tmCellKey(p.world_pos_x, p.world_pos_z);
     if (!trackMap.cells[key]) {
       trackMap.cells[key] = true;
@@ -26,17 +26,19 @@ function tmLoad(track) {
       trackMap.loading = false;
       if (Array.isArray(data) && data.length > 50) {
         trackMap.points = data;
-        trackMap.saved  = data.length >= TM_MIN;
+        trackMap.savedCount = data.length;
+        // Seed cells so accumulated only tracks points not already saved
+        data.forEach(function (p) { trackMap.cells[tmCellKey(p[0], p[1])] = true; });
       }
     })
     .catch(function () { trackMap.loading = false; });
 }
 
-function tmSave(track) {
+function tmSave(track, points) {
   fetch('/api/track-layout/' + encodeURIComponent(track), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(trackMap.accumulated)
+    body: JSON.stringify(points)
   }).catch(function () {});
 }
 
@@ -104,7 +106,7 @@ function tmUpdate(d) {
     trackMap.points      = null;
     trackMap.cells       = {};
     trackMap.accumulated = [];
-    trackMap.saved       = false;
+    trackMap.savedCount  = 0;
     tmLoad(d.track_location);
   }
 
@@ -112,12 +114,15 @@ function tmUpdate(d) {
     tmAddPoints(d.participants);
   }
 
-  if (!trackMap.saved && Object.keys(trackMap.cells).length >= TM_MIN) {
-    trackMap.saved = true;
-    tmSave(d.track_location);
+  var totalCells = Object.keys(trackMap.cells).length;
+  if (totalCells >= TM_MIN && totalCells >= trackMap.savedCount + 100) {
+    var combined = (trackMap.points || []).concat(trackMap.accumulated);
+    trackMap.savedCount = totalCells;
+    tmSave(d.track_location, combined);
   }
 
-  var renderPoints = trackMap.points || (trackMap.accumulated.length >= 20 ? trackMap.accumulated : null);
+  var allPoints = (trackMap.points || []).concat(trackMap.accumulated);
+  var renderPoints = allPoints.length >= 20 ? allPoints : null;
   var cars = (d.participants || []).map(function (p) {
     return { x: p.world_pos_x, z: p.world_pos_z, isPlayer: p.is_player, pos: p.race_position };
   });
