@@ -924,8 +924,8 @@ table { border-collapse: collapse; width: 100%; }
 #live-table .player-row td { background: #1a1a30; }
 #live-table .player-row .live-name { font-weight: 700; color: #e0e0e0; }
 
-/* Career PDF button */
-.career-pdf-btn {
+/* Career HTML export button */
+.career-export-btn {
   margin-left: auto;
   padding: 0.25rem 0.8rem;
   background: #12122a;
@@ -939,10 +939,7 @@ table { border-collapse: collapse; width: 100%; }
   letter-spacing: 0.03em;
   transition: background 0.15s;
 }
-.career-pdf-btn:hover { background: #1a1a3a; color: #e0e0e0; }
-
-/* Print-only title (hidden on screen) */
-.career-print-title { display: none; }
+.career-export-btn:hover { background: #1a1a3a; color: #e0e0e0; }
 
 /* ── Config tab ──────────────────────────────────────────────────────────────── */
 .config-panel { max-width: 640px; padding: 1.5rem 1rem; }
@@ -973,112 +970,3 @@ table { border-collapse: collapse; width: 100%; }
 .config-save-msg-ok    { color: #7dcea0; }
 .config-save-msg-error { color: #e74c3c; }
 
-/* ── Print / PDF styles ──────────────────────────────────────────────────────── */
-@media print {
-  /* Reset to light theme */
-  * {
-    background: transparent !important;
-    color: #111 !important;
-    border-color: #ccc !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-  }
-
-  /* Page setup */
-  @page { margin: 1.5cm 1.8cm; }
-  body { font-family: Georgia, 'Times New Roman', serif; font-size: 10pt; }
-
-  /* Hide everything except career panel */
-  .tab-bar, .career-pdf-btn,
-  #tab-live, #tab-manage,
-  #tab-career .sub-tab-bar { display: none !important; }
-
-  /* Force career panel visible */
-  #tab-career { display: block !important; }
-
-  /* Show both sub-tab panels, remove hidden state */
-  #tab-career .sub-tab-panel,
-  #tab-career .sub-tab-panel-hidden { display: block !important; }
-
-  /* Print title */
-  .career-print-title {
-    display: block !important;
-    font-size: 18pt;
-    font-weight: bold;
-    margin: 0 0 1.2rem 0;
-    padding-bottom: 0.4rem;
-    border-bottom: 2pt solid #111 !important;
-    letter-spacing: 0.03em;
-  }
-
-  /* Section headings */
-  #career-sub-stats { page-break-before: always; padding-top: 0.5rem; }
-  #career-sub-stats::before {
-    content: 'Driver Statistics';
-    display: block;
-    font-size: 14pt;
-    font-weight: bold;
-    margin-bottom: 0.8rem;
-    padding-bottom: 0.3rem;
-    border-bottom: 1pt solid #999 !important;
-  }
-
-  /* Championship blocks */
-  .championship {
-    border: 1pt solid #bbb !important;
-    margin-bottom: 1rem;
-    page-break-inside: avoid;
-    padding: 0.4rem 0.6rem;
-  }
-  .champ-header { border-bottom: 1pt solid #ccc !important; margin-bottom: 0.5rem; }
-  .champ-title h2 { font-size: 12pt; margin: 0 0 0.2rem 0; }
-  .champ-meta { font-size: 8.5pt; color: #555 !important; }
-  .champ-body { display: flex; flex-wrap: wrap; gap: 0.8rem; }
-
-  /* Badges */
-  .badge {
-    border: 1pt solid #999 !important;
-    border-radius: 3px;
-    padding: 0 4px;
-    font-size: 7.5pt;
-  }
-
-  /* Standings and stats tables */
-  table { border-collapse: collapse; width: 100%; margin-bottom: 0.5rem; font-size: 8.5pt; }
-  th, td { border: 0.5pt solid #bbb !important; padding: 3px 6px; text-align: left; }
-  th { background: #f0f0f0 !important; font-weight: bold; }
-  td.pos, td.pts { text-align: center; }
-
-  .standings-panel { min-width: 180px; flex: 1; }
-  .results-panel { flex: 2; min-width: 280px; }
-
-  /* Round details — always expanded in print */
-  details { display: block !important; }
-  details > * { display: block !important; }
-  details summary { font-weight: bold; font-size: 9pt; margin: 0.4rem 0 0.2rem; list-style: none; }
-  details summary::marker, details summary::-webkit-details-marker { display: none; }
-
-  .round-session { margin-bottom: 0.4rem; page-break-inside: avoid; }
-  .round-session-label { font-size: 8pt; margin-bottom: 0.2rem; color: #444 !important; }
-  .session-type-badge {
-    border: 0.5pt solid #999 !important;
-    border-radius: 2px;
-    padding: 0 3px;
-    font-size: 7pt;
-    font-weight: bold;
-  }
-
-  /* Driver stats table */
-  .stats-table { font-size: 8.5pt; }
-  .stat-name { font-weight: bold; }
-  .stat-num { text-align: center; }
-
-  /* Misc */
-  .manage-empty, .manage-placeholder { color: #888 !important; font-style: italic; }
-  .result-car { color: #555 !important; font-size: 7.5pt; }
-  .badge-active   { border-color: #c0392b !important; }
-  .badge-progress { border-color: #27ae60 !important; }
-  .badge-final    { border-color: #2980b9 !important; }
-
-  a { text-decoration: none; color: inherit !important; }
-}

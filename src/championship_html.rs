@@ -22,12 +22,11 @@ fn generate_html() -> String {
 </header>
 <main>
   <div id="tab-career" class="tab-panel tab-panel-hidden">
-    <div class="career-print-title">AMS2 Career Championships</div>
     <div class="sub-tab-bar">
       <button class="sub-tab-btn sub-tab-active" data-career-sub="champs">Championships</button>
       <button class="sub-tab-btn" data-career-sub="stats">Driver Stats</button>
       <button class="sub-tab-btn" data-career-sub="tracks">Track Stats</button>
-      <button id="career-pdf-btn" class="career-pdf-btn">&#128438; Download PDF</button>
+      <button id="career-export-btn" class="career-export-btn">&#128229; Download HTML</button>
     </div>
     <div id="career-sub-champs" class="sub-tab-panel">
       <div class="champ-master-detail">

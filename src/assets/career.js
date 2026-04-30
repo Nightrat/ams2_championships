@@ -202,9 +202,10 @@ function renderCareerChampionships(champs) {
 }
 
 function renderCareerStats(driverStats) {
+  careerDriverStats = driverStats || [];
   var container = document.getElementById('career-stats-container');
   if (!container) return;
-  var rows = (driverStats || []).map(function (d) {
+  var rows = (careerDriverStats).map(function (d) {
     return { name: d.name, races: d.races, p1: d.p1, p2: d.p2, p3: d.p3, top10: d.top10,
              dnf: d.dnf, qualiP1: d.quali_p1, qualiP2: d.quali_p2, qualiP3: d.quali_p3, qualiTop10: d.quali_top10,
              champWins: d.champ_wins, champP2: d.champ_p2, champP3: d.champ_p3,
@@ -250,6 +251,7 @@ function renderCareerStats(driverStats) {
 }
 
 var allTrackStats = [];
+var careerDriverStats = [];
 
 function aggregateTrackStats(rows) {
   var byKey = {};
@@ -410,42 +412,141 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
   });
 }());
 
-// ── PDF download ──────────────────────────────────────────────────────────────
-var careerPdfBtn = document.getElementById('career-pdf-btn');
-if (careerPdfBtn) {
-  careerPdfBtn.addEventListener('click', function () {
+// ── HTML export ───────────────────────────────────────────────────────────────
+var EXPORT_CSS = [
+  'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1200px;margin:0 auto;padding:1.5rem 2rem;color:#111;font-size:14px}',
+  'h1{font-size:1.5rem;border-bottom:2px solid #ddd;padding-bottom:0.4rem;margin-bottom:0.3rem}',
+  'h2{font-size:1.15rem;margin:2rem 0 0.8rem;border-bottom:1px solid #eee;padding-bottom:0.2rem}',
+  'h3{font-size:0.95rem;margin:0.6rem 0 0.3rem;color:#333}',
+  '.export-date{color:#888;font-size:0.82rem;margin:0 0 1rem}',
+  '.champ-block{border:1px solid #ddd;border-radius:6px;margin-bottom:1.5rem;padding:1rem}',
+  '.champ-title{display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem}',
+  '.champ-title h2{margin:0;border:none;padding:0;font-size:1.05rem}',
+  '.badge{font-size:0.7rem;font-weight:700;padding:1px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:0.04em;border:1px solid}',
+  '.badge-active{border-color:#c0392b;color:#c0392b;background:#fdf0ef}',
+  '.badge-progress{border-color:#27ae60;color:#27ae60;background:#edfaf1}',
+  '.badge-final{border-color:#2980b9;color:#2980b9;background:#eaf4fb}',
+  '.champ-body{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start}',
+  '.standings-panel{min-width:200px;flex:0 0 auto}',
+  '.results-panel{flex:2;min-width:300px}',
+  'table{border-collapse:collapse;width:100%;margin-bottom:0.5rem;font-size:0.83rem}',
+  'th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}',
+  'th{background:#f5f5f5;font-weight:600;color:#333}',
+  '.pos,.pts,.stat-num{text-align:center}',
+  '.stat-name{font-weight:600}',
+  '.stat-group-start{border-left:2px solid #bbb}',
+  '.result-car{color:#777;font-size:0.78rem}',
+  '.manage-empty,.manage-placeholder{color:#888;font-style:italic}',
+  'details{margin-bottom:0.4rem}',
+  'summary{font-weight:600;font-size:0.88rem;cursor:pointer;padding:0.2rem 0}',
+  '.events-grid{margin-top:0.5rem}',
+  '.round-session{margin-bottom:1rem}',
+  '.round-session-label{font-size:0.79rem;color:#555;margin-bottom:0.3rem}',
+  '.session-type-badge{font-size:0.68rem;font-weight:700;border:1px solid #bbb;border-radius:2px;padding:0 3px}',
+  '.session-track{font-weight:600}',
+  '.session-date,.session-drivers{color:#888}',
+  '.session-track-var{color:#777;font-size:0.85em}',
+  '.lap-chart-wrap{margin-top:0.5rem}',
+  '.lap-chart-label{font-size:0.79rem;font-weight:600;color:#555;margin-bottom:0.2rem}',
+  '.lap-chart-scroll{overflow-x:auto}',
+  '.lap-chart-table th,.lap-chart-table td{padding:2px 4px;font-size:0.72rem;text-align:center;min-width:22px}',
+  '.lc-driver,.lc-driver-h{text-align:left;white-space:nowrap;min-width:100px}',
+  '.lap-p1{background:#8e44ad!important;color:#fff;font-weight:700}',
+  '.lap-p2{background:#2980b9!important;color:#fff}',
+  '.lap-p3{background:#16a085!important;color:#fff}',
+  '.lap-top{background:#eaf6e8}',
+  '.track-lap-driver{color:#444}',
+  '.track-lap-cell{white-space:nowrap}',
+  '.champ-sessions-list details+details{margin-top:0.25rem}',
+].join('');
+
+var careerExportBtn = document.getElementById('career-export-btn');
+if (careerExportBtn) {
+  careerExportBtn.addEventListener('click', function () {
     if (!careerChamps.length) { loadCareerChampionships(); return; }
 
-    // Build a flat print view of all championships with all round details open
-    var badgeMap = { Final: 'badge-final', Progress: 'badge-progress', Active: 'badge-active' };
-    var printHtml = careerChamps.map(function (champ) {
-      var badgeCls = badgeMap[champ.status] || 'badge-active';
-      return '<div class="championship" style="break-inside:avoid-page">' +
-        '<div class="champ-header" style="padding:0.6rem 1rem">' +
-          '<div class="champ-title"><h2>' + esc(champ.name) + '</h2>' +
-            '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span></div>' +
-        '</div>' +
+    var champsHtml = careerChamps.map(function (champ) {
+      var badgeCls = champ.status === 'Final' ? 'badge-final' : champ.status === 'Progress' ? 'badge-progress' : 'badge-active';
+      return '<div class="champ-block">' +
+        '<div class="champ-title"><h2>' + esc(champ.name) + '</h2>' +
+          '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span></div>' +
         '<div class="champ-body">' +
           '<div class="standings-panel"><h3>Driver Standings</h3>' + careerStandingsHtml(champ.driver_standings) + '</div>' +
           (champ.constructor_standings.length ? '<div class="standings-panel"><h3>Constructor Standings</h3>' + careerConstructorsHtml(champ.constructor_standings) + '</div>' : '') +
           '<div class="results-panel"><h3>Rounds</h3>' + careerRoundsHtml(champ) + '</div>' +
         '</div></div>';
+    }).join('').replace(/<details /g, '<details open ');
+
+    var statsRows = careerDriverStats.map(function (d) {
+      return '<tr><td class="stat-name">' + esc(d.name) + '</td>' +
+        '<td class="stat-num">' + d.races + '</td>' +
+        '<td class="stat-num">' + d.p1 + '</td>' +
+        '<td class="stat-num">' + d.p2 + '</td>' +
+        '<td class="stat-num">' + d.p3 + '</td>' +
+        '<td class="stat-num">' + d.top10 + '</td>' +
+        '<td class="stat-num">' + (d.races ? d.avg_pos.toFixed(1) : '—') + '</td>' +
+        '<td class="stat-num">' + (d.dnf || 0) + '</td>' +
+        '<td class="stat-num stat-group-start">' + (d.quali_p1 || 0) + '</td>' +
+        '<td class="stat-num">' + (d.quali_p2 || 0) + '</td>' +
+        '<td class="stat-num">' + (d.quali_p3 || 0) + '</td>' +
+        '<td class="stat-num">' + (d.quali_top10 || 0) + '</td>' +
+        '<td class="stat-num stat-group-start">' + (d.champ_wins || 0) + '</td>' +
+        '<td class="stat-num">' + (d.champ_p2 || 0) + '</td>' +
+        '<td class="stat-num">' + (d.champ_p3 || 0) + '</td></tr>';
     }).join('');
+    var statsHtml = statsRows
+      ? '<table class="stats-table"><thead><tr>' +
+          '<th class="stat-name">Driver</th><th class="stat-num">Races</th>' +
+          '<th class="stat-num">1st</th><th class="stat-num">2nd</th><th class="stat-num">3rd</th>' +
+          '<th class="stat-num">Top 10</th><th class="stat-num">Avg Pos</th><th class="stat-num">DNF</th>' +
+          '<th class="stat-num stat-group-start">Q Pole</th><th class="stat-num">Q 2nd</th>' +
+          '<th class="stat-num">Q 3rd</th><th class="stat-num">Q Top 10</th>' +
+          '<th class="stat-num stat-group-start">C 1st</th><th class="stat-num">C 2nd</th><th class="stat-num">C 3rd</th>' +
+        '</tr></thead><tbody>' + statsRows + '</tbody></table>'
+      : '<p class="manage-empty">No data.</p>';
 
-    var subPanel = document.getElementById('career-sub-champs');
-    var origHtml = subPanel.innerHTML;
-    subPanel.innerHTML = '<div style="padding:1rem">' + printHtml + '</div>';
+    var trackRows = aggregateTrackStats(allTrackStats);
+    trackRows.sort(function (a, b) { return b.last_visited - a.last_visited; });
+    var tracksHtml = trackRows.length
+      ? '<table class="stats-table"><thead><tr>' +
+          '<th class="stat-name">Track</th><th class="stat-num">Races</th><th class="stat-num">Qualifyings</th>' +
+          '<th class="stat-num">Best Lap</th><th class="stat-num">2nd Lap</th><th class="stat-num">3rd Lap</th>' +
+          '<th class="stat-num">Last Visited</th>' +
+        '</tr></thead><tbody>' +
+        trackRows.map(function (t) {
+          var name = t.track_variation && t.track_variation !== t.track
+            ? esc(t.track) + ' <span class="session-track-var">(' + esc(t.track_variation) + ')</span>'
+            : esc(t.track);
+          return '<tr>' +
+            '<td class="stat-name">' + name + '</td>' +
+            '<td class="stat-num">' + t.races + '</td>' +
+            '<td class="stat-num">' + t.qualifyings + '</td>' +
+            '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.best_lap,   t.best_lap_driver,   t.best_lap_car,   true) + '</td>' +
+            '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.second_lap, t.second_lap_driver, t.second_lap_car, true) + '</td>' +
+            '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.third_lap,  t.third_lap_driver,  t.third_lap_car,  true) + '</td>' +
+            '<td class="stat-num">' + fmtDate(t.last_visited) + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>'
+      : '<p class="manage-empty">No data.</p>';
 
-    // Expand all round <details>
-    subPanel.querySelectorAll('details').forEach(function (d) { d.open = true; });
+    var html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
+      '<meta charset="UTF-8">\n<title>AMS2 Career Championships</title>\n' +
+      '<style>' + EXPORT_CSS + '</style>\n</head>\n<body>\n' +
+      '<h1>AMS2 Career Championships</h1>\n' +
+      '<p class="export-date">Exported ' + new Date().toLocaleDateString() + '</p>\n' +
+      '<h2>Championships</h2>\n' + champsHtml +
+      '<h2>Driver Statistics</h2>\n' + statsHtml +
+      '<h2>Track Statistics</h2>\n' + tracksHtml +
+      '\n</body>\n</html>';
 
-    window.onafterprint = function () {
-      subPanel.innerHTML = origHtml;
-      // Re-attach list click handlers
-      renderCareerChampionships(careerChamps);
-      window.onafterprint = null;
-    };
-
-    window.print();
+    var blob = new Blob([html], { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'ams2_career_' + new Date().toISOString().slice(0, 10) + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 }
