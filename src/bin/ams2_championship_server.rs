@@ -1,213 +1,11 @@
-use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use ams2_championship::ams2_shared_memory::read_live_session;
 use ams2_championship::data_store::{Championship, ChampionshipStatus, SharedStore, persist, compute_career};
-
-// ── HTTP primitives ───────────────────────────────────────────────────────────
-
-struct Request {
-    method: String,
-    path: String,
-    body: Vec<u8>,
-    headers: String,
-}
-
-#[cfg(test)]
-fn parse_request(buf: &[u8]) -> Request {
-    let line_end = buf
-        .iter()
-        .position(|&b| b == b'\r' || b == b'\n')
-        .unwrap_or(buf.len());
-    let first_line = std::str::from_utf8(&buf[..line_end]).unwrap_or("");
-    let mut parts = first_line.split_ascii_whitespace();
-    let method = parts.next().unwrap_or("GET").to_owned();
-    let path = parts.next().unwrap_or("/").to_owned();
-    let header_end = buf.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4).unwrap_or(buf.len());
-    let headers = std::str::from_utf8(&buf[..header_end]).unwrap_or("").to_owned();
-    let body = buf.get(header_end..).unwrap_or(&[]).to_vec();
-    Request { method, path, body, headers }
-}
-
-fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]) {
-    let header = format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\
-         Cache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\n\
-         Connection: close\r\n\r\n",
-        status,
-        content_type,
-        body.len()
-    );
-    let _ = stream.write_all(header.as_bytes());
-    let _ = stream.write_all(body);
-}
-
-fn json_ok(stream: &mut TcpStream, body: &[u8]) {
-    send_response(stream, "200 OK", "application/json", body);
-}
-
-fn json_err(stream: &mut TcpStream, status: &str, msg: &str) {
-    let body = format!("{{\"error\":\"{msg}\"}}");
-    send_response(stream, status, "application/json", body.as_bytes());
-}
-
-// ── Request handler ───────────────────────────────────────────────────────────
-
-fn read_full_request(stream: &mut TcpStream) -> Request {
-    let mut raw: Vec<u8> = Vec::new();
-    let mut tmp = [0u8; 8192];
-
-    // Read until we have the full headers (\r\n\r\n).
-    loop {
-        let n = stream.read(&mut tmp).unwrap_or(0);
-        if n == 0 { break; }
-        raw.extend_from_slice(&tmp[..n]);
-        if raw.windows(4).any(|w| w == b"\r\n\r\n") { break; }
-    }
-
-    // Parse method and path from the first line.
-    let line_end = raw.iter().position(|&b| b == b'\r' || b == b'\n').unwrap_or(raw.len());
-    let first_line = std::str::from_utf8(&raw[..line_end]).unwrap_or("");
-    let mut parts = first_line.split_ascii_whitespace();
-    let method = parts.next().unwrap_or("GET").to_owned();
-    let path   = parts.next().unwrap_or("/").to_owned();
-
-    // Find where the body starts.
-    let header_end = raw.windows(4).position(|w| w == b"\r\n\r\n")
-        .map(|p| p + 4)
-        .unwrap_or(raw.len());
-
-    // Parse Content-Length from headers.
-    let headers_str = std::str::from_utf8(&raw[..header_end]).unwrap_or("");
-    let content_length: usize = headers_str
-        .lines()
-        .find(|l| l.to_ascii_lowercase().starts_with("content-length:"))
-        .and_then(|l| l.split_once(':').map(|x| x.1))
-        .and_then(|v| v.trim().parse().ok())
-        .unwrap_or(0);
-
-    // Read remaining body bytes until Content-Length is satisfied.
-    let mut body = raw[header_end..].to_vec();
-    while body.len() < content_length {
-        let n = stream.read(&mut tmp).unwrap_or(0);
-        if n == 0 { break; }
-        body.extend_from_slice(&tmp[..n]);
-    }
-    body.truncate(content_length);
-
-    Request { method, path, body, headers: headers_str.to_owned() }
-}
-
-/// Turns a track name into a safe filename stem (e.g. "Spa – GP" → "spa_gp").
-fn track_slug(name: &str) -> String {
-    name.chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
-        .collect::<String>()
-        .split('_')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("_")
-}
-
-// ── WebSocket ─────────────────────────────────────────────────────────────────
-
-fn sha1(data: &[u8]) -> [u8; 20] {
-    let mut h: [u32; 5] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
-    let mut msg = data.to_vec();
-    let bit_len = (data.len() as u64) * 8;
-    msg.push(0x80);
-    while msg.len() % 64 != 56 { msg.push(0); }
-    msg.extend_from_slice(&bit_len.to_be_bytes());
-    for chunk in msg.chunks(64) {
-        let mut w = [0u32; 80];
-        for i in 0..16 {
-            w[i] = u32::from_be_bytes([chunk[i*4], chunk[i*4+1], chunk[i*4+2], chunk[i*4+3]]);
-        }
-        for i in 16..80 { w[i] = (w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16]).rotate_left(1); }
-        let (mut a, mut b, mut c, mut d, mut e) = (h[0], h[1], h[2], h[3], h[4]);
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..80 {
-            let (f, k) = match i {
-                0..=19  => ((b & c) | (!b & d), 0x5A827999u32),
-                20..=39 => (b ^ c ^ d,           0x6ED9EBA1),
-                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
-                _       => (b ^ c ^ d,           0xCA62C1D6),
-            };
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(k).wrapping_add(w[i]);
-            e = d; d = c; c = b.rotate_left(30); b = a; a = t;
-        }
-        h[0] = h[0].wrapping_add(a); h[1] = h[1].wrapping_add(b);
-        h[2] = h[2].wrapping_add(c); h[3] = h[3].wrapping_add(d); h[4] = h[4].wrapping_add(e);
-    }
-    let mut out = [0u8; 20];
-    for (i, &v) in h.iter().enumerate() { out[i*4..i*4+4].copy_from_slice(&v.to_be_bytes()); }
-    out
-}
-
-fn base64_encode(data: &[u8]) -> String {
-    const C: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::new();
-    for chunk in data.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
-        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
-        let n = (b0 << 16) | (b1 << 8) | b2;
-        out.push(C[(n >> 18) as usize] as char);
-        out.push(C[((n >> 12) & 0x3F) as usize] as char);
-        out.push(if chunk.len() > 1 { C[((n >> 6) & 0x3F) as usize] as char } else { '=' });
-        out.push(if chunk.len() > 2 { C[(n & 0x3F) as usize] as char } else { '=' });
-    }
-    out
-}
-
-fn ws_accept_key(key: &str) -> String {
-    let mut combined = key.as_bytes().to_vec();
-    combined.extend_from_slice(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-    base64_encode(&sha1(&combined))
-}
-
-fn ws_send_text(stream: &mut TcpStream, payload: &[u8]) -> std::io::Result<()> {
-    let len = payload.len();
-    let mut frame = Vec::with_capacity(len + 10);
-    frame.push(0x81); // FIN + text opcode
-    if len < 126 {
-        frame.push(len as u8);
-    } else if len < 65536 {
-        frame.push(126);
-        frame.extend_from_slice(&(len as u16).to_be_bytes());
-    } else {
-        frame.push(127);
-        frame.extend_from_slice(&(len as u64).to_be_bytes());
-    }
-    frame.extend_from_slice(payload);
-    stream.write_all(&frame)
-}
-
-fn handle_websocket(mut stream: TcpStream, headers: &str, poll_ms: u64) {
-    let key = headers.lines()
-        .find(|l| l.to_ascii_lowercase().starts_with("sec-websocket-key:"))
-        .and_then(|l| l.split_once(':').map(|x| x.1))
-        .map(|v| v.trim())
-        .unwrap_or("");
-    if key.is_empty() { return; }
-
-    let accept = ws_accept_key(key);
-    let handshake = format!(
-        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
-    );
-    if stream.write_all(handshake.as_bytes()).is_err() { return; }
-
-    loop {
-        let data = read_live_session();
-        match serde_json::to_vec(&data) {
-            Ok(json) => { if ws_send_text(&mut stream, &json).is_err() { break; } }
-            Err(_)   => break,
-        }
-        std::thread::sleep(std::time::Duration::from_millis(poll_ms));
-    }
-}
+use ams2_championship::http::{send_response, json_ok, json_err, read_full_request, track_slug};
+use ams2_championship::websocket::handle_websocket;
 
 fn handle(
     mut stream: TcpStream,
@@ -322,7 +120,7 @@ fn handle(
         return;
     }
 
-    // Routes with path segments: /api/championships/:id[/sessions/:sid]
+    // Routes with path segments: /api/championships/:id[/...]
     let segs: Vec<&str> = path.trim_start_matches('/').split('/').collect();
 
     // PATCH /api/championships/:id
@@ -480,7 +278,6 @@ fn handle(
         return;
     }
 
-
     // POST /api/record-session — manually capture the current live session
     if method == "POST" && path == "/api/record-session" {
         match ams2_championship::session_recorder::capture_current(&store, &data_path) {
@@ -513,13 +310,11 @@ fn handle(
 
         let old_cfg = ams2_championship::config::load_or_create(&config_path);
 
-        // Determine which fields require a restart
         let mut restart_required: Vec<&'static str> = vec![];
-        if req_body.port    != old_cfg.port                    { restart_required.push("port"); }
-        if req_body.host    != old_cfg.host                    { restart_required.push("host"); }
-        if req_body.data_file != old_cfg.data_file             { restart_required.push("data_file"); }
+        if req_body.port    != old_cfg.port    { restart_required.push("port"); }
+        if req_body.host    != old_cfg.host    { restart_required.push("host"); }
+        if req_body.data_file != old_cfg.data_file { restart_required.push("data_file"); }
 
-        // Optionally move the data file
         let mut moved = false;
         if req_body.move_data_file && req_body.data_file != old_cfg.data_file {
             let new_dest = req_body.data_file.as_deref()
@@ -580,7 +375,6 @@ fn handle(
 
     // POST /api/track-layout/:track — save layout points to file
     if method == "POST" && segs.len() == 3 && segs[0] == "api" && segs[1] == "track-layout" {
-        // Reject payloads with too few points (must have at least 300 entries).
         let count = serde_json::from_slice::<serde_json::Value>(&req.body)
             .ok()
             .and_then(|v| v.as_array().map(|a| a.len()))
@@ -598,7 +392,6 @@ fn handle(
         return;
     }
 
-
     // Default: serve the static championship HTML
     send_response(&mut stream, "200 OK", "text/html; charset=utf-8", &html);
 }
@@ -612,7 +405,6 @@ mod tests;
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fn main() {
-    // ── Directories (next to the executable) ─────────────────────────────────
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
@@ -629,7 +421,6 @@ fn main() {
         std::process::exit(1);
     }
 
-    // ── Config ────────────────────────────────────────────────────────────────
     let config_path = exe_dir.join("config.json");
     let cfg = ams2_championship::config::load_or_create(&config_path);
 
@@ -638,7 +429,6 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|| champ_dir.join("ams2_career.json"));
 
-    // ── Data store ────────────────────────────────────────────────────────────
     let store = ams2_championship::data_store::load_store(&career_path);
     {
         let data = store.read().unwrap();
@@ -651,7 +441,6 @@ fn main() {
     }
     ams2_championship::session_recorder::start(store.clone(), career_path.clone(), cfg.record_practice, cfg.record_qualify, cfg.record_race);
 
-    // ── HTTP server ───────────────────────────────────────────────────────────
     let html = Arc::new(ams2_championship::build_base_html().into_bytes());
     let addr = format!("{}:{}", cfg.host, cfg.port);
 
