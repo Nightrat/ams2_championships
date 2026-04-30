@@ -178,10 +178,12 @@ Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
 cargo test
 ```
 
-**71 unit tests** across two test files:
+**117 unit tests** across four test files in `src/tests/`:
 
-- `src/data_store_tests.rs` — JSON persistence round-trips, standings computation, constructor scoring, `compute_career` aggregation, track stats, points-earned in result views, qualifying position stats, championship standings finishes
-- `src/server_tests.rs` — HTTP request parsing, SHA-1, base64, WebSocket accept-key (RFC 6455), track slug generation
+- `src/tests/data_store.rs` — JSON persistence round-trips, standings computation, constructor scoring, `compute_career` aggregation, track stats, points-earned in result views, qualifying position stats, championship standings finishes
+- `src/tests/session_recorder.rs` — session capture and `should_capture` logic
+- `src/tests/config.rs` — config load/create/defaults
+- `src/tests/server.rs` — HTTP request parsing, SHA-1, base64, WebSocket accept-key (RFC 6455), track slug generation, HTTP route integration tests
 
 ### Project structure
 
@@ -192,9 +194,14 @@ src/
   ams2_shared_memory.rs          # AMS2 shared memory reader (Windows, $pcars2$ API)
   config.rs                      # Config struct, JSON load/create with per-field serde defaults
   data_store.rs                  # Career data model, JSON persistence, standings/career computation
-  data_store_tests.rs            # Unit tests for data_store (via #[path])
+  http.rs                        # HTTP primitives: Request, send_response, json_ok/err, read_full_request, track_slug
   session_recorder.rs            # Background thread: detects race end, captures results
-  server_tests.rs                # Unit tests for the server binary (via #[path])
+  websocket.rs                   # WebSocket handshake (SHA-1, base64, RFC 6455) and live push loop
+  tests/
+    data_store.rs                # Unit tests for data_store
+    session_recorder.rs          # Unit tests for session_recorder
+    config.rs                    # Unit tests for config
+    server.rs                    # Unit tests for the server binary
   assets/
     style.css                    # Embedded at compile time via include_str!
     utils.js                     # Shared helpers: formatting, sorting, tab switching
@@ -206,7 +213,7 @@ src/
     telemetry.js                 # Telemetry panel: tyre/brake temps, setup recommendations
     main.js                      # Tab init and sub-tab wiring
   bin/
-    ams2_championship_server.rs  # HTTP server, REST API, WebSocket, session recorder startup
+    ams2_championship_server.rs  # handle() route dispatcher and main(); HTTP/WebSocket via lib modules
 ```
 
 ## Dependencies

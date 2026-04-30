@@ -1,7 +1,7 @@
 use super::*;
 use ams2_championship::data_store::{CareerData, Championship, ChampionshipStatus, Round};
 use ams2_championship::http::{Request, parse_request, track_slug};
-use ams2_championship::websocket::{sha1, base64_encode, ws_accept_key};
+use ams2_championship::websocket::{sha1, base64_encode, ws_accept_key, ws_send_text};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, RwLock};
@@ -605,4 +605,51 @@ fn test_track_slug_empty() {
 #[test]
 fn test_track_slug_numbers_preserved() {
     assert_eq!(track_slug("Circuit 1"), "circuit_1");
+}
+
+// ── ws_send_text ──────────────────────────────────────────────────────────────
+
+fn ws_capture(payload: &[u8]) -> Vec<u8> {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let payload = payload.to_vec();
+    std::thread::spawn(move || {
+        let (mut conn, _) = listener.accept().unwrap();
+        ws_send_text(&mut conn, &payload).unwrap();
+    });
+    let mut client = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
+    let mut buf = Vec::new();
+    client.read_to_end(&mut buf).unwrap();
+    buf
+}
+
+#[test]
+fn test_ws_send_text_small_payload() {
+    // < 126 bytes: [0x81, len, payload...]
+    let frame = ws_capture(b"hello");
+    assert_eq!(frame[0], 0x81);
+    assert_eq!(frame[1], 5);
+    assert_eq!(&frame[2..], b"hello");
+}
+
+#[test]
+fn test_ws_send_text_medium_payload() {
+    // 126..65536 bytes: [0x81, 126, len_hi, len_lo, payload...]
+    let payload = vec![b'x'; 200];
+    let frame = ws_capture(&payload);
+    assert_eq!(frame[0], 0x81);
+    assert_eq!(frame[1], 126);
+    assert_eq!(u16::from_be_bytes([frame[2], frame[3]]) as usize, 200);
+    assert_eq!(&frame[4..], payload.as_slice());
+}
+
+#[test]
+fn test_ws_send_text_large_payload() {
+    // >= 65536 bytes: [0x81, 127, len as u64 BE, payload...]
+    let payload = vec![b'y'; 70_000];
+    let frame = ws_capture(&payload);
+    assert_eq!(frame[0], 0x81);
+    assert_eq!(frame[1], 127);
+    assert_eq!(u64::from_be_bytes(frame[2..10].try_into().unwrap()) as usize, 70_000);
+    assert_eq!(&frame[10..], payload.as_slice());
 }
