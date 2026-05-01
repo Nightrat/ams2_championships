@@ -159,13 +159,20 @@ function updateSetupPanel(d) {
   if (viewedName) telLastViewedName = viewedName;
   var driverName = viewedName || telLastViewedName;
 
-  telBuf.push(tel);
-  if (telBuf.length > TEL_BUF_SIZE) telBuf.shift();
+  // Only accumulate samples while the car is on track (not in pits/garage).
+  // When in the box the buffer retains the last driving data so the panel stays frozen.
+  if (viewed && !viewed.in_pits) {
+    telBuf.push(tel);
+    if (telBuf.length > TEL_BUF_SIZE) telBuf.shift();
+  }
+
+  if (!telBuf.length) return;
 
   // Skip DOM update when tab hidden
   var subPanel = document.getElementById('live-sub-setup');
   if (subPanel && subPanel.classList.contains('live-subpanel-hidden')) return;
 
+  var snapTel = telBuf[telBuf.length - 1];
   var label = driverName ? '<div class="setup-driver-name">' + esc(driverName) + '</div>' : '';
-  panel.innerHTML = label + buildDriverPanel(tel, computeAvgTel(telBuf));
+  panel.innerHTML = label + buildDriverPanel(snapTel, computeAvgTel(telBuf));
 }

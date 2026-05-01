@@ -115,6 +115,7 @@ function processLiveData(d) {
         liveBody.innerHTML = '<tr><td colspan="12" class="live-empty">No active participants</td></tr>';
         return;
       }
+      updateSpotterFocus(d.participants);
 
       // ── Top speed tracking ────────────────────────────────────────────────
       if (liveTrack !== d.track_location) {
@@ -210,6 +211,93 @@ function processLiveData(d) {
       updateSetupPanel(d);
 }
 
+// ── Spotter ───────────────────────────────────────────────────────────────────
+var spotterActive = false;
+
+(function () {
+  fetch('/api/spotter/voices').then(function (r) { return r.json(); }).then(function (voices) {
+    var sel = document.getElementById('spotter-voice');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Default voice</option>';
+    voices.forEach(function (v) {
+      var opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    });
+  }).catch(function () {});
+
+  fetch('/api/spotter').then(function (r) { return r.json(); }).then(function (d) {
+    spotterActive = !!d.enabled;
+    var btn = document.getElementById('spotter-btn');
+    if (btn) {
+      btn.classList.toggle('spotter-active', spotterActive);
+      btn.title = spotterActive ? 'Spotter on — click to disable' : 'Enable voice spotter';
+    }
+    var sel = document.getElementById('spotter-voice');
+    if (sel && d.voice) sel.value = d.voice;
+  }).catch(function () {});
+
+  var btn = document.getElementById('spotter-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    spotterActive = !spotterActive;
+    btn.classList.toggle('spotter-active', spotterActive);
+    btn.title = spotterActive ? 'Spotter on — click to disable' : 'Enable voice spotter';
+    fetch('/api/spotter', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: spotterActive })
+    });
+  });
+}());
+
+// ── Spotter voice selection ───────────────────────────────────────────────────
+(function () {
+  var sel = document.getElementById('spotter-voice');
+  if (!sel) return;
+  sel.addEventListener('change', function () {
+    fetch('/api/spotter', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voice: sel.value || null })
+    });
+  });
+}());
+
+// ── Spotter focus (multiplayer player selection) ──────────────────────────────
+var spotterFocusNames = [];
+(function () {
+  var sel = document.getElementById('spotter-focus');
+  if (!sel) return;
+  sel.addEventListener('change', function () {
+    var name = sel.value || null;
+    fetch('/api/spotter', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name })
+    });
+  });
+}());
+
+function updateSpotterFocus(participants) {
+  var sel = document.getElementById('spotter-focus');
+  if (!sel || !participants) return;
+  var names = participants.map(function (p) { return p.name; }).sort();
+  var namesKey = names.join('\x00');
+  if (namesKey === spotterFocusNames.join('\x00')) return;
+  spotterFocusNames = names;
+  var current = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  names.forEach(function (n) {
+    var opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  if (names.indexOf(current) >= 0) sel.value = current;
+}
+
 // ── WebSocket connection with auto-reconnect ──────────────────────────────────
 var liveWs = null;
 var liveWsRetry = null;
@@ -220,7 +308,10 @@ function connectLiveWs() {
   liveWs = ws;
 
   ws.onmessage = function (e) {
-    try { processLiveData(JSON.parse(e.data)); } catch (_) {}
+    try {
+      var d = JSON.parse(e.data);
+      processLiveData(d);
+    } catch (_) {}
   };
 
   ws.onclose = ws.onerror = function () {

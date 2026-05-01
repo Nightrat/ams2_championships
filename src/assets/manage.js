@@ -35,6 +35,7 @@ function renderChampList() {
     }).join('');
     return '<div class="champ-list-item' + sel + '" data-id="' + esc(c.id) + '">' +
       '<span class="champ-list-name">' + esc(c.name) + '</span>' +
+      '<button class="champ-rename-btn" data-cid="' + esc(c.id) + '" title="Rename">&#9998;</button>' +
       '<select class="champ-list-status ' + statusColourClass(c.status) + '" data-cid="' + esc(c.id) + '">' + opts + '</select>' +
       '</div>';
   }).join('');
@@ -51,6 +52,44 @@ function renderChampList() {
       e.stopPropagation();
       sel.className = 'champ-list-status ' + statusColourClass(sel.value);
       patchChamp(sel.dataset.cid, { status: sel.value });
+    });
+  });
+  el.querySelectorAll('.champ-rename-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var item = btn.closest('.champ-list-item');
+      var nameSpan = item.querySelector('.champ-list-name');
+      var original = nameSpan.textContent;
+      var input = document.createElement('input');
+      input.className = 'champ-list-rename-input';
+      input.value = original;
+      nameSpan.replaceWith(input);
+      btn.style.display = 'none';
+      input.focus();
+      input.select();
+      var committed = false;
+      function commit() {
+        if (committed) return;
+        committed = true;
+        var newName = input.value.trim();
+        if (newName && newName !== original) {
+          patchChamp(btn.dataset.cid, { name: newName });
+        } else {
+          input.replaceWith(nameSpan);
+          btn.style.display = '';
+        }
+      }
+      function cancel() {
+        if (committed) return;
+        committed = true;
+        input.replaceWith(nameSpan);
+        btn.style.display = '';
+      }
+      input.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter')  commit();
+        if (ev.key === 'Escape') cancel();
+      });
+      input.addEventListener('blur', commit);
     });
   });
 }

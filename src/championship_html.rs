@@ -59,6 +59,11 @@ fn generate_html() -> String {
       <nav class="live-subnav">
         <button class="live-subtab live-subtab-active" data-sub="timing">Timing</button>
         <button class="live-subtab" data-sub="setup">Telemetry</button>
+        <button id="spotter-btn" class="spotter-btn" title="Enable voice spotter">&#128362; Spotter</button>
+        <select id="spotter-voice" class="spotter-voice" title="TTS voice"></select>
+        <select id="spotter-focus" class="spotter-focus" title="Spotter focus: which driver to track">
+          <option value="">Auto (viewed player)</option>
+        </select>
       </nav>
       <div id="live-sub-timing" class="live-subpanel">
         <div class="live-body">

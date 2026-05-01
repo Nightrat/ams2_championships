@@ -5,6 +5,7 @@ use std::sync::Arc;
 use ams2_championship::ams2_shared_memory::read_live_session;
 use ams2_championship::data_store::{Championship, ChampionshipStatus, SharedStore, persist, compute_career};
 use ams2_championship::http::{send_response, json_ok, json_err, read_full_request, track_slug};
+use ams2_championship::spotter::Focus;
 use ams2_championship::websocket::handle_websocket;
 
 fn handle(
@@ -15,6 +16,7 @@ fn handle(
     layouts_dir: Arc<PathBuf>,
     config_path: Arc<PathBuf>,
     poll_ms: u64,
+    spotter_focus: Focus,
 ) {
     let req = read_full_request(&mut stream);
     let path = req.path.as_str();
@@ -340,6 +342,9 @@ fn handle(
             record_race:     req_body.record_race,
             show_track_map: req_body.show_track_map,
             track_map_max_points: req_body.track_map_max_points,
+            spotter_enabled: old_cfg.spotter_enabled,
+            spotter_voice:   old_cfg.spotter_voice,
+            spotter_name:    old_cfg.spotter_name,
         };
         match serde_json::to_string_pretty(&new_cfg) {
             Ok(text) => { if let Err(e) = std::fs::write(config_path.as_ref(), text) {
@@ -392,6 +397,75 @@ fn handle(
         return;
     }
 
+    // GET /api/spotter/voices
+    if path == "/api/spotter/voices" && method == "GET" {
+        let voices = ams2_championship::spotter::list_voices();
+        let json = serde_json::to_vec(&voices).unwrap_or_else(|_| b"[]".to_vec());
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // GET /api/spotter
+    if path == "/api/spotter" && method == "GET" {
+        let cfg = spotter_focus.lock().unwrap().clone();
+        let player_json = match cfg.name {
+            Some(n) => serde_json::Value::String(n).to_string(),
+            None    => "null".to_string(),
+        };
+        let voice_json = match cfg.voice {
+            Some(v) => serde_json::Value::String(v).to_string(),
+            None    => "null".to_string(),
+        };
+        let body = format!("{{\"enabled\":{},\"player\":{player_json},\"voice\":{voice_json}}}", cfg.enabled);
+        json_ok(&mut stream, body.as_bytes());
+        return;
+    }
+
+    // PATCH /api/spotter — set enabled, focused player, and/or voice
+    if path == "/api/spotter" && method == "PATCH" {
+        if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&req.body) {
+            let mut cfg = spotter_focus.lock().unwrap();
+            if let Some(serde_json::Value::Bool(b)) = v.get("enabled") {
+                cfg.enabled = *b;
+            }
+            if let Some(player) = v.get("player") {
+                cfg.name = match player {
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            if let Some(voice) = v.get("voice") {
+                cfg.voice = match voice {
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    _ => None,
+                };
+            }
+            let player_json = match cfg.name.clone() {
+                Some(n) => serde_json::Value::String(n).to_string(),
+                None    => "null".to_string(),
+            };
+            let voice_json = match cfg.voice.clone() {
+                Some(v) => serde_json::Value::String(v).to_string(),
+                None    => "null".to_string(),
+            };
+            let body = format!("{{\"enabled\":{},\"player\":{player_json},\"voice\":{voice_json}}}", cfg.enabled);
+            let (s_enabled, s_voice, s_name) = (cfg.enabled, cfg.voice.clone(), cfg.name.clone());
+            drop(cfg);
+            // Persist to config file
+            let mut file_cfg = ams2_championship::config::load_or_create(&config_path);
+            file_cfg.spotter_enabled = s_enabled;
+            file_cfg.spotter_voice   = s_voice;
+            file_cfg.spotter_name    = s_name;
+            if let Ok(text) = serde_json::to_string_pretty(&file_cfg) {
+                let _ = std::fs::write(config_path.as_ref(), text);
+            }
+            json_ok(&mut stream, body.as_bytes());
+        } else {
+            json_err(&mut stream, "400 Bad Request", "invalid JSON");
+        }
+        return;
+    }
+
     // Default: serve the static championship HTML
     send_response(&mut stream, "200 OK", "text/html; charset=utf-8", &html);
 }
@@ -440,6 +514,12 @@ fn main() {
         );
     }
     ams2_championship::session_recorder::start(store.clone(), career_path.clone(), cfg.record_practice, cfg.record_qualify, cfg.record_race);
+    let spotter_focus: Focus = Arc::new(std::sync::Mutex::new(ams2_championship::spotter::SpotterConfig {
+        enabled: cfg.spotter_enabled,
+        voice:   cfg.spotter_voice.clone(),
+        name:    cfg.spotter_name.clone(),
+    }));
+    ams2_championship::spotter::start(cfg.poll_ms, spotter_focus.clone());
 
     let html = Arc::new(ams2_championship::build_base_html().into_bytes());
     let addr = format!("{}:{}", cfg.host, cfg.port);
@@ -460,11 +540,12 @@ fn main() {
     let config_path = Arc::new(config_path);
     let poll_ms = cfg.poll_ms;
     for stream in listener.incoming().flatten() {
-        let html = Arc::clone(&html);
-        let store = store.clone();
-        let data_path = Arc::clone(&data_path);
+        let html        = Arc::clone(&html);
+        let store       = store.clone();
+        let data_path   = Arc::clone(&data_path);
         let layouts_dir = Arc::clone(&layouts_dir);
         let config_path = Arc::clone(&config_path);
-        std::thread::spawn(move || handle(stream, html, store, data_path, layouts_dir, config_path, poll_ms));
+        let focus       = spotter_focus.clone();
+        std::thread::spawn(move || handle(stream, html, store, data_path, layouts_dir, config_path, poll_ms, focus));
     }
 }

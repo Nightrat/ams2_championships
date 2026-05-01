@@ -19,6 +19,7 @@ fn empty_telemetry() -> PlayerTelemetry {
         throttle: 0.0, brake_input: 0.0, steering: 0.0,
         speed: 0.0, rpm: 0.0, gear: 0,
         tyre_compound: [String::new(), String::new(), String::new(), String::new()],
+        fuel_level: 0.0, fuel_capacity: 0.0,
     }
 }
 
@@ -33,6 +34,7 @@ fn make_participant(name: &str, pos: u32, laps: u32, fl: f32, car: &str) -> Part
         fastest_lap_time: fl, last_lap_time: 0.0,
         world_pos_x: 0.0, world_pos_z: 0.0,
         interval_gap_secs: 0.0, interval_gap_laps: 0,
+        in_pits: false,
     }
 }
 
@@ -42,8 +44,10 @@ fn make_session(session_state: u32, participants: Vec<ParticipantData>) -> LiveS
         connected: true, game_state: 2, session_state, race_state: 2,
         num_participants: n,
         track_location: "Spa".into(), track_variation: "GP".into(),
-        track_length: 7000.0, car_name: "Ferrari".into(), car_class: "GT3".into(),
+        track_length: 7000.0, laps_in_event: 0,
+        car_name: "Ferrari".into(), car_class: "GT3".into(),
         participants, player_telemetry: empty_telemetry(),
+        race_flag_colour: 0, race_flag_reason: 0,
     }
 }
 

@@ -32,6 +32,8 @@ pub struct ParticipantData {
     pub interval_gap_secs: f32,
     /// Whole laps behind the car directly ahead (0 = same lap).
     pub interval_gap_laps: u32,
+    /// True when the participant is in the pit lane or garage (mCurrentSector == -1).
+    pub in_pits: bool,
 }
 
 /// Player car telemetry from the AMS2 shared memory (player's car only).
@@ -68,6 +70,10 @@ pub struct PlayerTelemetry {
     pub gear:       i32,
     /// Tyre compound name per wheel (FL, FR, RL, RR).
     pub tyre_compound: [String; 4],
+    /// Current fuel level in litres (mFuelLevel).
+    pub fuel_level:    f32,
+    /// Fuel tank capacity in litres (mFuelCapacity).
+    pub fuel_capacity: f32,
 }
 
 /// Snapshot of the current AMS2 session state.
@@ -82,12 +88,18 @@ pub struct LiveSessionData {
     pub track_variation: String,
     /// Total track length in metres (mTrackLength), used for gap calculation.
     pub track_length: f32,
+    /// Total laps in the event (mLapsInEvent). 0 = time-based / unknown.
+    pub laps_in_event: u32,
     /// Player's car name (mCarName).
     pub car_name: String,
     /// Player's car class name (mCarClassName).
     pub car_class: String,
     pub participants: Vec<ParticipantData>,
     pub player_telemetry: PlayerTelemetry,
+    /// mHighestFlagColour: 0=none,1=green,2=blue,3=white slow,4=white final lap,5=red,6=yellow,7=double yellow,8=black&white,9=meatball,10=black,11=chequered
+    pub race_flag_colour: u32,
+    /// mHighestFlagReason: 0=none,1=solo crash,2=stopped,3=oil,4=gravel,5=recovery,6=SC deployed,7=SC returning
+    pub race_flag_reason: u32,
 }
 
 fn disconnected() -> LiveSessionData {
@@ -100,9 +112,12 @@ fn disconnected() -> LiveSessionData {
         track_location: String::new(),
         track_variation: String::new(),
         track_length: 0.0,
+        laps_in_event: 0,
         car_name: String::new(),
         car_class: String::new(),
         participants: vec![],
+        race_flag_colour: 0,
+        race_flag_reason: 0,
         player_telemetry: PlayerTelemetry {
             tyre_temp_left:    [0.0; 4],
             tyre_temp_center:  [0.0; 4],
@@ -115,6 +130,7 @@ fn disconnected() -> LiveSessionData {
             throttle: 0.0, brake_input: 0.0, steering: 0.0,
             speed: 0.0, rpm: 0.0, gear: 0,
             tyre_compound: [String::new(), String::new(), String::new(), String::new()],
+            fuel_level: 0.0, fuel_capacity: 0.0,
         },
     }
 }
@@ -167,6 +183,7 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_PARTICIPANTS: usize = 28;
     const OFF_CAR_NAME:        usize = 6444;  // char mCarName[64]
     const OFF_CAR_CLASS:       usize = 6508;  // char mCarClassName[64]
+    const OFF_LAPS_IN_EVENT:   usize = 6572;  // unsigned int mLapsInEvent
     const OFF_TRACK_LOCATION:  usize = 6576;  // char mTrackLocation[64]
     const OFF_TRACK_VARIATION: usize = 6640;  // char mTrackVariation[64]
     const OFF_TRACK_LENGTH: usize = 6704;
@@ -206,6 +223,11 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_BEST_S3: usize = 8688;
     const OFF_FASTEST_LAP_TIMES: usize = 8944;
     const OFF_LAST_LAP_TIMES: usize = 9200;
+    // After mLastLapTimes[64] (9200 + 256 = 9456):
+    const OFF_FUEL_LEVEL:          usize = 9460; // float mFuelLevel (litres)
+    const OFF_FUEL_CAPACITY:       usize = 9464; // float mFuelCapacity (litres)
+    const OFF_HIGHEST_FLAG_COLOUR: usize = 9468; // unsigned int mHighestFlagColour
+    const OFF_HIGHEST_FLAG_REASON: usize = 9472; // unsigned int mHighestFlagReason
 
     // ── ParticipantInfo layout (100 bytes each) ───────────────────────────────
     // bool mIsActive;              // +  0  (1)
@@ -230,6 +252,7 @@ pub fn read_live_session() -> LiveSessionData {
     const P_RACE_POS: usize = 84;
     const P_LAPS_DONE: usize = 88;
     const P_CUR_LAP: usize = 92;
+    const P_CURRENT_SECTOR: usize = 96; // int, -1 = pits/garage
 
     unsafe fn rf32x4(b: *const u8, off: usize) -> [f32; 4] {
         [rf32(b, off), rf32(b, off + 4), rf32(b, off + 8), rf32(b, off + 12)]
@@ -286,6 +309,8 @@ pub fn read_live_session() -> LiveSessionData {
                 rstr(ptr, OFF_TYRE_COMPOUND + 80,   40),
                 rstr(ptr, OFF_TYRE_COMPOUND + 120,  40),
             ],
+            fuel_level:    rf32(ptr, OFF_FUEL_LEVEL),
+            fuel_capacity: rf32(ptr, OFF_FUEL_CAPACITY),
         };
         let game_state = ru32(ptr, OFF_GAME_STATE);
         let session_state = ru32(ptr, OFF_SESSION_STATE);
@@ -294,6 +319,7 @@ pub fn read_live_session() -> LiveSessionData {
         let num_participants = ri32(ptr, OFF_NUM_PARTICIPANTS).clamp(0, 64);
         let car_name       = rstr(ptr, OFF_CAR_NAME, 64);
         let car_class      = rstr(ptr, OFF_CAR_CLASS, 64);
+        let laps_in_event   = ru32(ptr, OFF_LAPS_IN_EVENT);
         let track_location  = rstr(ptr, OFF_TRACK_LOCATION, 64);
         let track_variation = rstr(ptr, OFF_TRACK_VARIATION, 64);
         let track_length    = rf32(ptr, OFF_TRACK_LENGTH);
@@ -333,6 +359,7 @@ pub fn read_live_session() -> LiveSessionData {
                 world_pos_z: rf32(ptr, base + P_WORLD_POS + 8),
                 interval_gap_secs: 0.0,
                 interval_gap_laps: 0,
+                in_pits: ri32(ptr, base + P_CURRENT_SECTOR) < 0,
             });
         }
         // Sort by race position; unset (0) positions go to the end
@@ -374,6 +401,9 @@ pub fn read_live_session() -> LiveSessionData {
             }
         }
 
+        let race_flag_colour = ru32(ptr, OFF_HIGHEST_FLAG_COLOUR);
+        let race_flag_reason = ru32(ptr, OFF_HIGHEST_FLAG_REASON);
+
         UnmapViewOfFile(mapped);
         CloseHandle(handle);
 
@@ -386,10 +416,13 @@ pub fn read_live_session() -> LiveSessionData {
             track_location,
             track_variation,
             track_length,
+            laps_in_event,
             car_name,
             car_class,
             participants,
             player_telemetry,
+            race_flag_colour,
+            race_flag_reason,
         }
     }
 }

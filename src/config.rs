@@ -38,6 +38,15 @@ pub struct Config {
     /// Maximum number of unique grid cells stored for the track radar before saving stops accumulating.
     #[serde(default = "default_track_map_max_points")]
     pub track_map_max_points: u32,
+    /// Whether the server-side voice spotter is enabled.
+    #[serde(default)]
+    pub spotter_enabled: bool,
+    /// TTS voice name for the spotter (None = system default).
+    #[serde(default)]
+    pub spotter_voice: Option<String>,
+    /// Spotter focus player name in multiplayer (None = viewed player).
+    #[serde(default)]
+    pub spotter_name: Option<String>,
 }
 
 impl Default for Config {
@@ -52,6 +61,9 @@ impl Default for Config {
             record_race: default_true(),
             show_track_map: default_show_track_map(),
             track_map_max_points: default_track_map_max_points(),
+            spotter_enabled: false,
+            spotter_voice: None,
+            spotter_name: None,
         }
     }
 }

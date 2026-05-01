@@ -4,7 +4,7 @@ use ams2_championship::http::{Request, parse_request, track_slug};
 use ams2_championship::websocket::{sha1, base64_encode, ws_accept_key, ws_send_text};
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 fn req(raw: &[u8]) -> Request {
     parse_request(raw)
@@ -42,7 +42,7 @@ fn call(
     let s = store;
     std::thread::spawn(move || {
         let (conn, _) = listener.accept().unwrap();
-        handle(conn, html, s, dp, layouts_dir, config_path, 200);
+        handle(conn, html, s, dp, layouts_dir, config_path, 200, Arc::new(Mutex::new(ams2_championship::spotter::SpotterConfig::default())));
     });
     let mut client = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
     client.write_all(&request_bytes).unwrap();
