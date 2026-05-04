@@ -21,6 +21,7 @@ This is a single-binary Rust application (`src/bin/ams2_championship_server.rs`)
 - Auto-records race/qualify/practice sessions to a JSON file (`ams2_career.json`)
 - Serves a single-page HTML app over a hand-rolled TCP HTTP server (no framework, no async runtime)
 - The entire UI — HTML, CSS, all JS — is compiled into the binary via `include_str!` in `championship_html.rs`
+- usage of javascript shall be minimized
 
 ### Key data flow
 
@@ -75,3 +76,20 @@ Test files live in `src/tests/` and are wired into their parent module with `#[p
 - `data_path` is `Arc<PathBuf>`
 - WebSocket (`/ws`) streams `LiveSessionData` JSON at configurable poll interval
 - CI runs on `windows-latest` only (shared memory code is Windows-specific)
+
+### Shared memory layout (`ams2_shared_memory.rs`)
+
+- Always read all fields from `ptr` **before** calling `UnmapViewOfFile` — reading after unmap is an access violation.
+- `ParticipantInfo` stride is 100 bytes; `mCurrentSector` (i32) at +96 is `-1` when the car is in the pit lane or garage (`in_pits` field).
+- AMS2-specific fields (tyre compound, tyre temps, ride height) live at offsets above 19000 and are not in the original PCars2 header.
+
+### Spotter (`src/spotter.rs`)
+
+- `SpotterState::update()` returns a `Vec<String>` of TTS phrases each poll; the background thread writes them line-by-line to a persistent PowerShell `SpeechSynthesizer` subprocess.
+- Position announcements are **debounced** (~2 s): `pending_position` tracks the real-time position; `prev_position` is only updated (and the announcement emitted) once `pos_cooldown` reaches zero. This prevents a queue of stale "Position N" calls after a spin.
+- Gap, flag, fuel, and tyre warn events use simple prev-state comparison — no debounce needed there.
+- `SpotterConfig` (enabled, voice, name) is shared via `Arc<Mutex<SpotterConfig>>`; PATCH `/api/spotter` updates it and persists it back to `config.json`.
+
+### Telemetry tab freeze behaviour
+
+`telemetry.js` only pushes samples into `telBuf` when `viewed.in_pits === false`. When the player enters the pit lane/garage the panel freezes on the last on-track data. The buffer clears only on WebSocket disconnect.
