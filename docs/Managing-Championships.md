@@ -27,9 +27,9 @@ A round can contain multiple sessions (e.g. a qualifying session and a race). On
 
 With a championship selected:
 
-- **Rename** — click the name to edit it inline
-- **Change points system** — select a new preset or enter custom values
-- **Change status** — set to **Active**, **Progress**, or **Final**. Only Final championships count toward championship standings finishes in the Driver Stats.
+- **Rename** — hover over the championship name in the left panel; a pencil icon (✎) appears. Click it to edit the name inline. Press **Enter** to save or **Escape** to cancel.
+- **Change points system** — select a new preset or enter custom values in the detail panel on the right
+- **Change status** — set to **Active**, **Progress**, or **Final** using the dropdown next to the name in the left panel. Only Final championships count toward championship standings finishes in the Driver Stats.
 
 ## Removing sessions and rounds
 

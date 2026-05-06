@@ -19,7 +19,7 @@ The career data path can be changed in `config.json` or the **Config** tab (`dat
 
 ## config.json
 
-`config.json` is created next to the executable on first run. It stores server settings such as the port, host, poll interval, auto-record flags, and track map options. See [Getting Started — Configuration](Getting-Started.md#configuration) for the full list of keys.
+`config.json` is created next to the executable on first run. It stores server settings such as the port, host, poll interval, auto-record flags, track map options, and voice spotter settings. See [Getting Started — Configuration](Getting-Started.md#configuration) for the full list of keys.
 
 The file is updated whenever you save changes in the **Config** tab. New keys added in future versions are written automatically on the next startup, so you never need to recreate the file from scratch.
 

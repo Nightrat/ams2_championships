@@ -50,6 +50,9 @@ On first run `config.json` is created next to the executable with all default va
 | `record_race` | `true` | Automatically save race sessions |
 | `show_track_map` | `true` | Show the track radar canvas in the live timing view |
 | `track_map_max_points` | `5000` | Maximum unique grid cells accumulated for the track radar |
+| `spotter_enabled` | `false` | Enable the server-side voice spotter |
+| `spotter_voice` | `null` | TTS voice name to use (`null` = system default) |
+| `spotter_name` | `null` | Driver name to track in multiplayer (`null` = viewed player) |
 
 Settings marked with *restart required* in the Config tab (port, host, data_file, and the record_* flags) take effect after restarting the server.
 

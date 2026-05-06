@@ -52,5 +52,34 @@ Click the **Telemetry** sub-tab to switch from the timing table to the telemetry
 
 - Tyre temperatures (inner / mid / outer per corner), wear, and pressure
 - Brake temperatures
-- Suspension travel
+- Suspension travel and ride height
 - Automatic setup recommendations based on a rolling 20-sample average
+
+The panel **freezes on the last on-track snapshot** when you enter the pit lane or garage, so you can review your tyre and brake data during the pit stop. Updating resumes as soon as you re-join the track. The buffer resets on WebSocket disconnect (e.g. server restart).
+
+## Voice spotter
+
+The navigation bar contains controls for a server-side voice spotter that reads race events aloud using Windows text-to-speech (SAPI / .NET `SpeechSynthesizer` — no extra software required):
+
+| Control | Description |
+|---|---|
+| **🎙 Spotter** button | Toggles the spotter on/off. Highlighted when active. |
+| **Voice** dropdown | Selects from voices installed on your Windows PC. Blank = system default. |
+| **Focus** dropdown | In multiplayer, selects which driver to track. Defaults to the viewed player. |
+
+Settings are saved to `config.json` automatically when you change them.
+
+### Events announced
+
+| Event | Condition |
+|---|---|
+| *Position N* | Race position changes — debounced ~2 s so a pile-up collapses into one announcement |
+| *Lap N* | Lap completed (race only) |
+| *N.N seconds to [name]* | Gap to car ahead drops below 1.5 s |
+| *Clear ahead* | Gap to car ahead rises above 5 s |
+| *N.N seconds to [name] behind* | Gap to car behind drops below 1.5 s |
+| *Clear behind* | Gap to car behind rises above 2 s |
+| *Personal best / Fastest lap, M:SS.s* | New personal best or overall session fastest set |
+| *Yellow flag / Safety Car / Red flag / Green flag* | Flag state transitions |
+| *Low fuel / Fuel critical, N laps remaining* | Fuel estimate falls below 5 / 2 laps |
+| *[corner] tyre worn / critical* | Per-corner tyre wear exceeds 70 % / 90 % |
