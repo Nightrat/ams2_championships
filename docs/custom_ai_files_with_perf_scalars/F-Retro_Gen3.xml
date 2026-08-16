@@ -1,0 +1,615 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<custom_ai_drivers>
+    <driver livery_name="Williams-Ford #1 Rosberg">
+        <name>Keke Rosberg</name>
+        <country>FIN</country>
+        <drag_scalar>0.940</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.920</weight_scalar>
+        <race_skill>1</race_skill>
+        <qualifying_skill>1</qualifying_skill>
+        <aggression>0.88</aggression>
+        <defending>0.88</defending>
+        <stamina>0.9</stamina>
+        <consistency>0.85</consistency>
+        <start_reactions>0.2</start_reactions>
+        <wet_skill>0.8</wet_skill>
+        <tyre_management>0.80</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.80</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.5</vehicle_reliability>
+		<setup_downforce>0.350</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+	</driver>
+	<driver livery_name="Williams-Ford #2 Laffite">
+        <name>Jacques Laffite</name>
+        <country>FRA</country>
+        <drag_scalar>0.940</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.920</weight_scalar>
+        <race_skill>0.94</race_skill>
+        <qualifying_skill>0.92</qualifying_skill>
+        <aggression>0.81</aggression>
+        <defending>0.81</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.85</consistency>
+        <start_reactions>0.6</start_reactions>
+        <wet_skill>0.65</wet_skill>
+        <tyre_management>0.72</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.80</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.35</vehicle_reliability>
+		<setup_downforce>0.60</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+
+	<driver livery_name="Tyrrell-Ford #3 Alboreto">
+        <name>Michele Alboreto</name>
+        <country>ITA</country>
+        <drag_scalar>1.015</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.965</weight_scalar>
+        <race_skill>0.9</race_skill>
+        <qualifying_skill>0.91</qualifying_skill>
+        <aggression>0.81</aggression>
+        <defending>0.81</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.84</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.65</wet_skill>
+        <tyre_management>0.7</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.80</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.5</vehicle_reliability>
+		<setup_downforce>0.550</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	<driver livery_name="Tyrrell-Ford #4 Sullivan">
+        <name>Danny Sullivan</name>
+        <country>USA</country>
+        <drag_scalar>1.020</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.965</weight_scalar>
+        <race_skill>0.85</race_skill>
+        <qualifying_skill>0.85</qualifying_skill>
+        <aggression>0.5</aggression>
+        <defending>0.5</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.66</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.5</wet_skill>
+        <tyre_management>0.66</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.50</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.3</vehicle_reliability>
+		<setup_downforce>0.450</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	
+	<driver livery_name="Brabham-BMW #5 Piquet">
+        <name>Nelson Piquet</name>
+        <country>BRA</country>
+        <drag_scalar>1.025</drag_scalar>
+        <power_scalar>1.020</power_scalar>
+        <weight_scalar>0.996</weight_scalar>
+        <race_skill>0.86</race_skill>
+        <qualifying_skill>0.89</qualifying_skill>
+        <aggression>0.8</aggression>
+        <defending>0.90</defending>
+        <stamina>0.70</stamina>
+        <consistency>0.75</consistency>
+        <start_reactions>0.7</start_reactions>
+        <wet_skill>0.9</wet_skill>
+        <tyre_management>0.8</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.80</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.3</vehicle_reliability>
+		<setup_downforce>0.300</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+    <driver livery_name="Brabham-BMW #6 Patrese">
+        <name>Riccardo Patrese</name>
+        <country>ITA</country>
+        <drag_scalar>1.025</drag_scalar>
+        <power_scalar>1.020</power_scalar>
+        <weight_scalar>0.996</weight_scalar>
+        <race_skill>0.75</race_skill>
+        <qualifying_skill>0.82</qualifying_skill>
+        <aggression>0.7</aggression>
+        <defending>0.8</defending>
+        <stamina>0.80</stamina>
+        <consistency>0.75</consistency>
+        <start_reactions>0.6</start_reactions>
+        <wet_skill>0.9</wet_skill>
+        <tyre_management>0.95</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.1</vehicle_reliability>
+		<setup_downforce>0.650</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+			 
+    <driver livery_name="McLaren-Ford #7 Watson">
+        <name>John Watson</name>
+        <country>GBR</country>
+        <drag_scalar>0.960</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.950</weight_scalar>
+        <race_skill>0.83</race_skill>
+        <qualifying_skill>0.87</qualifying_skill>
+        <aggression>0.85</aggression>
+        <defending>0.85</defending>
+        <stamina>0.9</stamina>
+        <consistency>0.8</consistency>
+        <start_reactions>0.2</start_reactions>
+        <wet_skill>0.68</wet_skill>
+        <tyre_management>0.75</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.5</vehicle_reliability>
+		<setup_downforce>0.300</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	<driver livery_name="McLaren-Ford #8 Lauda">
+        <name>Niki Lauda</name>
+        <country>AUT</country>
+        <drag_scalar>0.960</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.950</weight_scalar>
+        <race_skill>0.89</race_skill>
+        <qualifying_skill>0.85</qualifying_skill>
+        <aggression>0.82</aggression>
+        <defending>0.82</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.9</consistency>
+        <start_reactions>0.2</start_reactions>
+        <wet_skill>0.75</wet_skill>
+        <tyre_management>0.75</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.90</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.4</vehicle_reliability>
+		<setup_downforce>0.500</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	
+	 <driver livery_name="ATS-BMW #9 Winkelhock">
+        <name>Manfred Winkelhock</name>
+        <country>DEU</country>
+        <drag_scalar>1.030</drag_scalar>
+        <power_scalar>1.020</power_scalar>
+        <weight_scalar>0.998</weight_scalar>
+        <race_skill>0.75</race_skill>
+        <qualifying_skill>0.89</qualifying_skill>
+        <aggression>0.75</aggression>
+        <defending>0.6</defending>
+        <stamina>0.8</stamina>
+        <consistency>0.88</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.7</wet_skill>
+        <tyre_management>0.80</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0</vehicle_reliability>
+		<setup_downforce>0.250</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+    
+	<driver livery_name="Lotus-Renault #11 de Angelis">
+        <name>Elio de Angelis</name>
+        <country>ITA</country>
+        <drag_scalar>1.029</drag_scalar>
+        <power_scalar>1.000</power_scalar>
+        <weight_scalar>1.000</weight_scalar>
+        <race_skill>0.8</race_skill>
+        <qualifying_skill>0.8</qualifying_skill>
+        <aggression>0.7</aggression>
+        <defending>0.7</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.90</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.75</wet_skill>
+        <tyre_management>0.75</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.3</vehicle_reliability>
+		<setup_downforce>0.500</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+    <driver livery_name="Lotus-Ford #12 Mansell">
+        <name>Nigel Mansell</name>
+        <country>GBR</country>
+        <drag_scalar>1.015</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.950</weight_scalar>
+        <race_skill>0.9</race_skill>
+        <qualifying_skill>0.88</qualifying_skill>
+        <aggression>0.75</aggression>
+        <defending>0.75</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.84</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.63</wet_skill>
+        <tyre_management>0.7</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.35</vehicle_reliability>
+		<setup_downforce>0.200</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	
+	<driver livery_name="Renault #15 Prost">
+        <name>Alain Prost</name>
+        <country>FRA</country>
+        <drag_scalar>1.000</drag_scalar>
+        <power_scalar>1.000</power_scalar>
+        <weight_scalar>1.000</weight_scalar>
+        <race_skill>1.0</race_skill>
+        <qualifying_skill>1.0</qualifying_skill>
+        <aggression>0.9</aggression>
+        <defending>1.0</defending>
+        <stamina>0.9</stamina>
+        <consistency>1.0</consistency>
+        <start_reactions>1.0</start_reactions>
+        <wet_skill>0.9</wet_skill>
+        <tyre_management>1.0</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.90</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.36</vehicle_reliability>
+		<setup_downforce>0.600</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+    
+	<driver livery_name="Renault #16 Cheever">
+        <name>Eddie Cheever</name>
+        <country>USA</country>
+        <drag_scalar>1.000</drag_scalar>
+        <power_scalar>1.000</power_scalar>
+        <weight_scalar>1.000</weight_scalar>
+        <race_skill>0.90</race_skill>
+        <qualifying_skill>0.90</qualifying_skill>
+        <aggression>0.85</aggression>
+        <defending>0.86</defending>
+        <stamina>0.86</stamina>
+        <consistency>0.90</consistency>
+        <start_reactions>0.88</start_reactions>
+        <wet_skill>0.9</wet_skill>
+        <tyre_management>0.75</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.35</vehicle_reliability>
+		<setup_downforce>0.350</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	
+    <driver livery_name="Alfa Romeo #22 de Cesaris">
+        <name>Andrea de Cesaris</name>
+        <country>ITA</country>
+        <drag_scalar>1.015</drag_scalar>
+        <power_scalar>0.990</power_scalar>
+        <weight_scalar>0.990</weight_scalar>
+        <race_skill>0.87</race_skill>
+        <qualifying_skill>0.87</qualifying_skill>
+        <aggression>0.85</aggression>
+        <defending>0.85</defending>
+        <stamina>0.84</stamina>
+        <consistency>0.88</consistency>
+        <start_reactions>0.88</start_reactions>
+        <wet_skill>0.88</wet_skill>
+        <tyre_management>0.71</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.1</vehicle_reliability>
+		<setup_downforce>0.250</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+    <driver livery_name="Alfa Romeo #23 Baldi">
+        <name>Mauro Baldi</name>
+        <country>ITA</country>
+        <drag_scalar>1.015</drag_scalar>
+        <power_scalar>0.990</power_scalar>
+        <weight_scalar>0.990</weight_scalar>
+        <race_skill>0.77</race_skill>
+        <qualifying_skill>0.75</qualifying_skill>
+        <aggression>0.4</aggression>
+        <defending>0.2</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.7</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.8</wet_skill>
+        <tyre_management>0.66</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.1</vehicle_reliability>
+		<setup_downforce>0.550</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>    
+	
+    <driver livery_name="Ligier-Ford #25 Jarier">
+        <name>Jean Pierre Jarier</name>
+        <country>FRA</country>
+        <drag_scalar>1.085</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.995</weight_scalar>
+        <race_skill>0.88</race_skill>
+        <qualifying_skill>0.89</qualifying_skill>
+        <aggression>0.4</aggression>
+        <defending>0.2</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.65</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.42</wet_skill>
+        <tyre_management>0.65</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.3</vehicle_reliability>
+		<setup_downforce>0.750</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+    <driver livery_name="Ligier-Ford #26 Boesel">
+        <name>Raul Boesel</name>
+        <country>BRA</country>
+        <drag_scalar>1.085</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.995</weight_scalar>
+        <race_skill>0.85</race_skill>
+        <qualifying_skill>0.85</qualifying_skill>
+        <aggression>0.4</aggression>
+        <defending>0.2</defending>
+        <stamina>0.75</stamina>
+        <consistency>0.75</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.41</wet_skill>
+        <tyre_management>0.61</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.50</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.25</vehicle_reliability>
+		<setup_downforce>0.850</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	
+	<driver livery_name="Ferrari #27 Tambay">
+        <name>Patrick Tambay</name>
+        <country>FRA</country>
+        <drag_scalar>0.960</drag_scalar>
+		<power_scalar>0.998</power_scalar>
+		<weight_scalar>1.002</weight_scalar>
+        <race_skill>0.96</race_skill>
+        <qualifying_skill>1</qualifying_skill>
+        <aggression>0.94</aggression>
+        <defending>0.92</defending>
+        <stamina>0.9</stamina>
+        <consistency>0.90</consistency>
+        <start_reactions>0.98</start_reactions>
+        <wet_skill>0.9</wet_skill>
+        <tyre_management>0.9</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.80</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.35</vehicle_reliability>
+		<setup_downforce>0.150</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	<driver livery_name="Ferrari #28 Arnoux">
+        <name>René Arnoux</name>
+        <country>FRA</country>
+        <drag_scalar>0.960</drag_scalar>
+		<power_scalar>0.998</power_scalar>
+		<weight_scalar>1.002</weight_scalar>
+        <race_skill>0.98</race_skill>
+        <qualifying_skill>1</qualifying_skill>
+        <aggression>1.0</aggression>
+        <defending>0.95</defending>
+        <stamina>0.92</stamina>
+        <consistency>0.92</consistency>
+        <start_reactions>1.0</start_reactions>
+        <wet_skill>0.9</wet_skill>
+        <tyre_management>0.95</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.4</vehicle_reliability>
+		<setup_downforce>0.050</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>	
+	
+	 <driver livery_name="Arrows-Ford #29 Surer">
+        <name>Marc Surer</name>
+        <country>CHE</country>
+        <drag_scalar>1.035</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.970</weight_scalar>
+        <race_skill>0.9</race_skill>
+        <qualifying_skill>0.9</qualifying_skill>
+        <aggression>0.5</aggression>
+        <defending>0.5</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.7</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.55</wet_skill>
+        <tyre_management>0.59</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.35</vehicle_reliability>
+		<setup_downforce>0.300</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	<driver livery_name="Arrows-Ford #30 Boutsen">
+        <name>Thierry Boutsen</name>
+        <country>BEL</country>
+        <drag_scalar>1.035</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.970</weight_scalar>
+        <race_skill>0.88</race_skill>
+        <qualifying_skill>0.88</qualifying_skill>
+        <aggression>0.42</aggression>
+        <defending>0.3</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.90</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.44</wet_skill>
+        <tyre_management>0.80</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.3</vehicle_reliability>
+		<setup_downforce>0.450</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	
+	<driver livery_name="Theodore-Ford #33 Guerrero">
+        <name>Roberto Guerrero</name>
+        <country>COL</country>
+        <drag_scalar>1.050</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.980</weight_scalar>
+        <race_skill>0.84</race_skill>
+        <qualifying_skill>0.84</qualifying_skill>
+        <aggression>0.45</aggression>
+        <defending>0.55</defending>
+        <stamina>0.7</stamina>
+        <consistency>0.7</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.45</wet_skill>
+        <tyre_management>0.80</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.3</vehicle_reliability>
+		<setup_downforce>0.750</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+     <driver livery_name="Theodore-Ford #34 Cecotto">
+        <name>Johnny Cecotto</name>
+        <country>VEN</country>
+        <drag_scalar>1.050</drag_scalar>
+        <power_scalar>0.970</power_scalar>
+        <weight_scalar>0.980</weight_scalar>
+        <race_skill>0.78</race_skill>
+        <qualifying_skill>0.8</qualifying_skill>
+        <aggression>0.45</aggression>
+        <defending>0.55</defending>
+        <stamina>0.7</stamina>
+        <consistency>0.7</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.45</wet_skill>
+        <tyre_management>0.80</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.3</vehicle_reliability>
+		<setup_downforce>0.550</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+		
+	<driver livery_name="Toleman-Hart #35 Warwick">
+        <name>Derek Warwick</name>
+        <country>GBR</country>
+        <drag_scalar>1.020</drag_scalar>
+        <power_scalar>0.975</power_scalar>
+        <weight_scalar>0.985</weight_scalar>
+        <race_skill>0.85</race_skill>
+        <qualifying_skill>0.85</qualifying_skill>
+        <aggression>0.6</aggression>
+        <defending>0.6</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.82</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.85</wet_skill>
+        <tyre_management>0.7</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.70</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.15</vehicle_reliability>
+		<setup_downforce>0.300</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	<driver livery_name="Toleman-Hart #36 Giacomelli">
+        <name>Bruno Giacomelli</name>
+        <country>ITA</country>
+        <drag_scalar>1.020</drag_scalar>
+        <power_scalar>0.975</power_scalar>
+        <weight_scalar>0.985</weight_scalar>
+        <race_skill>0.80</race_skill>
+        <qualifying_skill>0.80</qualifying_skill>
+        <aggression>0.6</aggression>
+        <defending>0.6</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.82</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.85</wet_skill>
+        <tyre_management>0.7</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0</vehicle_reliability>
+		<setup_downforce>0.500</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+	
+	<driver livery_name="Spirit-Honda #40 Johansson">
+        <name>Stefan Johansson</name>
+        <country>SWE</country>
+        <drag_scalar>1.045</drag_scalar>
+        <power_scalar>0.965</power_scalar>
+        <weight_scalar>1.030</weight_scalar>
+        <race_skill>0.70</race_skill>
+        <qualifying_skill>0.70</qualifying_skill>
+        <aggression>0.70</aggression>
+        <defending>0.5</defending>
+        <stamina>0.70</stamina>
+        <consistency>0.8</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.7</wet_skill>
+        <tyre_management>0.7</tyre_management>
+        <blue_flag_conceding>1.0</blue_flag_conceding>
+        <weather_tyre_changes>1.0</weather_tyre_changes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <vehicle_reliability>0.15</vehicle_reliability>
+		<setup_downforce>0.300</setup_downforce>
+		<setup_downforce_randomness>0.200</setup_downforce_randomness>
+    </driver>
+</custom_ai_drivers>
