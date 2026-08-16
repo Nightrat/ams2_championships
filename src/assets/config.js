@@ -15,6 +15,7 @@ function loadConfig() {
       document.getElementById('cfg-port').value       = cfg.port;
       document.getElementById('cfg-host').value       = cfg.host;
       document.getElementById('cfg-data-file').value  = cfg.data_file || '';
+      document.getElementById('cfg-custom-ai-dir').value = cfg.custom_ai_dir || '';
       document.getElementById('cfg-poll-ms').value    = cfg.poll_ms;
       document.getElementById('cfg-record-practice').checked = cfg.record_practice;
       document.getElementById('cfg-record-qualify').checked  = cfg.record_qualify;
@@ -71,6 +72,7 @@ document.getElementById('config-form').addEventListener('submit', function (e) {
     port:           parseInt(document.getElementById('cfg-port').value, 10),
     host:           document.getElementById('cfg-host').value.trim(),
     data_file:      newDataFile,
+    custom_ai_dir:  document.getElementById('cfg-custom-ai-dir').value.trim() || null,
     poll_ms:        parseInt(document.getElementById('cfg-poll-ms').value, 10),
     record_practice:      document.getElementById('cfg-record-practice').checked,
     record_qualify:       document.getElementById('cfg-record-qualify').checked,

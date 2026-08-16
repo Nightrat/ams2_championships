@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use ams2_championship::ams2_shared_memory::read_live_session;
-use ams2_championship::data_store::{Championship, ChampionshipStatus, SharedStore, persist, compute_career};
+use ams2_championship::data_store::{Championship, ChampionshipStatus, SharedStore, persist, compute_career_full};
 use ams2_championship::http::{send_response, json_ok, json_err, read_full_request, track_slug};
 use ams2_championship::spotter::Focus;
 use ams2_championship::websocket::handle_websocket;
@@ -50,8 +50,22 @@ fn handle(
     // GET /api/career — pre-computed standings, constructor standings, career stats
     if method == "GET" && path == "/api/career" {
         let data = store.read().unwrap();
-        let career = compute_career(&data.championships, &data.sessions);
+        let cfg = ams2_championship::config::load_or_create(&config_path);
+        let ai_dir = cfg.custom_ai_dir.as_deref().map(PathBuf::from);
+        let career = compute_career_full(&data.championships, &data.sessions, ai_dir.as_deref());
         let json = serde_json::to_vec(&career).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // GET /api/custom-ai-files — list *.xml files in the configured Custom AI Drivers folder
+    if method == "GET" && path == "/api/custom-ai-files" {
+        let cfg = ams2_championship::config::load_or_create(&config_path);
+        let files = match cfg.custom_ai_dir {
+            Some(dir) => ams2_championship::custom_ai::list_files(std::path::Path::new(&dir)),
+            None => vec![],
+        };
+        let json = serde_json::to_vec(&files).unwrap_or_default();
         json_ok(&mut stream, &json);
         return;
     }
@@ -95,6 +109,8 @@ fn handle(
             manufacturer_scoring: body.manufacturer_scoring,
             rounds: vec![],
             session_ids: vec![],
+            custom_ai_file: None,
+            player_team: None,
         };
         let json = serde_json::to_vec(&champ).unwrap_or_default();
         store.write().unwrap().championships.push(champ);
@@ -125,6 +141,25 @@ fn handle(
     // Routes with path segments: /api/championships/:id[/...]
     let segs: Vec<&str> = path.trim_start_matches('/').split('/').collect();
 
+    // GET /api/championships/:id/teams — distinct team names from the championship's
+    // assigned Custom AI Drivers file, for the "player team" picker.
+    if method == "GET" && segs.len() == 4 && segs[0] == "api" && segs[1] == "championships" && segs[3] == "teams" {
+        let id = segs[2];
+        let data = store.read().unwrap();
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        let cfg = ams2_championship::config::load_or_create(&config_path);
+        let teams = match (cfg.custom_ai_dir, &champ.custom_ai_file) {
+            (Some(dir), Some(file)) => ams2_championship::custom_ai::list_teams(&std::path::Path::new(&dir).join(file)),
+            _ => vec![],
+        };
+        let json = serde_json::to_vec(&teams).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
     // PATCH /api/championships/:id
     if method == "PATCH" && segs.len() == 3 && segs[0] == "api" && segs[1] == "championships" {
         let id = segs[2];
@@ -134,6 +169,12 @@ fn handle(
             status: Option<ChampionshipStatus>,
             points_system: Option<Vec<i32>>,
             manufacturer_scoring: Option<bool>,
+            // Outer Option = key present or not (leave unchanged if absent);
+            // inner Option = explicit null clears the assignment.
+            #[serde(default)]
+            custom_ai_file: Option<Option<String>>,
+            #[serde(default)]
+            player_team: Option<Option<String>>,
         }
         let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
             json_err(&mut stream, "400 Bad Request", "invalid body");
@@ -156,6 +197,8 @@ fn handle(
         if let Some(status) = body.status { champ.status = status; }
         if let Some(ps) = body.points_system { champ.points_system = ps; }
         if let Some(ms) = body.manufacturer_scoring { champ.manufacturer_scoring = ms; }
+        if let Some(caf) = body.custom_ai_file { champ.custom_ai_file = caf; }
+        if let Some(pt) = body.player_team { champ.player_team = pt; }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         persist(&store, &data_path);
@@ -304,6 +347,8 @@ fn handle(
             port: u16, host: String, data_file: Option<String>,
             poll_ms: u64, record_practice: bool, record_qualify: bool, record_race: bool,
             show_track_map: bool, track_map_max_points: u32, move_data_file: bool,
+            #[serde(default)]
+            custom_ai_dir: Option<String>,
         }
         let req_body: PatchConfig = match serde_json::from_slice(&req.body) {
             Ok(v) => v,
@@ -345,6 +390,7 @@ fn handle(
             spotter_enabled: old_cfg.spotter_enabled,
             spotter_voice:   old_cfg.spotter_voice,
             spotter_name:    old_cfg.spotter_name,
+            custom_ai_dir:   req_body.custom_ai_dir,
         };
         match serde_json::to_string_pretty(&new_cfg) {
             Ok(text) => { if let Err(e) = std::fs::write(config_path.as_ref(), text) {

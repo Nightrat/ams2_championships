@@ -11,7 +11,7 @@ function careerConstructorsHtml(constructors) {
       '</tr>';
   }).join('');
   return '<table class="standings-table">' +
-    '<thead><tr><th>Pos</th><th>Car</th><th>Pts</th><th>W</th></tr></thead>' +
+    '<thead><tr><th>Pos</th><th>Car / Team</th><th>Pts</th><th>W</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>';
 }
 

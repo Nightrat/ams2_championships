@@ -70,7 +70,7 @@ fn test_capture_stores_session_with_correct_fields() {
         make_participant("Alice", 1, 10, 90.0, "Ferrari"),
         make_participant("Bob",   2, 10, 91.0, "McLaren"),
     ]);
-    capture(&store, &path, &session, vec![]);
+    capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     assert_eq!(data.sessions.len(), 1);
     let s = &data.sessions[0];
@@ -93,7 +93,7 @@ fn test_capture_dnf_driver_with_fewer_laps() {
         make_participant("Alice", 1, 10, 90.0, ""),
         make_participant("Bob",   2,  8, 91.0, ""),
     ]);
-    capture(&store, &path, &session, vec![]);
+    capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     let results = &data.sessions[0].results;
     assert!(!results[0].dnf, "Alice finished");
@@ -108,7 +108,7 @@ fn test_capture_all_same_laps_no_dnf() {
         make_participant("Alice", 1, 5, 90.0, ""),
         make_participant("Bob",   2, 5, 91.0, ""),
     ]);
-    capture(&store, &path, &session, vec![]);
+    capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     for r in &data.sessions[0].results {
         assert!(!r.dnf, "{} should not be DNF", r.name);
@@ -121,7 +121,7 @@ fn test_capture_zero_laps_nobody_is_dnf() {
     // max_laps == 0 → guard prevents DNF marking
     let (store, path) = make_store();
     let session = make_session(5, vec![make_participant("Alice", 1, 0, 0.0, "")]);
-    capture(&store, &path, &session, vec![]);
+    capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     assert!(!data.sessions[0].results[0].dnf);
     let _ = std::fs::remove_file(&path);
@@ -131,7 +131,7 @@ fn test_capture_zero_laps_nobody_is_dnf() {
 fn test_capture_maps_session_type_practice() {
     let (store, path) = make_store();
     let session = make_session(1, vec![make_participant("Alice", 1, 3, 90.0, "")]);
-    capture(&store, &path, &session, vec![]);
+    capture(&store, &path, &session, vec![], None);
     assert_eq!(store.read().unwrap().sessions[0].session_type, 1);
     let _ = std::fs::remove_file(&path);
 }
@@ -140,8 +140,38 @@ fn test_capture_maps_session_type_practice() {
 fn test_capture_maps_session_type_qualify() {
     let (store, path) = make_store();
     let session = make_session(3, vec![make_participant("Alice", 1, 3, 90.0, "")]);
-    capture(&store, &path, &session, vec![]);
+    capture(&store, &path, &session, vec![], None);
     assert_eq!(store.read().unwrap().sessions[0].session_type, 3);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_capture_is_player_from_telemetry_flag() {
+    let (store, path) = make_store();
+    let mut alice = make_participant("Alice", 1, 10, 90.0, "Ferrari");
+    alice.is_player = true;
+    let session = make_session(5, vec![alice, make_participant("Bob", 2, 10, 91.0, "McLaren")]);
+    capture(&store, &path, &session, vec![], None);
+    let data = store.read().unwrap();
+    assert!(data.sessions[0].results[0].is_player, "Alice");
+    assert!(!data.sessions[0].results[1].is_player, "Bob");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_capture_is_player_falls_back_to_player_name_override() {
+    // The terminal snapshot (e.g. taken during the post-race results screen) may have lost
+    // AMS2's is_player flag for everyone — the tracked player_name from an earlier poll
+    // should still mark the right result.
+    let (store, path) = make_store();
+    let session = make_session(5, vec![
+        make_participant("Alice", 1, 10, 90.0, "Ferrari"),
+        make_participant("Bob",   2, 10, 91.0, "McLaren"),
+    ]);
+    capture(&store, &path, &session, vec![], Some("Bob"));
+    let data = store.read().unwrap();
+    assert!(!data.sessions[0].results[0].is_player, "Alice");
+    assert!(data.sessions[0].results[1].is_player, "Bob");
     let _ = std::fs::remove_file(&path);
 }
 
@@ -149,7 +179,7 @@ fn test_capture_maps_session_type_qualify() {
 fn test_capture_persists_to_file() {
     let (store, path) = make_store();
     let session = make_session(5, vec![make_participant("Alice", 1, 10, 90.0, "")]);
-    capture(&store, &path, &session, vec![]);
+    capture(&store, &path, &session, vec![], None);
     assert!(path.exists(), "capture should persist data to disk");
     let content = std::fs::read_to_string(&path).unwrap();
     let v: serde_json::Value = serde_json::from_str(&content).unwrap();

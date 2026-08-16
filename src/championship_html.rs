@@ -164,6 +164,11 @@ fn generate_html() -> String {
           <span class="config-hint">Full path to the career JSON file. Leave empty for the default location.</span>
         </div>
         <div class="config-group">
+          <label class="config-label" for="cfg-custom-ai-dir">Custom AI Drivers folder</label>
+          <input class="config-input config-input-wide" id="cfg-custom-ai-dir" name="custom_ai_dir" type="text" placeholder="e.g. D:\SteamLibrary\steamapps\common\Automobilista 2\UserData\CustomAIDrivers" />
+          <span class="config-hint">Folder with AMS2 Custom AI Driver XML files. Assign one to a championship (Manage tab) to show team/livery names instead of the AMS2 car class.</span>
+        </div>
+        <div class="config-group">
           <label class="config-label" for="cfg-poll-ms">Poll interval (ms)</label>
           <input class="config-input" id="cfg-poll-ms" name="poll_ms" type="number" min="50" max="5000" />
           <span class="config-hint">Shared memory read interval for the live view (default 200 ms)</span>

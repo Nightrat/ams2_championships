@@ -91,6 +91,8 @@ fn make_champ(id: &str) -> Championship {
         manufacturer_scoring: false,
         rounds: vec![],
         session_ids: vec![],
+        custom_ai_file: None,
+        player_team: None,
     }
 }
 

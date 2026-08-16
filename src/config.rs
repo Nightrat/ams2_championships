@@ -47,6 +47,10 @@ pub struct Config {
     /// Spotter focus player name in multiplayer (None = viewed player).
     #[serde(default)]
     pub spotter_name: Option<String>,
+    /// Folder containing AMS2 Custom AI Driver XML files (e.g. .../UserData/CustomAIDrivers).
+    /// Used to look up team/livery names for drivers in a championship.
+    #[serde(default)]
+    pub custom_ai_dir: Option<String>,
 }
 
 impl Default for Config {
@@ -64,6 +68,7 @@ impl Default for Config {
             spotter_enabled: false,
             spotter_voice: None,
             spotter_name: None,
+            custom_ai_dir: None,
         }
     }
 }

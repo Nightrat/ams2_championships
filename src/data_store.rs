@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 /// One driver's position on a specific completed lap.
@@ -25,6 +25,9 @@ pub struct SessionResult {
     pub fastest_lap: f32,
     pub last_lap: f32,
     pub dnf: bool,
+    /// True when this result belongs to the human player (mViewedParticipantIndex at capture time).
+    #[serde(default)]
+    pub is_player: bool,
 }
 
 /// A race session captured from the AMS2 shared memory.
@@ -86,6 +89,17 @@ pub struct Championship {
     /// Legacy flat session list — migrated to rounds on load, never written back.
     #[serde(default, skip_serializing)]
     pub session_ids: Vec<String>,
+    /// Filename (inside the configured Custom AI Drivers folder) of an AMS2 Custom AI Driver
+    /// XML file. When set, driver display names are looked up in this file to show the
+    /// team/livery name instead of the generic AMS2 car name/class.
+    #[serde(default)]
+    pub custom_ai_file: Option<String>,
+    /// Manual team/car name override for the human player's result rows. AMS2's shared memory
+    /// doesn't expose a livery/team field, and the player's profile name usually won't match
+    /// a Custom AI Driver file entry, so this fills the same role for the player as
+    /// `custom_ai_file` does for AI drivers.
+    #[serde(default)]
+    pub player_team: Option<String>,
 }
 
 /// Root data structure persisted to ams2_career.json.
@@ -248,15 +262,25 @@ fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Standing
     out
 }
 
-fn constructors(champ: &Championship, sessions: &[RecordedSession]) -> Vec<StandingsEntry> {
+/// The player's manual team override, if this result is the player's and one is set.
+/// AMS2 shared memory has no livery/team field, so this is the only way to give the
+/// player's row a team name when their profile name doesn't match a Custom AI Driver entry.
+fn resolve_player_team<'a>(r: &SessionResult, champ: &'a Championship) -> Option<&'a str> {
+    if !r.is_player { return None; }
+    champ.player_team.as_deref().filter(|t| !t.is_empty())
+}
+
+fn constructors(champ: &Championship, sessions: &[RecordedSession], team_map: &HashMap<String, String>) -> Vec<StandingsEntry> {
     let mut pts: HashMap<String, i32> = HashMap::new();
     let mut wins: HashMap<String, u32> = HashMap::new();
     for round in &champ.rounds {
         for s in resolve_sessions(&round.session_ids, sessions) {
             if s.session_type != 5 { continue; }
             for r in &s.results {
-                let key = if !r.car_name.is_empty() { &r.car_name }
-                          else if !r.car_class.is_empty() { &r.car_class }
+                let key = if let Some(team) = team_map.get(&r.name) { team.to_string() }
+                          else if let Some(team) = resolve_player_team(r, champ) { team.to_string() }
+                          else if !r.car_name.is_empty() { r.car_name.clone() }
+                          else if !r.car_class.is_empty() { r.car_class.clone() }
                           else { continue };
                 let p = pts.entry(key.clone()).or_insert(0);
                 wins.entry(key.clone()).or_insert(0);
@@ -279,15 +303,32 @@ fn constructors(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Stand
     out
 }
 
+/// Resolve the driver-name -> team/livery-name map for a championship's assigned
+/// Custom AI Driver file, if any. Returns an empty map when no file is assigned,
+/// no directory is configured, or the file can't be parsed.
+fn resolve_team_map(champ: &Championship, ai_dir: Option<&Path>) -> HashMap<String, String> {
+    match (ai_dir, &champ.custom_ai_file) {
+        (Some(dir), Some(file)) => crate::custom_ai::parse_driver_teams(&dir.join(file)),
+        _ => HashMap::new(),
+    }
+}
+
 pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> CareerResponse {
+    compute_career_full(champs, sessions, None)
+}
+
+/// Like [`compute_career`], but resolves each championship's assigned Custom AI Driver file
+/// (relative to `ai_dir`) to substitute team/livery names for driver car labels.
+pub fn compute_career_full(champs: &[Championship], sessions: &[RecordedSession], ai_dir: Option<&Path>) -> CareerResponse {
     #[derive(Default)]
     struct Accum { races: u32, p1: u32, p2: u32, p3: u32, top10: u32, dnf: u32, quali_p1: u32, quali_p2: u32, quali_p3: u32, quali_top10: u32, champ_wins: u32, champ_p2: u32, champ_p3: u32, total_pos: u32 }
     let mut accum: HashMap<String, Accum> = HashMap::new();
     let mut championships: Vec<ChampionshipView> = Vec::new();
 
     for champ in champs {
+        let team_map = resolve_team_map(champ, ai_dir);
         let driver_standings = standings(champ, sessions);
-        let constructor_standings = constructors(champ, sessions);
+        let constructor_standings = constructors(champ, sessions, &team_map);
 
         if champ.status == ChampionshipStatus::Final {
             if let Some(w) = driver_standings.first() {
@@ -332,8 +373,11 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
                         if r.race_position == 3  { a.quali_p3 += 1; }
                         if r.race_position <= 10 { a.quali_top10 += 1; }
                     }
+                    let car_name = team_map.get(&r.name).cloned()
+                        .or_else(|| resolve_player_team(r, champ).map(|s| s.to_string()))
+                        .unwrap_or_else(|| r.car_name.clone());
                     result_views.push(SessionResultView {
-                        name: r.name.clone(), car_name: r.car_name.clone(),
+                        name: r.name.clone(), car_name,
                         car_class: r.car_class.clone(), race_position: r.race_position,
                         laps_completed: r.laps_completed, fastest_lap: r.fastest_lap,
                         last_lap: r.last_lap, dnf: r.dnf, points_earned,

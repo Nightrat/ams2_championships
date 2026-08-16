@@ -19,6 +19,8 @@ fn sample_championship() -> Championship {
         manufacturer_scoring: false,
         rounds: vec![Round { session_ids: vec!["100".into()] }],
         session_ids: vec!["100".into()],
+        custom_ai_file: None,
+        player_team: None,
     }
 }
 
@@ -41,6 +43,7 @@ fn sample_session() -> RecordedSession {
                 fastest_lap: 89.5,
                 last_lap: 90.1,
                 dnf: false,
+                is_player: false,
             },
             SessionResult {
                 name: "Bob".into(),
@@ -51,6 +54,7 @@ fn sample_session() -> RecordedSession {
                 fastest_lap: 90.0,
                 last_lap: 91.0,
                 dnf: false,
+                is_player: false,
             },
         ],
         lap_chart: vec![],
@@ -209,7 +213,17 @@ fn make_champ(pts: Vec<i32>, sessions: &[&str]) -> Championship {
         manufacturer_scoring: false,
         rounds: sessions.iter().map(|&id| Round { session_ids: vec![id.into()] }).collect(),
         session_ids: vec![],
+        custom_ai_file: None,
+        player_team: None,
     }
+}
+
+/// Marks the result belonging to `name` as the human player's row.
+fn mark_player(mut session: RecordedSession, name: &str) -> RecordedSession {
+    for r in &mut session.results {
+        if r.name == name { r.is_player = true; }
+    }
+    session
 }
 
 fn make_session(id: &str, session_type: u32, results: Vec<(&str, u32, bool, &str)>) -> RecordedSession {
@@ -221,6 +235,7 @@ fn make_session(id: &str, session_type: u32, results: Vec<(&str, u32, bool, &str
         results: results.into_iter().map(|(name, pos, dnf, car)| SessionResult {
             name: name.into(), car_name: car.into(), car_class: "".into(),
             race_position: pos, laps_completed: 10, fastest_lap: 0.0, last_lap: 0.0, dnf,
+            is_player: false,
         }).collect(),
         lap_chart: vec![],
     }
@@ -321,7 +336,7 @@ fn test_constructors_groups_by_car_name() {
         ("Bob",   2, false, "Ferrari"),
         ("Carol", 3, false, "McLaren"),
     ])];
-    let ct = constructors(&champ, &sessions);
+    let ct = constructors(&champ, &sessions, &HashMap::new());
     let ferrari = ct.iter().find(|e| e.name == "Ferrari").unwrap();
     assert_eq!(ferrari.points, 25 + 18); // Alice + Bob
     let mclaren = ct.iter().find(|e| e.name == "McLaren").unwrap();
@@ -335,7 +350,7 @@ fn test_constructors_dnf_excluded_from_points() {
         ("Alice", 1, true,  "Ferrari"), // DNF
         ("Bob",   2, false, "McLaren"),
     ])];
-    let ct = constructors(&champ, &sessions);
+    let ct = constructors(&champ, &sessions, &HashMap::new());
     let ferrari = ct.iter().find(|e| e.name == "Ferrari").unwrap();
     assert_eq!(ferrari.points, 0);
 }
@@ -346,7 +361,7 @@ fn test_constructors_empty_car_name_uses_car_class() {
     champ.manufacturer_scoring = true;
     let mut sess = make_session("r1", 5, vec![("Alice", 1, false, "")]);
     sess.results[0].car_class = "GT3".into();
-    let ct = constructors(&champ, &[sess]);
+    let ct = constructors(&champ, &[sess], &HashMap::new());
     assert!(ct.iter().any(|e| e.name == "GT3"));
 }
 
@@ -355,8 +370,78 @@ fn test_constructors_no_car_info_excluded() {
     let champ = make_champ(vec![25], &["r1"]);
     // car_name and car_class both empty — should not appear in constructors
     let sessions = vec![make_session("r1", 5, vec![("Alice", 1, false, "")])];
-    let ct = constructors(&champ, &sessions);
+    let ct = constructors(&champ, &sessions, &HashMap::new());
     assert!(ct.is_empty());
+}
+
+// ── player_team override ─────────────────────────────────────────────────────
+
+#[test]
+fn test_constructors_player_team_override_used_for_player_row() {
+    let mut champ = make_champ(vec![25, 18], &["r1"]);
+    champ.player_team = Some("My Custom Team".into());
+    let sessions = vec![mark_player(
+        make_session("r1", 5, vec![("Nightrat", 1, false, "Formula Junior"), ("Bob", 2, false, "McLaren")]),
+        "Nightrat",
+    )];
+    let ct = constructors(&champ, &sessions, &HashMap::new());
+    assert!(ct.iter().any(|e| e.name == "My Custom Team" && e.points == 25));
+    assert!(!ct.iter().any(|e| e.name == "Formula Junior"));
+}
+
+#[test]
+fn test_constructors_player_team_ignored_for_non_player_rows() {
+    let mut champ = make_champ(vec![25], &["r1"]);
+    champ.player_team = Some("My Custom Team".into());
+    // No result is marked is_player — the override must not leak onto Alice's row.
+    let sessions = vec![make_session("r1", 5, vec![("Alice", 1, false, "Ferrari")])];
+    let ct = constructors(&champ, &sessions, &HashMap::new());
+    assert!(ct.iter().any(|e| e.name == "Ferrari"));
+    assert!(!ct.iter().any(|e| e.name == "My Custom Team"));
+}
+
+#[test]
+fn test_constructors_custom_ai_map_takes_priority_over_player_team() {
+    let mut champ = make_champ(vec![25], &["r1"]);
+    champ.player_team = Some("Manual Team".into());
+    let sessions = vec![mark_player(
+        make_session("r1", 5, vec![("Jack Brabham", 1, false, "Formula Junior")]),
+        "Jack Brabham",
+    )];
+    let mut team_map = HashMap::new();
+    team_map.insert("Jack Brabham".to_string(), "Brabham-Repco".to_string());
+    let ct = constructors(&champ, &sessions, &team_map);
+    assert!(ct.iter().any(|e| e.name == "Brabham-Repco"));
+    assert!(!ct.iter().any(|e| e.name == "Manual Team"));
+}
+
+#[test]
+fn test_compute_career_player_team_shown_in_result_view() {
+    let mut champ = make_champ(vec![25, 18], &["r1"]);
+    champ.player_team = Some("My Custom Team".into());
+    let sessions = vec![mark_player(
+        make_session("r1", 5, vec![("Nightrat", 1, false, "Formula Junior"), ("Bob", 2, false, "McLaren")]),
+        "Nightrat",
+    )];
+    let resp = compute_career(&[champ], &sessions);
+    let race = &resp.championships[0].rounds[0].sessions[0];
+    let player = race.results.iter().find(|r| r.name == "Nightrat").unwrap();
+    let bob = race.results.iter().find(|r| r.name == "Bob").unwrap();
+    assert_eq!(player.car_name, "My Custom Team");
+    assert_eq!(bob.car_name, "McLaren");
+}
+
+#[test]
+fn test_player_team_blank_string_treated_as_unset() {
+    let mut champ = make_champ(vec![25], &["r1"]);
+    champ.player_team = Some("".into());
+    let sessions = vec![mark_player(
+        make_session("r1", 5, vec![("Nightrat", 1, false, "Formula Junior")]),
+        "Nightrat",
+    )];
+    let ct = constructors(&champ, &sessions, &HashMap::new());
+    // Falls through to car_name since the override is blank.
+    assert!(ct.iter().any(|e| e.name == "Formula Junior"));
 }
 
 // ── compute_career ────────────────────────────────────────────────────────────
@@ -622,6 +707,7 @@ fn make_track_session_car(id: &str, session_type: u32, track: &str, variation: &
         results: results.into_iter().map(|(name, pos, fl, car)| SessionResult {
             name: name.into(), car_name: car.into(), car_class: "".into(),
             race_position: pos, laps_completed: 10, fastest_lap: fl, last_lap: 0.0, dnf: false,
+            is_player: false,
         }).collect(),
         lap_chart: vec![],
     }

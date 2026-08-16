@@ -1,6 +1,7 @@
 pub mod championship_html;
 pub mod ams2_shared_memory;
 pub mod config;
+pub mod custom_ai;
 pub mod data_store;
 pub mod http;
 pub mod session_recorder;

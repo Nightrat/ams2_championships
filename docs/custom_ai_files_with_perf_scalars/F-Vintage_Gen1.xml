@@ -1,0 +1,538 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!--Custom AI by jusk - F1 1967 Season 
+
+Changelog v0.3:
+- Added new vehicle_relaiability attributes
+Changelog v0.2:
+- Added overrides to balance Monza '71 performance
+Changelog v0.1:
+- Initial version to match Alain Fry's skinpack
+
+***  1967 Season Calendar  ***
+#	Track				Date			AMS2 Track
+--------------------------------------------------------------------------------------------------
+1 	South African GP	02 Jan			Kyalami Historic 1976
+2 	Monaco GP			07 May			Azure Circuit			
+3 	Dutch GP			04 June						
+4 	Belgian GP			18 June			Spa Historic 1993 (older version expected soon)		
+5 	French GP			02 July		
+6 	British GP			15 July			Silverstone Historic 1975 (no chicane)			
+7 	German GP			06 Aug			Nurburgring Nordsleife (historic version expected soon)			
+8 	Canadian GP			27 Aug		
+9 	Italian GP			10 Sept			Monza 1971
+10 	USA GP		 		01 Oct			Watkins Glen Short			
+11 	Mexican GP	 		22 Oct			
+-->
+<custom_ai_drivers>
+	<driver livery_name="Brabham-Repco #1 J. Brabham">
+		<name>Jack Brabham</name>
+		<country>AUS</country>
+        <race_skill>0.93</race_skill> 
+        <qualifying_skill>0.94</qualifying_skill>
+		<aggression>0.55</aggression>
+        <defending>0.42</defending>
+        <stamina>0.79</stamina>
+        <consistency>0.80</consistency>
+        <start_reactions>0.89</start_reactions>
+        <wet_skill>0.84</wet_skill>
+        <tyre_management>0.79</tyre_management>
+        <blue_flag_conceding>0.88</blue_flag_conceding>
+        <weather_tyre_changes>0.64</weather_tyre_changes>
+        <avoidance_of_mistakes>0.71</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.62</avoidance_of_forced_mistakes>
+	    <vehicle_reliability>0.93</vehicle_reliability>
+	    <power_scalar>1.02</power_scalar>
+	    <weight_scalar>0.92</weight_scalar>
+	    <drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Repco #1 J. Brabham" tracks="Kyalami_Historic">
+        <qualifying_skill>0.98</qualifying_skill>
+        <consistency>0.90</consistency>
+	</driver>
+	<driver livery_name="Brabham-Repco #2 D. Hulme">
+		<name>Denny Hulme</name>
+		<country>NZL</country>
+        <race_skill>0.93</race_skill> 
+        <qualifying_skill>0.93</qualifying_skill>
+		<aggression>0.59</aggression>
+        <defending>0.40</defending>
+        <stamina>0.88</stamina>
+        <consistency>0.90</consistency>
+        <start_reactions>0.91</start_reactions>
+        <wet_skill>0.81</wet_skill>
+        <tyre_management>0.88</tyre_management>
+        <blue_flag_conceding>0.90</blue_flag_conceding>
+        <weather_tyre_changes>0.74</weather_tyre_changes>
+        <avoidance_of_mistakes>0.75</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.66</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.96</vehicle_reliability>
+	    <power_scalar>1.02</power_scalar>
+	    <weight_scalar>0.92</weight_scalar>
+	    <drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Repco #2 D. Hulme" tracks="Kyalami_Historic">
+        <qualifying_skill>0.98</qualifying_skill>
+        <consistency>0.94</consistency>
+	</driver>
+	<driver livery_name="Brabham-Repco #2 D. Hulme" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.99</qualifying_skill>
+        <consistency>0.94</consistency>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #5 J. Clark">
+		<name>Jim Clark</name>
+		<country>GBR</country>
+        <race_skill>0.94</race_skill> 
+        <qualifying_skill>0.98</qualifying_skill>
+		<aggression>0.62</aggression>
+        <defending>0.44</defending>
+        <stamina>0.86</stamina>
+        <consistency>0.95</consistency>
+        <start_reactions>0.94</start_reactions>
+        <wet_skill>0.89</wet_skill>
+        <tyre_management>0.92</tyre_management>
+        <blue_flag_conceding>0.85</blue_flag_conceding>
+        <weather_tyre_changes>0.69</weather_tyre_changes>
+        <avoidance_of_mistakes>0.78</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.68</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.51</vehicle_reliability>
+	    <power_scalar>1.10</power_scalar>
+	    <weight_scalar>0.93</weight_scalar>
+	    <drag_scalar>0.90</drag_scalar>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #6 G. Hill">
+		<name>Graham Hill</name>
+		<country>GBR</country>
+        <race_skill>0.91</race_skill> 
+        <qualifying_skill>0.94</qualifying_skill>
+		<aggression>0.54</aggression>
+        <defending>0.40</defending>
+        <stamina>0.84</stamina>
+        <consistency>0.86</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.86</wet_skill>
+        <tyre_management>0.89</tyre_management>
+        <blue_flag_conceding>0.88</blue_flag_conceding>
+        <weather_tyre_changes>0.77</weather_tyre_changes>
+        <avoidance_of_mistakes>0.55</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.42</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.36</vehicle_reliability>
+	    <power_scalar>1.10</power_scalar>
+	    <weight_scalar>0.93</weight_scalar>
+	    <drag_scalar>0.90</drag_scalar>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #6 G. Hill" tracks="Kyalami_Historic">
+        <race_skill>0.89</race_skill> 
+        <qualifying_skill>0.80</qualifying_skill>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #6 G. Hill" tracks="Watkins_Glen_S">
+        <race_skill>0.94</race_skill> 
+        <qualifying_skill>0.97</qualifying_skill>
+		<consistency>0.90</consistency>
+	</driver>
+	<driver livery_name="Cooper-Maserati #12 J. Siffert">
+		<name>Jo Siffert</name>
+		<country>CHE</country>
+        <race_skill>0.68</race_skill> 
+        <qualifying_skill>0.70</qualifying_skill>
+		<aggression>0.49</aggression>
+        <defending>0.36</defending>
+        <stamina>0.81</stamina>
+        <consistency>0.70</consistency>
+        <start_reactions>0.88</start_reactions>
+        <wet_skill>0.80</wet_skill>
+        <tyre_management>0.87</tyre_management>
+        <blue_flag_conceding>0.92</blue_flag_conceding>
+        <weather_tyre_changes>0.81</weather_tyre_changes>
+        <avoidance_of_mistakes>0.48</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.36</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.43</vehicle_reliability>
+	    <power_scalar>1.03</power_scalar>
+	    <weight_scalar>1.04</weight_scalar>
+	    <drag_scalar>1.03</drag_scalar>
+	</driver>
+	<driver livery_name="Cooper-Maserati #12 J. Siffert" tracks="Monza_1971">
+        <race_skill>0.48</race_skill> 
+        <qualifying_skill>0.50</qualifying_skill>
+	</driver>
+	<driver livery_name="McLaren-BRM #14 B. McLaren">
+		<name>Bruce McLaren</name>
+		<country>NZL</country>
+        <race_skill>0.75</race_skill> 
+        <qualifying_skill>0.82</qualifying_skill>
+		<aggression>0.51</aggression>
+        <defending>0.37</defending>
+        <stamina>0.79</stamina>
+        <consistency>0.75</consistency>
+        <start_reactions>0.89</start_reactions>
+        <wet_skill>0.78</wet_skill>
+        <tyre_management>0.79</tyre_management>
+        <blue_flag_conceding>0.91</blue_flag_conceding>
+        <weather_tyre_changes>0.86</weather_tyre_changes>
+        <avoidance_of_mistakes>0.38</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.30</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.33</vehicle_reliability>
+	    <power_scalar>1.05</power_scalar>
+	    <weight_scalar>1.03</weight_scalar>
+	    <drag_scalar>1.02</drag_scalar>
+	</driver>
+	<driver livery_name="McLaren-BRM #14 B. McLaren" tracks="Monza_1971">
+        <race_skill>0.60</race_skill> 
+        <qualifying_skill>0.68</qualifying_skill>
+        <consistency>0.85</consistency>
+	</driver>
+	<driver livery_name="Brabham-Repco #15 G. Ligier">
+		<name>Guy Ligier</name>
+		<country>FRA</country>
+        <race_skill>0.65</race_skill> 
+        <qualifying_skill>0.72</qualifying_skill>
+		<aggression>0.39</aggression>
+        <defending>0.29</defending>
+        <stamina>0.70</stamina>
+        <consistency>0.59</consistency>
+        <start_reactions>0.80</start_reactions>
+        <wet_skill>0.68</wet_skill>
+        <tyre_management>0.79</tyre_management>
+        <blue_flag_conceding>0.99</blue_flag_conceding>
+        <weather_tyre_changes>0.92</weather_tyre_changes>
+        <avoidance_of_mistakes>0.35</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.26</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.70</vehicle_reliability>
+	    <power_scalar>1.02</power_scalar>
+	    <weight_scalar>0.92</weight_scalar>
+	    <drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="BRM #3 J. Stewart">
+		<name>Jackie Stewart</name>
+		<country>GBR</country>
+        <race_skill>0.81</race_skill> 
+        <qualifying_skill>0.83</qualifying_skill>
+		<aggression>0.56</aggression>
+        <defending>0.41</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.78</consistency>
+        <start_reactions>0.89</start_reactions>
+        <wet_skill>0.91</wet_skill>
+        <tyre_management>0.92</tyre_management>
+        <blue_flag_conceding>0.88</blue_flag_conceding>
+        <weather_tyre_changes>0.66</weather_tyre_changes>
+        <avoidance_of_mistakes>0.61</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.53</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.29</vehicle_reliability>
+	    <power_scalar>1.08</power_scalar>
+	    <weight_scalar>1.08</weight_scalar>
+	    <drag_scalar>1.06</drag_scalar>
+	</driver>
+	<driver livery_name="BRM #3 J. Stewart" tracks="Spa_Francorchamps_1993,Nordschleife_2020,Nordschleife_2020_24hr">
+        <race_skill>0.91</race_skill> 
+        <qualifying_skill>0.93</qualifying_skill>
+        <consistency>0.88</consistency>
+	</driver>	
+	<driver livery_name="BRM #4 M. Spence">
+		<name>Mike Spence</name>
+		<country>GBR</country>
+        <race_skill>0.72</race_skill> 
+        <qualifying_skill>0.73</qualifying_skill>
+		<aggression>0.54</aggression>
+        <defending>0.39</defending>
+        <stamina>0.69</stamina>
+        <consistency>0.71</consistency>
+        <start_reactions>0.82</start_reactions>
+        <wet_skill>0.71</wet_skill>
+        <tyre_management>0.84</tyre_management>
+        <blue_flag_conceding>0.93</blue_flag_conceding>
+        <weather_tyre_changes>0.84</weather_tyre_changes>
+        <avoidance_of_mistakes>0.48</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.39</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.50</vehicle_reliability>
+	    <power_scalar>1.08</power_scalar>
+	    <weight_scalar>1.08</weight_scalar>
+	    <drag_scalar>1.06</drag_scalar>
+	</driver>
+	<driver livery_name="Honda #7 J. Surtees">
+		<name>John Surtees</name>
+		<country>GBR</country>
+        <race_skill>0.84</race_skill> 
+        <qualifying_skill>0.85</qualifying_skill>
+		<aggression>0.65</aggression>
+        <defending>0.43</defending>
+        <stamina>0.86</stamina>
+        <consistency>0.84</consistency>
+        <start_reactions>0.91</start_reactions>
+        <wet_skill>0.88</wet_skill>
+        <tyre_management>0.84</tyre_management>
+        <blue_flag_conceding>0.89</blue_flag_conceding>
+        <weather_tyre_changes>0.88</weather_tyre_changes>
+        <avoidance_of_mistakes>0.64</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.56</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.54</vehicle_reliability>
+	    <power_scalar>1.09</power_scalar>
+	    <weight_scalar>1.10</weight_scalar>
+	    <drag_scalar>1.00</drag_scalar>
+	</driver>
+	<driver livery_name="Honda #7 J. Surtees" tracks="Monza_1971">
+        <race_skill>0.64</race_skill> 
+        <qualifying_skill>0.65</qualifying_skill>
+	</driver>
+	<driver livery_name="Lola-BMW #17 H. Hahne">
+		<name>Hubert Hahne</name>
+		<country>DEU</country>
+        <race_skill>0.63</race_skill> 
+        <qualifying_skill>0.69</qualifying_skill>
+		<aggression>0.36</aggression>
+        <defending>0.24</defending>
+        <stamina>0.71</stamina>
+        <consistency>0.59</consistency>
+        <start_reactions>0.79</start_reactions>
+        <wet_skill>0.68</wet_skill>
+        <tyre_management>0.65</tyre_management>
+        <blue_flag_conceding>0.99</blue_flag_conceding>
+        <weather_tyre_changes>0.97</weather_tyre_changes>
+        <avoidance_of_mistakes>0.38</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.21</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.19</vehicle_reliability>
+	    <power_scalar>0.90</power_scalar>
+	    <weight_scalar>0.96</weight_scalar>
+	    <drag_scalar>1.05</drag_scalar>
+	</driver>
+	<driver livery_name="Matra-Ford Cosworth #20 J-P. Beltoise">
+		<name>Jean-Pierre Beltoise</name>
+		<country>FRA</country>
+        <race_skill>0.63</race_skill> 
+        <qualifying_skill>0.65</qualifying_skill>
+		<aggression>0.38</aggression>
+        <defending>0.34</defending>
+        <stamina>0.79</stamina>
+        <consistency>0.69</consistency>
+        <start_reactions>0.82</start_reactions>
+        <wet_skill>0.71</wet_skill>
+        <tyre_management>0.73</tyre_management>
+        <blue_flag_conceding>0.94</blue_flag_conceding>
+        <weather_tyre_changes>0.79</weather_tyre_changes>
+        <avoidance_of_mistakes>0.40</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.26</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.38</vehicle_reliability>
+	    <power_scalar>0.99</power_scalar>
+	    <weight_scalar>0.97</weight_scalar>
+	    <drag_scalar>1.00</drag_scalar>
+	</driver>
+	<driver livery_name="Matra-Ford Cosworth #29 J. Ickx">
+		<name>Jacky Ickx</name>
+		<country>BEL</country>
+        <race_skill>0.73</race_skill> 
+        <qualifying_skill>0.75</qualifying_skill>
+		<aggression>0.48</aggression>
+        <defending>0.40</defending>
+        <stamina>0.78</stamina>
+        <consistency>0.75</consistency>
+        <start_reactions>0.85</start_reactions>
+        <wet_skill>0.84</wet_skill>
+        <tyre_management>0.84</tyre_management>
+        <blue_flag_conceding>0.90</blue_flag_conceding>
+        <weather_tyre_changes>0.88</weather_tyre_changes>
+        <avoidance_of_mistakes>0.62</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.54</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.39</vehicle_reliability>
+	    <power_scalar>0.99</power_scalar>
+	    <weight_scalar>0.97</weight_scalar>
+	    <drag_scalar>1.00</drag_scalar>
+	</driver>
+	<driver livery_name="Matra-Ford Cosworth #29 J. Ickx" tracks="Nordschleife_2020,Nordschleife_2020_24hr">
+        <race_skill>0.85</race_skill> 
+        <qualifying_skill>0.91</qualifying_skill>
+        <consistency>0.85</consistency>
+	</driver>
+	<driver livery_name="Ferrari #8 C. Amon">
+		<name>Chris Amon</name>
+		<country>NZL</country>
+        <race_skill>0.86</race_skill> 
+        <qualifying_skill>0.88</qualifying_skill>
+		<aggression>0.53</aggression>
+        <defending>0.42</defending>
+        <stamina>0.83</stamina>
+        <consistency>0.81</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.89</wet_skill>
+        <tyre_management>0.93</tyre_management>
+        <blue_flag_conceding>0.90</blue_flag_conceding>
+        <weather_tyre_changes>0.62</weather_tyre_changes>
+        <avoidance_of_mistakes>0.67</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.60</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.93</vehicle_reliability>
+	    <power_scalar>1.05</power_scalar>
+	    <weight_scalar>1.00</weight_scalar>
+	    <drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="Ferrari #8 C. Amon" tracks="Monza_1971">
+        <race_skill>0.66</race_skill> 
+        <qualifying_skill>0.67</qualifying_skill>
+	</driver>
+	<driver livery_name="Ferrari #18 L. Bandini">
+		<name>Lorenzo Bandini</name>
+		<country>ITA</country>
+        <race_skill>0.84</race_skill> 
+        <qualifying_skill>0.86</qualifying_skill>
+		<aggression>0.55</aggression>
+        <defending>0.40</defending>
+        <stamina>0.76</stamina>
+        <consistency>0.79</consistency>
+        <start_reactions>0.92</start_reactions>
+        <wet_skill>0.84</wet_skill>
+        <tyre_management>0.92</tyre_management>
+        <blue_flag_conceding>0.90</blue_flag_conceding>
+        <weather_tyre_changes>0.72</weather_tyre_changes>
+        <avoidance_of_mistakes>0.62</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.50</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.89</vehicle_reliability>
+	    <power_scalar>1.05</power_scalar>
+	    <weight_scalar>1.00</weight_scalar>
+	    <drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="Ferrari #18 L. Bandini" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.95</qualifying_skill>
+        <consistency>0.89</consistency>
+	</driver>
+	<driver livery_name="Ferrari #18 L. Bandini" tracks="Monza_1971">
+        <qualifying_skill>0.64</qualifying_skill>
+        <consistency>0.66</consistency>
+	</driver>
+	<driver livery_name="Ferrari #19 L. Scarfiotti">
+		<name>Ludovico Scarfiotti</name>
+		<country>ITA</country>
+        <race_skill>0.75</race_skill> 
+        <qualifying_skill>0.76</qualifying_skill>
+		<aggression>0.52</aggression>
+        <defending>0.42</defending>
+        <stamina>0.80</stamina>
+        <consistency>0.74</consistency>
+        <start_reactions>0.88</start_reactions>
+        <wet_skill>0.86</wet_skill>
+        <tyre_management>0.79</tyre_management>
+        <blue_flag_conceding>0.96</blue_flag_conceding>
+        <weather_tyre_changes>0.79</weather_tyre_changes>
+        <avoidance_of_mistakes>0.48</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.40</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.90</vehicle_reliability>
+	    <power_scalar>1.05</power_scalar>
+	    <weight_scalar>1.00</weight_scalar>
+	    <drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="Ferrari #19 L. Scarfiotti" tracks="Monza_1971">
+        <race_skill>0.55</race_skill> 
+        <qualifying_skill>0.56</qualifying_skill>
+	</driver>
+	<driver livery_name="Cooper-Maserati #30 J. Rindt">
+		<name>Jochen Rindt</name>
+		<country>AUT</country>
+        <race_skill>0.79</race_skill> 
+        <qualifying_skill>0.81</qualifying_skill>
+		<aggression>0.54</aggression>
+        <defending>0.43</defending>
+        <stamina>0.88</stamina>
+        <consistency>0.74</consistency>
+        <start_reactions>0.90</start_reactions>
+        <wet_skill>0.90</wet_skill>
+        <tyre_management>0.86</tyre_management>
+        <blue_flag_conceding>0.89</blue_flag_conceding>
+        <weather_tyre_changes>0.68</weather_tyre_changes>
+        <avoidance_of_mistakes>0.49</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.41</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.24</vehicle_reliability>
+	    <power_scalar>1.03</power_scalar>
+	    <weight_scalar>1.04</weight_scalar>
+	    <drag_scalar>1.03</drag_scalar>
+	</driver>
+	<driver livery_name="Cooper-Maserati #30 J. Rindt" tracks="Spa_Francorchamps_1993">
+        <race_skill>0.89</race_skill> 
+        <qualifying_skill>0.92</qualifying_skill>
+        <consistency>0.84</consistency>
+	</driver>
+	<driver livery_name="Cooper-Maserati #30 J. Rindt" tracks="Monza_1971">
+        <race_skill>0.59</race_skill> 
+        <qualifying_skill>0.61</qualifying_skill>
+	</driver>
+	<driver livery_name="Cooper-Maserati #11 P. Rodriguez">
+		<name>Pedro Rodríguez</name>
+		<country>MEX</country>
+        <race_skill>0.74</race_skill> 
+        <qualifying_skill>0.74</qualifying_skill>
+		<aggression>0.48</aggression>
+        <defending>0.38</defending>
+        <stamina>0.79</stamina>
+        <consistency>0.65</consistency>
+        <start_reactions>0.88</start_reactions>
+        <wet_skill>0.79</wet_skill>
+        <tyre_management>0.79</tyre_management>
+        <blue_flag_conceding>0.93</blue_flag_conceding>
+        <weather_tyre_changes>0.92</weather_tyre_changes>
+        <avoidance_of_mistakes>0.59</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.45</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.81</vehicle_reliability>
+	    <power_scalar>1.03</power_scalar>
+	    <weight_scalar>1.04</weight_scalar>
+	    <drag_scalar>1.03</drag_scalar>
+	</driver>
+	<driver livery_name="Cooper-Maserati #11 P. Rodriguez" tracks="Kyalami_Historic">
+        <race_skill>0.91</race_skill> 
+        <qualifying_skill>0.92</qualifying_skill>
+        <consistency>0.96</consistency>
+	</driver>
+	<driver livery_name="Cooper-Maserati #11 P. Rodriguez" tracks="Monza_1971">
+        <race_skill>0.59</race_skill> 
+        <qualifying_skill>0.60</qualifying_skill>
+	</driver>
+	<driver livery_name="Eagle-Climax #10 D. Gurney">
+		<name>Dan Gurney</name>
+		<country>USA</country>
+        <race_skill>0.89</race_skill> 
+        <qualifying_skill>0.92</qualifying_skill>
+		<aggression>0.59</aggression>
+        <defending>0.40</defending>
+        <stamina>0.87</stamina>
+        <consistency>0.78</consistency>
+        <start_reactions>0.91</start_reactions>
+        <wet_skill>0.84</wet_skill>
+        <tyre_management>0.86</tyre_management>
+        <blue_flag_conceding>0.86</blue_flag_conceding>
+        <weather_tyre_changes>0.82</weather_tyre_changes>
+        <avoidance_of_mistakes>0.53</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.44</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.25</vehicle_reliability>
+	    <power_scalar>0.94</power_scalar>
+	    <weight_scalar>0.95</weight_scalar>
+	    <drag_scalar>0.92</drag_scalar>
+	</driver>
+	<driver livery_name="Eagle-Climax #10 D. Gurney" tracks="Spa_Francorchamps_1993">
+        <race_skill>0.95</race_skill> 
+        <qualifying_skill>0.97</qualifying_skill>
+        <consistency>0.88</consistency>
+	</driver>
+	<driver livery_name="Eagle-Climax #10 D. Gurney" tracks="Monza_1971">
+        <race_skill>0.64</race_skill> 
+        <qualifying_skill>0.69</qualifying_skill>
+	</driver>
+	<driver livery_name="Eagle-Climax #22 R. Ginther">
+		<name>Richie Ginther</name>
+		<country>USA</country>
+        <race_skill>0.68</race_skill> 
+        <qualifying_skill>0.70</qualifying_skill>
+		<aggression>0.46</aggression>
+        <defending>0.32</defending>
+        <stamina>0.82</stamina>
+        <consistency>0.65</consistency>
+        <start_reactions>0.86</start_reactions>
+        <wet_skill>0.81</wet_skill>
+        <tyre_management>0.71</tyre_management>
+        <blue_flag_conceding>0.98</blue_flag_conceding>
+        <weather_tyre_changes>0.89</weather_tyre_changes>
+        <avoidance_of_mistakes>0.46</avoidance_of_mistakes>
+        <avoidance_of_forced_mistakes>0.32</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.20</vehicle_reliability>
+	    <power_scalar>0.94</power_scalar>
+	    <weight_scalar>0.95</weight_scalar>
+	    <drag_scalar>0.92</drag_scalar>
+	</driver>
+	<driver livery_name="Eagle-Climax #22 R. Ginther" tracks ="Monza_1971">
+        <race_skill>0.49</race_skill> 
+        <qualifying_skill>0.50</qualifying_skill>
+	</driver>
+</custom_ai_drivers>

@@ -1,13 +1,15 @@
 // ── Manage tab ────────────────────────────────────────────────────────────────
-var manageState = { champs: [], sessions: [], selectedId: null, currentRidx: 0 };
+var manageState = { champs: [], sessions: [], customAiFiles: [], selectedId: null, currentRidx: 0 };
 
 function loadManage() {
   Promise.all([
     fetch('/api/championships').then(function (r) { return r.json(); }),
-    fetch('/api/sessions').then(function (r) { return r.json(); })
+    fetch('/api/sessions').then(function (r) { return r.json(); }),
+    fetch('/api/custom-ai-files').then(function (r) { return r.json(); }).catch(function () { return []; })
   ]).then(function (results) {
     manageState.champs = sortChamps(results[0] || []);
     manageState.sessions = results[1] || [];
+    manageState.customAiFiles = results[2] || [];
     var active = manageState.champs.find(function (c) { return c.status === 'Active'; });
     manageState.selectedId = active ? active.id : (manageState.champs[0] ? manageState.champs[0].id : null);
     renderChampList();
@@ -101,6 +103,15 @@ function renderChampDetail(id) {
 
   var rounds = champ.rounds || [];
 
+  var aiOptions = '<option value="">None</option>' +
+    manageState.customAiFiles.map(function (f) {
+      return '<option value="' + esc(f) + '"' + (f === champ.custom_ai_file ? ' selected' : '') + '>' + esc(f) + '</option>';
+    }).join('');
+  var aiHint = manageState.customAiFiles.length
+    ? 'Driver names matching a &lt;name&gt; entry in this file show its livery/team name instead of the AMS2 car class.'
+    : 'No .xml files found. Set a Custom AI Drivers folder in the Config tab.';
+  var playerTeamHint = 'AMS2 does not expose your team/livery in telemetry — set it manually here. Applies to your own result rows only.';
+
   var roundsHtml = rounds.length === 0
     ? '<div class="manage-empty">No rounds yet. Click \u201c+ Add Round\u201d to create one.</div>'
     : rounds.map(function (round, rIdx) {
@@ -143,6 +154,9 @@ function renderChampDetail(id) {
     '<div class="champ-detail-meta">' +
       '<label>Points&nbsp;<input class="manage-input champ-points-input" value="' + esc(champ.points_system.join(',')) + '" data-id="' + esc(champ.id) + '" size="32" title="Comma-separated points per finishing position"></label>' +
       '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
+      '<label title="' + aiHint + '">Custom AI Drivers&nbsp;<select class="manage-select champ-custom-ai-select">' + aiOptions + '</select></label>' +
+      '<label title="' + esc(playerTeamHint) + '">My Team&nbsp;<input class="manage-input champ-player-team-input" list="player-team-datalist" placeholder="e.g. Brabham-Repco" value="' + esc(champ.player_team || '') + '"></label>' +
+      '<datalist id="player-team-datalist"></datalist>' +
     '</div>' +
     '<div class="champ-rounds-header">' +
       '<span>Rounds&nbsp;(' + rounds.length + ')</span>' +
@@ -163,6 +177,15 @@ function renderChampDetail(id) {
   right.querySelector('.champ-manufacturer-check').addEventListener('change', function () {
     patchChamp(champ.id, { manufacturer_scoring: this.checked });
   });
+  right.querySelector('.champ-custom-ai-select').addEventListener('change', function () {
+    patchChamp(champ.id, { custom_ai_file: this.value || null });
+  });
+  right.querySelector('.champ-player-team-input').addEventListener('blur', function () {
+    var val = this.value.trim();
+    if (val === (champ.player_team || '')) return;
+    patchChamp(champ.id, { player_team: val || null });
+  });
+  loadPlayerTeamOptions(champ.id);
   right.querySelector('.champ-delete-btn').addEventListener('click', function () {
     if (!confirm('Delete "' + champ.name + '"?')) return;
     fetch('/api/championships/' + champ.id, { method: 'DELETE' }).then(function () {
@@ -199,6 +222,16 @@ function renderChampDetail(id) {
       if (panel) panel.style.display = '';
     });
   });
+}
+
+function loadPlayerTeamOptions(champId) {
+  fetch('/api/championships/' + champId + '/teams').then(function (r) { return r.json(); })
+    .then(function (teams) {
+      if (manageState.selectedId !== champId) return; // user navigated away before this resolved
+      var datalist = document.getElementById('player-team-datalist');
+      if (!datalist) return;
+      datalist.innerHTML = (teams || []).map(function (t) { return '<option value="' + esc(t) + '">'; }).join('');
+    }).catch(function () {});
 }
 
 function renderAvailableSessions(champId) {

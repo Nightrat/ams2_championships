@@ -34,7 +34,12 @@ use ams2::{SESSION_PRACTICE, SESSION_QUALIFY, SESSION_RACE};
 #[path = "tests/session_recorder.rs"]
 mod tests;
 
-pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData, lap_chart: Vec<LapChartEntry>) {
+/// `player_name`, when given, names the participant known to be the human player from an
+/// earlier poll in this session. AMS2 often stops reporting `mViewedParticipantIndex` as the
+/// player's own car during the post-race results/podium screen, so the *last* cached snapshot
+/// before capture — the one actually persisted — can have every participant's `is_player`
+/// read back as false even though it was correctly true earlier in the same session.
+pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData, lap_chart: Vec<LapChartEntry>, player_name: Option<&str>) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -59,6 +64,7 @@ pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSession
             fastest_lap: p.fastest_lap_time,
             last_lap: p.last_lap_time,
             dnf: max_laps > 0 && p.laps_completed < max_laps,
+            is_player: p.is_player || player_name == Some(p.name.as_str()),
         })
         .collect();
 
@@ -106,7 +112,7 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
     if !matches!(session.session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE) {
         return Err("No active session".into());
     }
-    capture(store, path, &session, vec![]);
+    capture(store, path, &session, vec![], None);
     Ok(())
 }
 
@@ -144,6 +150,9 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
         // Lap-by-lap position chart accumulated during a race session.
         let mut lap_chart: Vec<LapChartEntry> = vec![];
         let mut leader_laps: u32 = 0;
+        // Name of the human player, learned from any poll in the current session where
+        // AMS2 correctly reported mViewedParticipantIndex — see the comment on `capture()`.
+        let mut player_name: Option<String> = None;
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
@@ -162,13 +171,14 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             if !session.connected {
                 if let Some(ref cached) = session_cache {
                     if should_capture(cached) && should_record(cached.session_state) {
-                        capture(&store, &path, cached, std::mem::take(&mut lap_chart));
+                        capture(&store, &path, cached, std::mem::take(&mut lap_chart), player_name.as_deref());
                     }
                 }
                 prev_session_state = 0;
                 session_cache = None;
                 lap_chart.clear();
                 leader_laps = 0;
+                player_name = None;
                 continue;
             }
 
@@ -180,12 +190,13 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             if prev_session_state != session_state {
                 if let Some(ref cached) = session_cache {
                     if should_capture(cached) && should_record(cached.session_state) {
-                        capture(&store, &path, cached, std::mem::take(&mut lap_chart));
+                        capture(&store, &path, cached, std::mem::take(&mut lap_chart), player_name.as_deref());
                     }
                 }
                 session_cache = None;
                 lap_chart.clear();
                 leader_laps = 0;
+                player_name = None;
                 prev_session_state = session_state;
             }
 
@@ -210,6 +221,9 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             if matches!(session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE)
                 && session.num_participants > 0
             {
+                if let Some(p) = session.participants.iter().find(|p| p.is_player) {
+                    player_name = Some(p.name.clone());
+                }
                 session_cache = Some(session.clone());
             } else if !matches!(session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE) {
                 session_cache = None;
