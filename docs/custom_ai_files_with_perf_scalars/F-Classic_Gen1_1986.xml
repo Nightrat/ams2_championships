@@ -7,12 +7,15 @@
         <consistency>0.96</consistency>
         <country>FRA</country>
         <defending>0.7</defending>
+        <drag_scalar>0.97</drag_scalar>
         <fuel_management>0.94</fuel_management>
         <name>Alain Prost</name>
+        <power_scalar>1.07</power_scalar>
         <qualifying_skill>0.93</qualifying_skill>
         <race_skill>0.96</race_skill>
         <stamina>0.98</stamina>
         <tyre_management>0.9</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
         <wet_skill>0.5</wet_skill>
     </driver>
     <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -76,12 +79,15 @@
         <consistency>0.86</consistency>
         <country>FIN</country>
         <defending>0.94</defending>
+        <drag_scalar>0.97</drag_scalar>
         <fuel_management>0.8</fuel_management>
         <name>Keke Rosberg</name>
+        <power_scalar>1.07</power_scalar>
         <qualifying_skill>0.9</qualifying_skill>
         <race_skill>0.9</race_skill>
         <stamina>0.86</stamina>
         <tyre_management>0.73</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
         <wet_skill>0.56</wet_skill>
     </driver>
     <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -143,12 +149,15 @@
         <consistency>0.82</consistency>
         <country>GBR</country>
         <defending>0.42</defending>
+        <drag_scalar>1.01</drag_scalar>
         <fuel_management>0.67</fuel_management>
         <name>Martin Brundle</name>
+        <power_scalar>0.99</power_scalar>
         <qualifying_skill>0.73</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.82</stamina>
         <tyre_management>0.6</tyre_management>
+        <weight_scalar>1.02</weight_scalar>
         <wet_skill>0.68</wet_skill>
     </driver>
     <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -212,12 +221,15 @@
         <consistency>0.78</consistency>
         <country>FRA</country>
         <defending>0.86</defending>
+        <drag_scalar>1.01</drag_scalar>
         <fuel_management>0.58</fuel_management>
         <name>Philippe Streiff</name>
+        <power_scalar>0.99</power_scalar>
         <qualifying_skill>0.7</qualifying_skill>
         <race_skill>0.77</race_skill>
         <stamina>0.79</stamina>
         <tyre_management>0.55</tyre_management>
+        <weight_scalar>1.02</weight_scalar>
         <wet_skill>0.24</wet_skill>
     </driver>
     <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -279,12 +291,15 @@
         <consistency>0.93</consistency>
         <country>GBR</country>
         <defending>0.8</defending>
+        <drag_scalar>0.95</drag_scalar>
         <fuel_management>0.88</fuel_management>
         <name>Nigel Mansell</name>
+        <power_scalar>1.10</power_scalar>
         <qualifying_skill>0.96</qualifying_skill>
         <race_skill>0.98</race_skill>
         <stamina>0.9</stamina>
         <tyre_management>0.85</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
         <wet_skill>0.27</wet_skill>
     </driver>
     <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -348,12 +363,15 @@
         <consistency>0.98</consistency>
         <country>BRA</country>
         <defending>0.92</defending>
+        <drag_scalar>0.95</drag_scalar>
         <fuel_management>0.92</fuel_management>
         <name>Nelson Piquet</name>
+        <power_scalar>1.10</power_scalar>
         <qualifying_skill>0.94</qualifying_skill>
         <race_skill>0.98</race_skill>
         <stamina>0.97</stamina>
         <tyre_management>0.99</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
         <wet_skill>0.27</wet_skill>
     </driver>
     <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -415,12 +433,15 @@
         <consistency>0.87</consistency>
         <country>ITA</country>
         <defending>0.8</defending>
+        <drag_scalar>0.90</drag_scalar>
         <fuel_management>0.72</fuel_management>
         <name>Riccardo Patrese</name>
+        <power_scalar>0.98</power_scalar>
         <qualifying_skill>0.8</qualifying_skill>
         <race_skill>0.81</race_skill>
         <stamina>0.9</stamina>
         <tyre_management>0.7</tyre_management>
+        <weight_scalar>0.99</weight_scalar>
         <wet_skill>0.23</wet_skill>
     </driver>
     <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -486,12 +507,15 @@
         <consistency>0.83</consistency>
         <country>ITA</country>
         <defending>0.76</defending>
+        <drag_scalar>0.90</drag_scalar>
         <fuel_management>0.7</fuel_management>
         <name>Elio De Angelis</name>
+        <power_scalar>0.98</power_scalar>
         <qualifying_skill>0.71</qualifying_skill>
         <race_skill>0.79</race_skill>
         <stamina>0.8</stamina>
         <tyre_management>0.67</tyre_management>
+        <weight_scalar>0.99</weight_scalar>
         <wet_skill>0.5</wet_skill>
     </driver>
     <driver livery_name="1986 Brabham #8 - E. De Angelis" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -517,12 +541,15 @@
         <consistency>0.84</consistency>
         <country>ITA</country>
         <defending>0.47</defending>
+        <drag_scalar>1.05</drag_scalar>
         <fuel_management>0.78</fuel_management>
         <name>Michele Alboreto</name>
+        <power_scalar>1.04</power_scalar>
         <qualifying_skill>0.81</qualifying_skill>
         <race_skill>0.89</race_skill>
         <stamina>0.87</stamina>
         <tyre_management>0.73</tyre_management>
+        <weight_scalar>1.00</weight_scalar>
         <wet_skill>0.5</wet_skill>
     </driver>
     <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -588,12 +615,15 @@
         <consistency>0.89</consistency>
         <country>SWE</country>
         <defending>0.52</defending>
+        <drag_scalar>1.05</drag_scalar>
         <fuel_management>0.78</fuel_management>
         <name>Stefan Johansson</name>
+        <power_scalar>1.04</power_scalar>
         <qualifying_skill>0.79</qualifying_skill>
         <race_skill>0.89</race_skill>
         <stamina>0.9</stamina>
         <tyre_management>0.75</tyre_management>
+        <weight_scalar>1.00</weight_scalar>
         <wet_skill>0.21</wet_skill>
     </driver>
     <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -661,12 +691,15 @@
         <consistency>0.72</consistency>
         <country>GBR</country>
         <defending>0.25</defending>
+        <drag_scalar>0.96</drag_scalar>
         <fuel_management>0.4</fuel_management>
         <name>Johnny Dumfries</name>
+        <power_scalar>1.06</power_scalar>
         <qualifying_skill>0.74</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.72</stamina>
         <tyre_management>0.46</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
         <wet_skill>0.5</wet_skill>
     </driver>
     <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -730,12 +763,15 @@
         <consistency>0.91</consistency>
         <country>BRA</country>
         <defending>0.93</defending>
+        <drag_scalar>0.96</drag_scalar>
         <fuel_management>0.81</fuel_management>
         <name>Ayrton Senna</name>
+        <power_scalar>1.06</power_scalar>
         <qualifying_skill>0.98</qualifying_skill>
         <race_skill>0.96</race_skill>
         <stamina>0.9</stamina>
         <tyre_management>0.87</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
         <wet_skill>0.92</wet_skill>
     </driver>
     <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -797,12 +833,15 @@
         <consistency>0.7</consistency>
         <country>GBR</country>
         <defending>0.2</defending>
+        <drag_scalar>1.08</drag_scalar>
         <fuel_management>0.41</fuel_management>
         <name>Jonathan Palmer</name>
+        <power_scalar>0.93</power_scalar>
         <qualifying_skill>0.68</qualifying_skill>
         <race_skill>0.7</race_skill>
         <stamina>0.7</stamina>
         <tyre_management>0.4</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
         <wet_skill>0.19</wet_skill>
     </driver>
     <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -866,12 +905,15 @@
         <consistency>0.66</consistency>
         <country>NLD</country>
         <defending>0.14</defending>
+        <drag_scalar>1.08</drag_scalar>
         <fuel_management>0.32</fuel_management>
         <name>Huub Rothengatter</name>
+        <power_scalar>0.93</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.7</race_skill>
         <stamina>0.68</stamina>
         <tyre_management>0.3</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
         <wet_skill>0.17</wet_skill>
     </driver>
     <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Imola_GP_1988,Imola_GP_2001">
@@ -925,12 +967,15 @@
         <consistency>0.77</consistency>
         <country>AUS</country>
         <defending>0.16</defending>
+        <drag_scalar>1.03</drag_scalar>
         <fuel_management>0.55</fuel_management>
         <name>Alan Jones</name>
+        <power_scalar>0.96</power_scalar>
         <qualifying_skill>0.71</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.78</stamina>
         <tyre_management>0.53</tyre_management>
+        <weight_scalar>1.02</weight_scalar>
         <wet_skill>0.13</wet_skill>
     </driver>
     <driver livery_name="1986 Lola #15 - A. Jones" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -998,12 +1043,15 @@
         <consistency>0.78</consistency>
         <country>FRA</country>
         <defending>0.07</defending>
+        <drag_scalar>1.03</drag_scalar>
         <fuel_management>0.55</fuel_management>
         <name>Patrick Tambay</name>
+        <power_scalar>0.96</power_scalar>
         <qualifying_skill>0.77</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.79</stamina>
         <tyre_management>0.51</tyre_management>
+        <weight_scalar>1.02</weight_scalar>
         <wet_skill>0.19</wet_skill>
     </driver>
     <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1071,12 +1119,15 @@
         <consistency>0.78</consistency>
         <country>CHE</country>
         <defending>0.2</defending>
+        <drag_scalar>1.02</drag_scalar>
         <fuel_management>0.56</fuel_management>
         <name>Marc Surer</name>
+        <power_scalar>1.01</power_scalar>
         <qualifying_skill>0.7</qualifying_skill>
         <race_skill>0.76</race_skill>
         <stamina>0.79</stamina>
         <tyre_management>0.59</tyre_management>
+        <weight_scalar>1.01</weight_scalar>
         <wet_skill>0.27</wet_skill>
     </driver>
     <driver livery_name="1986 Arrows #17 - M. Surer" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1106,12 +1157,15 @@
         <consistency>0.82</consistency>
         <country>BEL</country>
         <defending>0.65</defending>
+        <drag_scalar>1.02</drag_scalar>
         <fuel_management>0.67</fuel_management>
         <name>Thierry Boutsen</name>
+        <power_scalar>1.01</power_scalar>
         <qualifying_skill>0.71</qualifying_skill>
         <race_skill>0.78</race_skill>
         <stamina>0.85</stamina>
         <tyre_management>0.67</tyre_management>
+        <weight_scalar>1.01</weight_scalar>
         <wet_skill>0.53</wet_skill>
     </driver>
     <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1173,12 +1227,15 @@
         <consistency>0.84</consistency>
         <country>ITA</country>
         <defending>0.45</defending>
+        <drag_scalar>0.99</drag_scalar>
         <fuel_management>0.68</fuel_management>
         <name>Teo Fabi</name>
+        <power_scalar>1.08</power_scalar>
         <qualifying_skill>0.83</qualifying_skill>
         <race_skill>0.79</race_skill>
         <stamina>0.83</stamina>
         <tyre_management>0.67</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
         <wet_skill>0.28</wet_skill>
     </driver>
     <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1244,12 +1301,15 @@
         <consistency>0.86</consistency>
         <country>AUT</country>
         <defending>0.82</defending>
+        <drag_scalar>0.99</drag_scalar>
         <fuel_management>0.72</fuel_management>
         <name>Gerhard Berger</name>
+        <power_scalar>1.08</power_scalar>
         <qualifying_skill>0.88</qualifying_skill>
         <race_skill>0.83</race_skill>
         <stamina>0.87</stamina>
         <tyre_management>0.71</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
         <wet_skill>0.54</wet_skill>
     </driver>
     <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1313,12 +1373,15 @@
         <consistency>0.7</consistency>
         <country>ITA</country>
         <defending>0.27</defending>
+        <drag_scalar>1.09</drag_scalar>
         <fuel_management>0.37</fuel_management>
         <name>Piercarlo Ghinzani</name>
+        <power_scalar>0.91</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.66</race_skill>
         <stamina>0.66</stamina>
         <tyre_management>0.3</tyre_management>
+        <weight_scalar>1.05</weight_scalar>
         <wet_skill>0.17</wet_skill>
     </driver>
     <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1384,12 +1447,15 @@
         <consistency>0.65</consistency>
         <country>DEU</country>
         <defending>0.19</defending>
+        <drag_scalar>1.09</drag_scalar>
         <fuel_management>0.38</fuel_management>
         <name>Christian Danner</name>
+        <power_scalar>0.91</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.62</race_skill>
         <stamina>0.68</stamina>
         <tyre_management>0.39</tyre_management>
+        <weight_scalar>1.05</weight_scalar>
         <wet_skill>0.12</wet_skill>
     </driver>
     <driver livery_name="1986 Osella #22 - C. Danner" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1423,12 +1489,15 @@
         <consistency>0.72</consistency>
         <country>ITA</country>
         <defending>0.51</defending>
+        <drag_scalar>1.07</drag_scalar>
         <fuel_management>0.48</fuel_management>
         <name>Andre De Cesaris</name>
+        <power_scalar>0.92</power_scalar>
         <qualifying_skill>0.67</qualifying_skill>
         <race_skill>0.67</race_skill>
         <stamina>0.74</stamina>
         <tyre_management>0.5</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
         <wet_skill>0.28</wet_skill>
     </driver>
     <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1492,12 +1561,15 @@
         <consistency>0.71</consistency>
         <country>ITA</country>
         <defending>0.41</defending>
+        <drag_scalar>1.07</drag_scalar>
         <fuel_management>0.45</fuel_management>
         <name>Alessandro Nannini</name>
+        <power_scalar>0.92</power_scalar>
         <qualifying_skill>0.67</qualifying_skill>
         <race_skill>0.67</race_skill>
         <stamina>0.74</stamina>
         <tyre_management>0.41</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
         <wet_skill>0.27</wet_skill>
     </driver>
     <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1565,12 +1637,15 @@
         <consistency>0.88</consistency>
         <country>FRA</country>
         <defending>0.85</defending>
+        <drag_scalar>1.00</drag_scalar>
         <fuel_management>0.76</fuel_management>
         <name>René Arnoux</name>
+        <power_scalar>1.00</power_scalar>
         <qualifying_skill>0.85</qualifying_skill>
         <race_skill>0.85</race_skill>
         <stamina>0.87</stamina>
         <tyre_management>0.75</tyre_management>
+        <weight_scalar>1.01</weight_scalar>
         <wet_skill>0.6</wet_skill>
     </driver>
     <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1632,12 +1707,15 @@
         <consistency>0.87</consistency>
         <country>FRA</country>
         <defending>0.5</defending>
+        <drag_scalar>1.00</drag_scalar>
         <fuel_management>0.71</fuel_management>
         <name>Jacques Laffite</name>
+        <power_scalar>1.00</power_scalar>
         <qualifying_skill>0.8</qualifying_skill>
         <race_skill>0.88</race_skill>
         <stamina>0.85</stamina>
         <tyre_management>0.76</tyre_management>
+        <weight_scalar>1.01</weight_scalar>
         <wet_skill>0.28</wet_skill>
     </driver>
     <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="Jacarepagua_Historic,Jacarepagua_2005">
@@ -1677,12 +1755,15 @@
         <consistency>0.68</consistency>
         <country>ITA</country>
         <defending>0.42</defending>
+        <drag_scalar>1.10</drag_scalar>
         <fuel_management>0.37</fuel_management>
         <name>Ivan Capelli</name>
+        <power_scalar>0.90</power_scalar>
         <qualifying_skill>0.61</qualifying_skill>
         <race_skill>0.61</race_skill>
         <stamina>0.67</stamina>
         <tyre_management>0.30</tyre_management>
+        <weight_scalar>1.05</weight_scalar>
         <wet_skill>0.11</wet_skill>
     </driver>
     <driver livery_name="1986 AGS #31 - I. Capelli" tracks="Monza_1991">
@@ -1700,12 +1781,15 @@
         <consistency>0.81</consistency>
         <country>GBR</country>
         <defending>0.40</defending>
+        <drag_scalar>0.90</drag_scalar>
         <fuel_management>0.61</fuel_management>
         <name>Derek Warwick</name>
+        <power_scalar>0.98</power_scalar>
         <qualifying_skill>0.76</qualifying_skill>
         <race_skill>0.78</race_skill>
         <stamina>0.82</stamina>
         <tyre_management>0.65</tyre_management>
+        <weight_scalar>0.99</weight_scalar>
         <wet_skill>0.27</wet_skill>
     </driver>
     <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="Montreal_Historic,Montreal_Historic_1991">
@@ -1749,12 +1833,15 @@
         <consistency>0.75</consistency>
         <country>FRA</country>
         <defending>0.17</defending>
+        <drag_scalar>1.00</drag_scalar>
         <fuel_management>0.58</fuel_management>
         <name>Philippe Alliot</name>
+        <power_scalar>1.00</power_scalar>
         <qualifying_skill>0.79</qualifying_skill>
         <race_skill>0.75</race_skill>
         <stamina>0.80</stamina>
         <tyre_management>0.50</tyre_management>
+        <weight_scalar>1.01</weight_scalar>
         <wet_skill>0.24</wet_skill>
     </driver>
     <driver livery_name="1986 Ligier #26 - P. Alliot" tracks="Hockenheim_1988,Hockenheim_2001">
@@ -1788,12 +1875,15 @@
         <consistency>0.75</consistency>
         <country>DEU</country>
         <defending>0.33</defending>
+        <drag_scalar>1.02</drag_scalar>
         <fuel_management>0.60</fuel_management>
         <name>Christian Danner</name>
+        <power_scalar>1.01</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.79</race_skill>
         <stamina>0.76</stamina>
         <tyre_management>0.52</tyre_management>
+        <weight_scalar>1.01</weight_scalar>
         <wet_skill>0.18</wet_skill>
     </driver>
     <driver livery_name="1986 Arrows #17 - C. Danner" tracks="BrandsHatch_GP">
@@ -1833,12 +1923,15 @@
         <consistency>0.67</consistency>
         <country>CAN</country>
         <defending>0.06</defending>
+        <drag_scalar>1.09</drag_scalar>
         <fuel_management>0.30</fuel_management>
         <name>Allan Berg</name>
+        <power_scalar>0.91</power_scalar>
         <qualifying_skill>0.6</qualifying_skill>
         <race_skill>0.67</race_skill>
         <stamina>0.69</stamina>
         <tyre_management>0.32</tyre_management>
+        <weight_scalar>1.05</weight_scalar>
         <wet_skill>0.5</wet_skill>
     </driver>
     <driver livery_name="1986 Osella #22 - A. Berg" tracks="BrandsHatch_GP">
@@ -1870,12 +1963,15 @@
         <consistency>0.76</consistency>
         <country>USA</country>
         <defending>0.47</defending>
+        <drag_scalar>1.03</drag_scalar>
         <fuel_management>0.59</fuel_management>
         <name>Eddie Cheever</name>
+        <power_scalar>0.96</power_scalar>
         <qualifying_skill>0.73</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.76</stamina>
         <tyre_management>0.50</tyre_management>
+        <weight_scalar>1.02</weight_scalar>
         <wet_skill>0.15</wet_skill>
     </driver>
 </custom_ai_drivers>
