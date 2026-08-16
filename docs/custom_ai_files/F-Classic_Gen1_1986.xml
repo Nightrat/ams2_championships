@@ -1,0 +1,1881 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<custom_ai_drivers>
+    <driver livery_name="1986 McLaren #1 - A. Prost">
+        <aggression>0.43</aggression>
+        <avoidance_of_forced_mistakes>0.82</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.82</avoidance_of_mistakes>
+        <consistency>0.96</consistency>
+        <country>FRA</country>
+        <defending>0.7</defending>
+        <fuel_management>0.94</fuel_management>
+        <name>Alain Prost</name>
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.96</race_skill>
+        <stamina>0.98</stamina>
+        <tyre_management>0.9</tyre_management>
+        <wet_skill>0.5</wet_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.87</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.91</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.94</qualifying_skill>
+        <race_skill>0.99</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Azure_Circuit_2021">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.96</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="HUNGARORING">
+        <qualifying_skill>0.97</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.99</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Monza_1991">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.98</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #1 - A. Prost" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg">
+        <aggression>0.93</aggression>
+        <avoidance_of_forced_mistakes>0.33</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.33</avoidance_of_mistakes>
+        <consistency>0.86</consistency>
+        <country>FIN</country>
+        <defending>0.94</defending>
+        <fuel_management>0.8</fuel_management>
+        <name>Keke Rosberg</name>
+        <qualifying_skill>0.9</qualifying_skill>
+        <race_skill>0.9</race_skill>
+        <stamina>0.86</stamina>
+        <tyre_management>0.73</tyre_management>
+        <wet_skill>0.56</wet_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.87</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.97</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.90</qualifying_skill>
+        <race_skill>0.91</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.88</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="HUNGARORING">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.98</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Monza_1991">
+        <qualifying_skill>0.90</qualifying_skill>
+        <race_skill>0.91</race_skill>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.87</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 McLaren #2 - K. Rosberg" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.82</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle">
+        <aggression>0.43</aggression>
+        <avoidance_of_forced_mistakes>0.68</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.68</avoidance_of_mistakes>
+        <consistency>0.82</consistency>
+        <country>GBR</country>
+        <defending>0.42</defending>
+        <fuel_management>0.67</fuel_management>
+        <name>Martin Brundle</name>
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.8</race_skill>
+        <stamina>0.82</stamina>
+        <tyre_management>0.6</tyre_management>
+        <wet_skill>0.68</wet_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.76</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.80</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.78</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.75</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.76</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="HUNGARORING">
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.72</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Monza_1991">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.71</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #3 - M. Brundle" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.70</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff">
+        <aggression>0.44</aggression>
+        <avoidance_of_forced_mistakes>0.4</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.4</avoidance_of_mistakes>
+        <consistency>0.78</consistency>
+        <country>FRA</country>
+        <defending>0.86</defending>
+        <fuel_management>0.58</fuel_management>
+        <name>Philippe Streiff</name>
+        <qualifying_skill>0.7</qualifying_skill>
+        <race_skill>0.77</race_skill>
+        <stamina>0.79</stamina>
+        <tyre_management>0.55</tyre_management>
+        <wet_skill>0.24</wet_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.70</qualifying_skill>
+        <race_skill>0.78</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.73</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.70</qualifying_skill>
+        <race_skill>0.72</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.70</qualifying_skill>
+        <race_skill>0.80</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="HUNGARORING">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Monza_1991">
+        <qualifying_skill>0.64</qualifying_skill>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Tyrrell #4 - P. Streiff" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.76</qualifying_skill>
+        <race_skill>0.87</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell">
+        <aggression>0.99</aggression>
+        <avoidance_of_forced_mistakes>0.54</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.54</avoidance_of_mistakes>
+        <consistency>0.93</consistency>
+        <country>GBR</country>
+        <defending>0.8</defending>
+        <fuel_management>0.88</fuel_management>
+        <name>Nigel Mansell</name>
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.9</stamina>
+        <tyre_management>0.85</tyre_management>
+        <wet_skill>0.27</wet_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.95</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.96</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.94</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.99</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="HUNGARORING">
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.93</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Monza_1991">
+        <qualifying_skill>0.94</qualifying_skill>
+        <race_skill>0.97</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.94</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #5 - N. Mansell" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>1.00</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet">
+        <aggression>0.35</aggression>
+        <avoidance_of_forced_mistakes>0.88</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.88</avoidance_of_mistakes>
+        <consistency>0.98</consistency>
+        <country>BRA</country>
+        <defending>0.92</defending>
+        <fuel_management>0.92</fuel_management>
+        <name>Nelson Piquet</name>
+        <qualifying_skill>0.94</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.97</stamina>
+        <tyre_management>0.99</tyre_management>
+        <wet_skill>0.27</wet_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.96</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.97</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.77</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>1.00</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.95</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="BrandsHatch_GP">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.97</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.99</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="HUNGARORING">
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.92</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Monza_1991">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>1.00</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.96</race_skill>
+    </driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.97</race_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese">
+        <aggression>0.88</aggression>
+        <avoidance_of_forced_mistakes>0.67</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.67</avoidance_of_mistakes>
+        <consistency>0.87</consistency>
+        <country>ITA</country>
+        <defending>0.8</defending>
+        <fuel_management>0.72</fuel_management>
+        <name>Riccardo Patrese</name>
+        <qualifying_skill>0.8</qualifying_skill>
+        <race_skill>0.81</race_skill>
+        <stamina>0.9</stamina>
+        <tyre_management>0.7</tyre_management>
+        <wet_skill>0.23</wet_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.81</race_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.87</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.77</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.83</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.70</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="HUNGARORING">
+        <qualifying_skill>0.75</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Monza_1991">
+        <qualifying_skill>0.83</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - E. De Angelis">
+        <aggression>0.75</aggression>
+        <avoidance_of_forced_mistakes>0.82</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.82</avoidance_of_mistakes>
+        <consistency>0.83</consistency>
+        <country>ITA</country>
+        <defending>0.76</defending>
+        <fuel_management>0.7</fuel_management>
+        <name>Elio De Angelis</name>
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.79</race_skill>
+        <stamina>0.8</stamina>
+        <tyre_management>0.67</tyre_management>
+        <wet_skill>0.5</wet_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - E. De Angelis" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.79</race_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - E. De Angelis" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.73</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - E. De Angelis" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - E. De Angelis" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto">
+        <aggression>0.51</aggression>
+        <avoidance_of_forced_mistakes>0.54</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.54</avoidance_of_mistakes>
+        <consistency>0.84</consistency>
+        <country>ITA</country>
+        <defending>0.47</defending>
+        <fuel_management>0.78</fuel_management>
+        <name>Michele Alboreto</name>
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.89</race_skill>
+        <stamina>0.87</stamina>
+        <tyre_management>0.73</tyre_management>
+        <wet_skill>0.5</wet_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.94</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.86</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.77</qualifying_skill>
+        <race_skill>0.81</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.83</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="HUNGARORING">
+        <qualifying_skill>0.74</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.86</qualifying_skill>
+        <race_skill>0.93</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Monza_1991">
+        <qualifying_skill>0.88</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.75</qualifying_skill>
+        <race_skill>0.90</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #27 - M. Alboreto" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.76</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson">
+        <aggression>0.67</aggression>
+        <avoidance_of_forced_mistakes>0.5</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.5</avoidance_of_mistakes>
+        <consistency>0.89</consistency>
+        <country>SWE</country>
+        <defending>0.52</defending>
+        <fuel_management>0.78</fuel_management>
+        <name>Stefan Johansson</name>
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.89</race_skill>
+        <stamina>0.9</stamina>
+        <tyre_management>0.75</tyre_management>
+        <wet_skill>0.21</wet_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.89</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.77</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.77</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.95</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.71</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.83</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="HUNGARORING">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.91</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Monza_1991">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.80</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1986 Ferrari #28 - S. Johansson" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.93</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries">
+        <aggression>0.07</aggression>
+        <avoidance_of_forced_mistakes>0.23</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.23</avoidance_of_mistakes>
+        <consistency>0.72</consistency>
+        <country>GBR</country>
+        <defending>0.25</defending>
+        <fuel_management>0.4</fuel_management>
+        <name>Johnny Dumfries</name>
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.8</race_skill>
+        <stamina>0.72</stamina>
+        <tyre_management>0.46</tyre_management>
+        <wet_skill>0.5</wet_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.80</qualifying_skill>
+        <race_skill>0.77</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.79</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.77</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.72</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.75</qualifying_skill>
+        <race_skill>0.77</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.80</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="HUNGARORING">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Monza_1991">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.81</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.84</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna">
+        <aggression>0.97</aggression>
+        <avoidance_of_forced_mistakes>0.5</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.5</avoidance_of_mistakes>
+        <consistency>0.91</consistency>
+        <country>BRA</country>
+        <defending>0.93</defending>
+        <fuel_management>0.81</fuel_management>
+        <name>Ayrton Senna</name>
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.96</race_skill>
+        <stamina>0.9</stamina>
+        <tyre_management>0.87</tyre_management>
+        <wet_skill>0.92</wet_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.96</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.98</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>1.00</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.95</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.97</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.96</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.95</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="HUNGARORING">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.97</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.88</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Monza_1991">
+        <qualifying_skill>0.94</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>1.00</qualifying_skill>
+        <race_skill>0.93</race_skill>
+    </driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer">
+        <aggression>0.59</aggression>
+        <avoidance_of_forced_mistakes>0.32</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.32</avoidance_of_mistakes>
+        <consistency>0.7</consistency>
+        <country>GBR</country>
+        <defending>0.2</defending>
+        <fuel_management>0.41</fuel_management>
+        <name>Jonathan Palmer</name>
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.7</race_skill>
+        <stamina>0.7</stamina>
+        <tyre_management>0.4</tyre_management>
+        <wet_skill>0.19</wet_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.71</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.73</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.69</qualifying_skill>
+        <race_skill>0.71</race_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.65</qualifying_skill>
+        <race_skill>0.68</race_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="HUNGARORING">
+        <qualifying_skill>0.63</qualifying_skill>
+        <race_skill>0.70</race_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Monza_1991">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #14 - J. Palmer" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter">
+        <aggression>0.1</aggression>
+        <avoidance_of_forced_mistakes>0.4</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.4</avoidance_of_mistakes>
+        <consistency>0.66</consistency>
+        <country>NLD</country>
+        <defending>0.14</defending>
+        <fuel_management>0.32</fuel_management>
+        <name>Huub Rothengatter</name>
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.7</race_skill>
+        <stamina>0.68</stamina>
+        <tyre_management>0.3</tyre_management>
+        <wet_skill>0.17</wet_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.61</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.63</qualifying_skill>
+        <race_skill>0.71</race_skill>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.61</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="HUNGARORING">
+        <qualifying_skill>0.61</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Monza_1991">
+        <qualifying_skill>0.63</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.63</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Zakspeed #29 - H. Rothengatter" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones">
+        <aggression>0.66</aggression>
+        <avoidance_of_forced_mistakes>0.31</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.31</avoidance_of_mistakes>
+        <consistency>0.77</consistency>
+        <country>AUS</country>
+        <defending>0.16</defending>
+        <fuel_management>0.55</fuel_management>
+        <name>Alan Jones</name>
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.8</race_skill>
+        <stamina>0.78</stamina>
+        <tyre_management>0.53</tyre_management>
+        <wet_skill>0.13</wet_skill>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.71</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.73</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.70</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.76</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.77</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="HUNGARORING">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Monza_1991">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.68</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Lola #15 - A. Jones" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay">
+        <aggression>0.4</aggression>
+        <avoidance_of_forced_mistakes>0.67</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.67</avoidance_of_mistakes>
+        <consistency>0.78</consistency>
+        <country>FRA</country>
+        <defending>0.07</defending>
+        <fuel_management>0.55</fuel_management>
+        <name>Patrick Tambay</name>
+        <qualifying_skill>0.77</qualifying_skill>
+        <race_skill>0.8</race_skill>
+        <stamina>0.79</stamina>
+        <tyre_management>0.51</tyre_management>
+        <wet_skill>0.19</wet_skill>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.76</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.71</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.81</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.86</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.70</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.80</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="HUNGARORING">
+        <qualifying_skill>0.83</qualifying_skill>
+        <race_skill>0.81</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Monza_1991">
+        <qualifying_skill>0.72</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.72</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #16 - P. Tambay" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.70</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - M. Surer">
+        <aggression>0.57</aggression>
+        <avoidance_of_forced_mistakes>0.36</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.36</avoidance_of_mistakes>
+        <consistency>0.78</consistency>
+        <country>CHE</country>
+        <defending>0.2</defending>
+        <fuel_management>0.56</fuel_management>
+        <name>Marc Surer</name>
+        <qualifying_skill>0.7</qualifying_skill>
+        <race_skill>0.76</race_skill>
+        <stamina>0.79</stamina>
+        <tyre_management>0.59</tyre_management>
+        <wet_skill>0.27</wet_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - M. Surer" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - M. Surer" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - M. Surer" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.80</qualifying_skill>
+        <race_skill>0.71</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - M. Surer" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.78</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - M. Surer" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.64</qualifying_skill>
+        <race_skill>0.78</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen">
+        <aggression>0.77</aggression>
+        <avoidance_of_forced_mistakes>0.46</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.46</avoidance_of_mistakes>
+        <consistency>0.82</consistency>
+        <country>BEL</country>
+        <defending>0.65</defending>
+        <fuel_management>0.67</fuel_management>
+        <name>Thierry Boutsen</name>
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.78</race_skill>
+        <stamina>0.85</stamina>
+        <tyre_management>0.67</tyre_management>
+        <wet_skill>0.53</wet_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.83</qualifying_skill>
+        <race_skill>0.77</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.80</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.77</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.76</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.72</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="HUNGARORING">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Monza_1991">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.79</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.78</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #18 - T. Boutsen" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi">
+        <aggression>0.48</aggression>
+        <avoidance_of_forced_mistakes>0.45</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.45</avoidance_of_mistakes>
+        <consistency>0.84</consistency>
+        <country>ITA</country>
+        <defending>0.45</defending>
+        <fuel_management>0.68</fuel_management>
+        <name>Teo Fabi</name>
+        <qualifying_skill>0.83</qualifying_skill>
+        <race_skill>0.79</race_skill>
+        <stamina>0.83</stamina>
+        <tyre_management>0.67</tyre_management>
+        <wet_skill>0.28</wet_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.80</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.86</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.73</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.85</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="HUNGARORING">
+        <qualifying_skill>0.76</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>1.00</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Monza_1991">
+        <qualifying_skill>1.00</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #19 - T. Fabi" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.71</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger">
+        <aggression>0.87</aggression>
+        <avoidance_of_forced_mistakes>0.56</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.56</avoidance_of_mistakes>
+        <consistency>0.86</consistency>
+        <country>AUT</country>
+        <defending>0.82</defending>
+        <fuel_management>0.72</fuel_management>
+        <name>Gerhard Berger</name>
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.83</race_skill>
+        <stamina>0.87</stamina>
+        <tyre_management>0.71</tyre_management>
+        <wet_skill>0.54</wet_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.83</qualifying_skill>
+        <race_skill>0.80</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.86</qualifying_skill>
+        <race_skill>0.93</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.88</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.78</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.80</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="HUNGARORING">
+        <qualifying_skill>0.77</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Monza_1991">
+        <qualifying_skill>0.94</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.92</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Benetton #20 - G. Berger" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani">
+        <aggression>0.1</aggression>
+        <avoidance_of_forced_mistakes>0.28</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.28</avoidance_of_mistakes>
+        <consistency>0.7</consistency>
+        <country>ITA</country>
+        <defending>0.27</defending>
+        <fuel_management>0.37</fuel_management>
+        <name>Piercarlo Ghinzani</name>
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.66</race_skill>
+        <stamina>0.66</stamina>
+        <tyre_management>0.3</tyre_management>
+        <wet_skill>0.17</wet_skill>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.63</qualifying_skill>
+        <race_skill>0.64</race_skill>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.61</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.61</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.60</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="HUNGARORING">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.61</qualifying_skill>
+        <race_skill>0.67</race_skill>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Monza_1991">
+        <qualifying_skill>0.60</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - C. Danner">
+        <aggression>0.29</aggression>
+        <avoidance_of_forced_mistakes>0.27</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.27</avoidance_of_mistakes>
+        <consistency>0.65</consistency>
+        <country>DEU</country>
+        <defending>0.19</defending>
+        <fuel_management>0.38</fuel_management>
+        <name>Christian Danner</name>
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.62</race_skill>
+        <stamina>0.68</stamina>
+        <tyre_management>0.39</tyre_management>
+        <wet_skill>0.12</wet_skill>
+    </driver>
+    <driver livery_name="1986 Osella #22 - C. Danner" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.63</qualifying_skill>
+        <race_skill>0.58</race_skill>
+    </driver>
+    <driver livery_name="1986 Osella #22 - C. Danner" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - C. Danner" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - C. Danner" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - C. Danner" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.60</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - C. Danner" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.60</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris">
+        <aggression>0.83</aggression>
+        <avoidance_of_forced_mistakes>0.31</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.31</avoidance_of_mistakes>
+        <consistency>0.72</consistency>
+        <country>ITA</country>
+        <defending>0.51</defending>
+        <fuel_management>0.48</fuel_management>
+        <name>Andre De Cesaris</name>
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.67</race_skill>
+        <stamina>0.74</stamina>
+        <tyre_management>0.5</tyre_management>
+        <wet_skill>0.28</wet_skill>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.73</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.63</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.64</race_skill>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="HUNGARORING">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Monza_1991">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.68</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Minardi #23 - A. De Cesaris" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini">
+        <aggression>0.85</aggression>
+        <avoidance_of_forced_mistakes>0.64</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.64</avoidance_of_mistakes>
+        <consistency>0.71</consistency>
+        <country>ITA</country>
+        <defending>0.41</defending>
+        <fuel_management>0.45</fuel_management>
+        <name>Alessandro Nannini</name>
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.67</race_skill>
+        <stamina>0.74</stamina>
+        <tyre_management>0.41</tyre_management>
+        <wet_skill>0.27</wet_skill>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.77</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.65</qualifying_skill>
+        <race_skill>0.57</race_skill>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.63</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="HUNGARORING">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.69</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Monza_1991">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Minardi #24 - A. Nannini" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.70</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux">
+        <aggression>0.73</aggression>
+        <avoidance_of_forced_mistakes>0.61</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.61</avoidance_of_mistakes>
+        <consistency>0.88</consistency>
+        <country>FRA</country>
+        <defending>0.85</defending>
+        <fuel_management>0.76</fuel_management>
+        <name>René Arnoux</name>
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.85</race_skill>
+        <stamina>0.87</stamina>
+        <tyre_management>0.75</tyre_management>
+        <wet_skill>0.6</wet_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.86</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.75</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.80</qualifying_skill>
+        <race_skill>0.87</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.90</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="HUNGARORING">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Monza_1991">
+        <qualifying_skill>0.83</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.78</qualifying_skill>
+        <race_skill>0.84</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #25 - R. Arnoux" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.81</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite">
+        <aggression>0.52</aggression>
+        <avoidance_of_forced_mistakes>0.63</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.63</avoidance_of_mistakes>
+        <consistency>0.87</consistency>
+        <country>FRA</country>
+        <defending>0.5</defending>
+        <fuel_management>0.71</fuel_management>
+        <name>Jacques Laffite</name>
+        <qualifying_skill>0.8</qualifying_skill>
+        <race_skill>0.88</race_skill>
+        <stamina>0.85</stamina>
+        <tyre_management>0.76</tyre_management>
+        <wet_skill>0.28</wet_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="Jacarepagua_Historic,Jacarepagua_2005">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.87</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005">
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.89</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.84</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - J. Laffite" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.67</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 AGS #31 - I. Capelli">
+        <aggression>0.36</aggression>
+        <avoidance_of_forced_mistakes>0.40</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.66</avoidance_of_mistakes>
+        <consistency>0.68</consistency>
+        <country>ITA</country>
+        <defending>0.42</defending>
+        <fuel_management>0.37</fuel_management>
+        <name>Ivan Capelli</name>
+        <qualifying_skill>0.61</qualifying_skill>
+        <race_skill>0.61</race_skill>
+        <stamina>0.67</stamina>
+        <tyre_management>0.30</tyre_management>
+        <wet_skill>0.11</wet_skill>
+    </driver>
+    <driver livery_name="1986 AGS #31 - I. Capelli" tracks="Monza_1991">
+        <qualifying_skill>0.61</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 AGS #31 - I. Capelli" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.63</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick">
+        <aggression>0.40</aggression>
+        <avoidance_of_forced_mistakes>0.40</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <consistency>0.81</consistency>
+        <country>GBR</country>
+        <defending>0.40</defending>
+        <fuel_management>0.61</fuel_management>
+        <name>Derek Warwick</name>
+        <qualifying_skill>0.76</qualifying_skill>
+        <race_skill>0.78</race_skill>
+        <stamina>0.82</stamina>
+        <tyre_management>0.65</tyre_management>
+        <wet_skill>0.27</wet_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="Montreal_Historic,Montreal_Historic_1991">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.76</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.66</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="HUNGARORING">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.85</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="Monza_1991">
+        <qualifying_skill>0.91</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.76</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - P. Alliot">
+        <aggression>0.40</aggression>
+        <avoidance_of_forced_mistakes>0.30</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.62</avoidance_of_mistakes>
+        <consistency>0.75</consistency>
+        <country>FRA</country>
+        <defending>0.17</defending>
+        <fuel_management>0.58</fuel_management>
+        <name>Philippe Alliot</name>
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.75</race_skill>
+        <stamina>0.80</stamina>
+        <tyre_management>0.50</tyre_management>
+        <wet_skill>0.24</wet_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - P. Alliot" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - P. Alliot" tracks="HUNGARORING">
+        <qualifying_skill>0.77</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - P. Alliot" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.83</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - P. Alliot" tracks="Monza_1991">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - P. Alliot" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.77</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Ligier #26 - P. Alliot" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner">
+        <aggression>0.09</aggression>
+        <avoidance_of_forced_mistakes>0.36</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.51</avoidance_of_mistakes>
+        <consistency>0.75</consistency>
+        <country>DEU</country>
+        <defending>0.33</defending>
+        <fuel_management>0.60</fuel_management>
+        <name>Christian Danner</name>
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.79</race_skill>
+        <stamina>0.76</stamina>
+        <tyre_management>0.52</tyre_management>
+        <wet_skill>0.18</wet_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.64</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner" tracks="HUNGARORING">
+        <qualifying_skill>0.66</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner" tracks="Monza_1991">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.77</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner" tracks="Cascais_1988,Cascais_Alternate,Cascais">
+        <qualifying_skill>0.66</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1986 Arrows #17 - C. Danner" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - A. Berg">
+        <aggression>0.06</aggression>
+        <avoidance_of_forced_mistakes>0.24</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.55</avoidance_of_mistakes>
+        <consistency>0.67</consistency>
+        <country>CAN</country>
+        <defending>0.06</defending>
+        <fuel_management>0.30</fuel_management>
+        <name>Allan Berg</name>
+        <qualifying_skill>0.6</qualifying_skill>
+        <race_skill>0.67</race_skill>
+        <stamina>0.69</stamina>
+        <tyre_management>0.32</tyre_management>
+        <wet_skill>0.5</wet_skill>
+    </driver>
+    <driver livery_name="1986 Osella #22 - A. Berg" tracks="BrandsHatch_GP">
+        <qualifying_skill>0.60</qualifying_skill>
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <defending>0.25</defending>
+    </driver>
+    <driver livery_name="1986 Osella #22 - A. Berg" tracks="Hockenheim_1988,Hockenheim_2001">
+        <qualifying_skill>0.60</qualifying_skill>
+        <race_skill>0.67</race_skill>
+    </driver>
+    <driver livery_name="1986 Osella #22 - A. Berg" tracks="HUNGARORING">
+        <qualifying_skill>0.60</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - A. Berg" tracks="Spielberg_Vintage,Spielberg_Historic">
+        <qualifying_skill>0.60</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Osella #22 - A. Berg" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.25</vehicle_reliability>
+    </driver>
+    <driver livery_name="1986 Lola #16 - E. Cheever">
+        <aggression>0.45</aggression>
+        <avoidance_of_forced_mistakes>0.34</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.60</avoidance_of_mistakes>
+        <consistency>0.76</consistency>
+        <country>USA</country>
+        <defending>0.47</defending>
+        <fuel_management>0.59</fuel_management>
+        <name>Eddie Cheever</name>
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.8</race_skill>
+        <stamina>0.76</stamina>
+        <tyre_management>0.50</tyre_management>
+        <wet_skill>0.15</wet_skill>
+    </driver>
+</custom_ai_drivers>
