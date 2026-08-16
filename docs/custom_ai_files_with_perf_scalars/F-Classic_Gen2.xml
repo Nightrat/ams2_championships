@@ -1,0 +1,2872 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<custom_ai_drivers>
+    <driver livery_name="1988 Lotus #1 - N. Piquet">
+        <aggression>0.3</aggression>
+        <avoidance_of_forced_mistakes>0.63</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.63</avoidance_of_mistakes>
+        <blue_flag_conceding>0.38</blue_flag_conceding>
+        <consistency>0.94</consistency>
+        <country>BRA</country>
+        <defending>0.72</defending>
+        <drag_scalar>1.00</drag_scalar>
+        <fuel_management>0.84</fuel_management>
+        <name>Nelson Piquet</name>
+        <power_scalar>1.04</power_scalar>
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.93</race_skill>
+        <stamina>0.92</stamina>
+        <start_reactions>0.9</start_reactions>
+        <tyre_management>0.88</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
+        <vehicle_reliability>0.83</vehicle_reliability>
+        <weather_tyre_changes>0.54</weather_tyre_changes>
+        <wet_skill>0.38</wet_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Jacarepagua_Historic">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Azure_Circuit_2021">
+        <aggression>0.96</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.15</avoidance_of_mistakes>
+        <qualifying_skill>0.85</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <aggression>0.92</aggression>
+        <avoidance_of_forced_mistakes>0.09</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.09</avoidance_of_mistakes>
+        <qualifying_skill>0.95</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="HUNGARORING">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Monza_1991,Monza_2020">
+        <aggression>0.97</aggression>
+        <avoidance_of_forced_mistakes>0.12</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.12</avoidance_of_mistakes>
+        <qualifying_skill>0.92</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.95</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #1 - N. Piquet" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima">
+        <aggression>0.96</aggression>
+        <avoidance_of_forced_mistakes>0.4</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.4</avoidance_of_mistakes>
+        <blue_flag_conceding>0.52</blue_flag_conceding>
+        <consistency>0.87</consistency>
+        <country>JPN</country>
+        <defending>0.58</defending>
+        <drag_scalar>1.00</drag_scalar>
+        <fuel_management>0.75</fuel_management>
+        <name>Satoru Nakajima</name>
+        <power_scalar>1.04</power_scalar>
+        <qualifying_skill>0.83</qualifying_skill>
+        <race_skill>0.86</race_skill>
+        <stamina>0.85</stamina>
+        <start_reactions>0.48</start_reactions>
+        <tyre_management>0.74</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
+        <vehicle_reliability>0.68</vehicle_reliability>
+        <weather_tyre_changes>0.41</weather_tyre_changes>
+        <wet_skill>0.36</wet_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="HUNGARORING">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <aggression>0.96</aggression>
+        <avoidance_of_forced_mistakes>0.12</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.12</avoidance_of_mistakes>
+        <qualifying_skill>0.78</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.08</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.08</avoidance_of_mistakes>
+        <qualifying_skill>0.79</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #2 - S. Nakajima" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.06</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.06</avoidance_of_mistakes>
+        <qualifying_skill>0.82</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer">
+        <aggression>0.36</aggression>
+        <avoidance_of_forced_mistakes>0.39</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.39</avoidance_of_mistakes>
+        <blue_flag_conceding>0.77</blue_flag_conceding>
+        <consistency>0.84</consistency>
+        <country>GBR</country>
+        <defending>0.33</defending>
+        <drag_scalar>1.01</drag_scalar>
+        <fuel_management>0.76</fuel_management>
+        <name>Jonathan Palmer</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.84</race_skill>
+        <stamina>0.86</stamina>
+        <start_reactions>0.49</start_reactions>
+        <tyre_management>0.78</tyre_management>
+        <weight_scalar>0.96</weight_scalar>
+        <vehicle_reliability>0.46</vehicle_reliability>
+        <weather_tyre_changes>0.73</weather_tyre_changes>
+        <wet_skill>0.53</wet_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.65</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="HUNGARORING">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.78</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #3 - J. Palmer" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey">
+        <aggression>0.4</aggression>
+        <avoidance_of_forced_mistakes>0.35</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.35</avoidance_of_mistakes>
+        <blue_flag_conceding>0.76</blue_flag_conceding>
+        <consistency>0.81</consistency>
+        <country>GBR</country>
+        <defending>0.34</defending>
+        <drag_scalar>1.01</drag_scalar>
+        <fuel_management>0.62</fuel_management>
+        <name>Julian Bailey</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.61</qualifying_skill>
+        <race_skill>0.76</race_skill>
+        <stamina>0.8</stamina>
+        <start_reactions>0.21</start_reactions>
+        <tyre_management>0.68</tyre_management>
+        <weight_scalar>0.96</weight_scalar>
+        <vehicle_reliability>0.25</vehicle_reliability>
+        <weather_tyre_changes>0.43</weather_tyre_changes>
+        <wet_skill>0.15</wet_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>0.08</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <aggression>0.99</aggression>
+        <avoidance_of_forced_mistakes>0.17</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.17</avoidance_of_mistakes>
+        <qualifying_skill>0.67</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.65</qualifying_skill>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="HUNGARORING">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1988 Tyrrell #4 - J. Bailey" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell">
+        <aggression>0.7</aggression>
+        <avoidance_of_forced_mistakes>0.47</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.47</avoidance_of_mistakes>
+        <blue_flag_conceding>0.33</blue_flag_conceding>
+        <consistency>0.93</consistency>
+        <country>GBR</country>
+        <defending>0.77</defending>
+        <drag_scalar>0.98</drag_scalar>
+        <fuel_management>0.9</fuel_management>
+        <name>Nigel Mansell</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.9</stamina>
+        <start_reactions>0.81</start_reactions>
+        <tyre_management>0.89</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.21</vehicle_reliability>
+        <weather_tyre_changes>0.71</weather_tyre_changes>
+        <wet_skill>0.77</wet_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.99</qualifying_skill>
+        <vehicle_reliability>0.08</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.85</qualifying_skill>
+        <vehicle_reliability>-0.8</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Azure_Circuit_2021">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.17</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.17</avoidance_of_mistakes>
+        <qualifying_skill>0.95</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <aggression>0.96</aggression>
+        <avoidance_of_forced_mistakes>0.11</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.11</avoidance_of_mistakes>
+        <qualifying_skill>0.85</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="HUNGARORING">
+        <qualifying_skill>0.99</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.19</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.19</avoidance_of_mistakes>
+        <qualifying_skill>0.93</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <consistency>0.95</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Kansai_GP,Kansai_Classic">
+        <aggression>0.99</aggression>
+        <avoidance_of_forced_mistakes>0.11</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.11</avoidance_of_mistakes>
+        <qualifying_skill>0.91</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - N. Mansell" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.12</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.12</avoidance_of_mistakes>
+        <qualifying_skill>0.97</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese">
+        <aggression>0.5</aggression>
+        <avoidance_of_forced_mistakes>0.55</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.55</avoidance_of_mistakes>
+        <blue_flag_conceding>0.52</blue_flag_conceding>
+        <consistency>0.85</consistency>
+        <country>ITA</country>
+        <defending>0.58</defending>
+        <drag_scalar>0.98</drag_scalar>
+        <fuel_management>0.76</fuel_management>
+        <name>Riccardo Patrese</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.89</race_skill>
+        <stamina>0.85</stamina>
+        <start_reactions>0.88</start_reactions>
+        <tyre_management>0.75</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.64</vehicle_reliability>
+        <weather_tyre_changes>0.3</weather_tyre_changes>
+        <wet_skill>0.53</wet_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>0.08</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.85</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <aggression>0.92</aggression>
+        <avoidance_of_forced_mistakes>0.05</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.05</avoidance_of_mistakes>
+        <qualifying_skill>0.82</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="HUNGARORING">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.95</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.85</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #6 - R. Patrese" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani">
+        <aggression>0.16</aggression>
+        <avoidance_of_forced_mistakes>0.3</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.3</avoidance_of_mistakes>
+        <blue_flag_conceding>0.95</blue_flag_conceding>
+        <consistency>0.73</consistency>
+        <country>ITA</country>
+        <defending>0.15</defending>
+        <drag_scalar>1.05</drag_scalar>
+        <fuel_management>0.55</fuel_management>
+        <name>Piercarlo Ghinzani</name>
+        <power_scalar>0.94</power_scalar>
+        <qualifying_skill>0.63</qualifying_skill>
+        <race_skill>0.74</race_skill>
+        <stamina>0.72</stamina>
+        <start_reactions>0.24</start_reactions>
+        <tyre_management>0.51</tyre_management>
+        <weight_scalar>1.06</weight_scalar>
+        <vehicle_reliability>0.27</vehicle_reliability>
+        <weather_tyre_changes>0.64</weather_tyre_changes>
+        <wet_skill>0.15</wet_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.6</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="HUNGARORING">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #9 - P. Ghinzani" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>0.01</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider">
+        <aggression>0.14</aggression>
+        <avoidance_of_forced_mistakes>0.32</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.32</avoidance_of_mistakes>
+        <blue_flag_conceding>0.99</blue_flag_conceding>
+        <consistency>0.75</consistency>
+        <country>DEU</country>
+        <defending>0.11</defending>
+        <drag_scalar>1.05</drag_scalar>
+        <fuel_management>0.54</fuel_management>
+        <name>Bernd Schneider</name>
+        <power_scalar>0.94</power_scalar>
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.8</race_skill>
+        <stamina>0.75</stamina>
+        <start_reactions>0.24</start_reactions>
+        <tyre_management>0.55</tyre_management>
+        <weight_scalar>1.06</weight_scalar>
+        <vehicle_reliability>0.2</vehicle_reliability>
+        <weather_tyre_changes>0.83</weather_tyre_changes>
+        <wet_skill>0.14</wet_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.67</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="HUNGARORING">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.79</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.8</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Zakspeed #10 - B. Schneider" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost">
+        <aggression>0.74</aggression>
+        <avoidance_of_forced_mistakes>0.77</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.77</avoidance_of_mistakes>
+        <blue_flag_conceding>0.3</blue_flag_conceding>
+        <consistency>0.98</consistency>
+        <country>FRA</country>
+        <defending>0.8</defending>
+        <drag_scalar>0.90</drag_scalar>
+        <fuel_management>0.92</fuel_management>
+        <name>Alain Prost</name>
+        <power_scalar>1.10</power_scalar>
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.99</race_skill>
+        <stamina>0.98</stamina>
+        <start_reactions>0.9</start_reactions>
+        <tyre_management>0.94</tyre_management>
+        <weight_scalar>1.03</weight_scalar>
+        <vehicle_reliability>0.95</vehicle_reliability>
+        <weather_tyre_changes>0.7</weather_tyre_changes>
+        <wet_skill>0.31</wet_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Jacarepagua_Historic">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Azure_Circuit_2021">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.96</qualifying_skill>
+        <vehicle_reliability>-0.8</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="HUNGARORING">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.99</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <consistency>0.98</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <consistency>0.95</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Kansai_GP,Kansai_Classic">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #11 - A. Prost" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna">
+        <aggression>0.94</aggression>
+        <avoidance_of_forced_mistakes>0.79</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.79</avoidance_of_mistakes>
+        <blue_flag_conceding>0.14</blue_flag_conceding>
+        <consistency>1.0</consistency>
+        <country>BRA</country>
+        <defending>0.96</defending>
+        <drag_scalar>0.90</drag_scalar>
+        <fuel_management>0.98</fuel_management>
+        <name>Ayrton Senna</name>
+        <power_scalar>1.10</power_scalar>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.99</race_skill>
+        <stamina>0.97</stamina>
+        <start_reactions>0.97</start_reactions>
+        <tyre_management>1.0</tyre_management>
+        <weight_scalar>1.03</weight_scalar>
+        <vehicle_reliability>0.82</vehicle_reliability>
+        <weather_tyre_changes>0.54</weather_tyre_changes>
+        <wet_skill>0.93</wet_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Jacarepagua_Historic">
+        <qualifying_skill>1.0</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.97</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Azure_Circuit_2021">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.13</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.13</avoidance_of_mistakes>
+        <qualifying_skill>1.0</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <consistency>0.96</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <consistency>0.99</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="HUNGARORING">
+        <consistency>0.98</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <consistency>0.99</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Monza_1991,Monza_2020">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.14</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.14</avoidance_of_mistakes>
+        <qualifying_skill>1.0</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <consistency>0.96</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Kansai_GP,Kansai_Classic">
+        <consistency>0.97</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #12 - A. Senna" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.97</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff">
+        <aggression>0.31</aggression>
+        <avoidance_of_forced_mistakes>0.33</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.33</avoidance_of_mistakes>
+        <blue_flag_conceding>0.99</blue_flag_conceding>
+        <consistency>0.81</consistency>
+        <country>FRA</country>
+        <defending>0.11</defending>
+        <drag_scalar>1.05</drag_scalar>
+        <fuel_management>0.64</fuel_management>
+        <name>Philippe Streiff</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.76</qualifying_skill>
+        <race_skill>0.84</race_skill>
+        <stamina>0.78</stamina>
+        <start_reactions>0.4</start_reactions>
+        <tyre_management>0.64</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.41</vehicle_reliability>
+        <weather_tyre_changes>0.28</weather_tyre_changes>
+        <wet_skill>0.34</wet_skill>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Jacarepagua_Historic">
+        <aggression>0.96</aggression>
+        <avoidance_of_forced_mistakes>0.16</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.16</avoidance_of_mistakes>
+        <qualifying_skill>0.72</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.88</qualifying_skill>
+        <vehicle_reliability>0.13</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="HUNGARORING">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.69</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.82</qualifying_skill>
+        <vehicle_reliability>0.07</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 AGS #14 - P. Streiff" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin">
+        <aggression>0.51</aggression>
+        <avoidance_of_forced_mistakes>0.62</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.62</avoidance_of_mistakes>
+        <blue_flag_conceding>0.6</blue_flag_conceding>
+        <consistency>0.86</consistency>
+        <country>BRA</country>
+        <defending>0.5</defending>
+        <drag_scalar>0.92</drag_scalar>
+        <fuel_management>0.77</fuel_management>
+        <name>Mauricio Gugelmin</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.83</qualifying_skill>
+        <race_skill>0.87</race_skill>
+        <stamina>0.85</stamina>
+        <start_reactions>0.7</start_reactions>
+        <tyre_management>0.72</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.62</vehicle_reliability>
+        <weather_tyre_changes>0.61</weather_tyre_changes>
+        <wet_skill>0.58</wet_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.82</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="HUNGARORING">
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <aggression>0.93</aggression>
+        <avoidance_of_forced_mistakes>0.07</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.07</avoidance_of_mistakes>
+        <qualifying_skill>0.82</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.95</qualifying_skill>
+        <vehicle_reliability>-0.8</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 March #15 - M. Gugelmin" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.15</avoidance_of_mistakes>
+        <qualifying_skill>0.72</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli">
+        <aggression>0.51</aggression>
+        <avoidance_of_forced_mistakes>0.64</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.64</avoidance_of_mistakes>
+        <blue_flag_conceding>0.52</blue_flag_conceding>
+        <consistency>0.87</consistency>
+        <country>ITA</country>
+        <defending>0.58</defending>
+        <drag_scalar>0.92</drag_scalar>
+        <fuel_management>0.76</fuel_management>
+        <name>Ivan Capelli</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.93</race_skill>
+        <stamina>0.86</stamina>
+        <start_reactions>0.65</start_reactions>
+        <tyre_management>0.79</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.64</vehicle_reliability>
+        <weather_tyre_changes>0.58</weather_tyre_changes>
+        <wet_skill>0.54</wet_skill>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.93</qualifying_skill>
+        <vehicle_reliability>0.03</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="HUNGARORING">
+        <qualifying_skill>0.96</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.93</qualifying_skill>
+        <vehicle_reliability>0.04</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.96</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 March #16 - I. Capelli" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick">
+        <aggression>0.54</aggression>
+        <avoidance_of_forced_mistakes>0.59</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.59</avoidance_of_mistakes>
+        <blue_flag_conceding>0.55</blue_flag_conceding>
+        <consistency>0.79</consistency>
+        <country>GBR</country>
+        <defending>0.55</defending>
+        <drag_scalar>1.00</drag_scalar>
+        <fuel_management>0.67</fuel_management>
+        <name>Derek Warwick</name>
+        <power_scalar>0.99</power_scalar>
+        <qualifying_skill>0.86</qualifying_skill>
+        <race_skill>0.92</race_skill>
+        <stamina>0.82</stamina>
+        <start_reactions>0.63</start_reactions>
+        <tyre_management>0.68</tyre_management>
+        <weight_scalar>1.05</weight_scalar>
+        <vehicle_reliability>0.68</vehicle_reliability>
+        <weather_tyre_changes>0.78</weather_tyre_changes>
+        <wet_skill>0.52</wet_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Jacarepagua_Historic">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Azure_Circuit_2021">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.78</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="HUNGARORING">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Monza_1991,Monza_2020">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.2</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.2</avoidance_of_mistakes>
+        <qualifying_skill>0.75</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Kansai_GP,Kansai_Classic">
+        <aggression>0.94</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.15</avoidance_of_mistakes>
+        <qualifying_skill>0.92</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #17 - D. Warwick" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.92</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever">
+        <aggression>0.53</aggression>
+        <avoidance_of_forced_mistakes>0.7</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.7</avoidance_of_mistakes>
+        <blue_flag_conceding>0.58</blue_flag_conceding>
+        <consistency>0.79</consistency>
+        <country>USA</country>
+        <defending>0.52</defending>
+        <drag_scalar>1.00</drag_scalar>
+        <fuel_management>0.61</fuel_management>
+        <name>Eddie Cheever</name>
+        <power_scalar>0.99</power_scalar>
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.89</race_skill>
+        <stamina>0.8</stamina>
+        <start_reactions>0.69</start_reactions>
+        <tyre_management>0.68</tyre_management>
+        <weight_scalar>1.05</weight_scalar>
+        <vehicle_reliability>0.61</vehicle_reliability>
+        <weather_tyre_changes>0.84</weather_tyre_changes>
+        <wet_skill>0.56</wet_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.8</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="HUNGARORING">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Monza_1991,Monza_2020">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <aggression>0.98</aggression>
+        <avoidance_of_forced_mistakes>0.12</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.12</avoidance_of_mistakes>
+        <qualifying_skill>0.64</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.79</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Arrows #18 - E. Cheever" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini">
+        <aggression>0.77</aggression>
+        <avoidance_of_forced_mistakes>0.65</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.65</avoidance_of_mistakes>
+        <blue_flag_conceding>0.34</blue_flag_conceding>
+        <consistency>0.84</consistency>
+        <country>ITA</country>
+        <defending>0.76</defending>
+        <drag_scalar>0.97</drag_scalar>
+        <fuel_management>0.8</fuel_management>
+        <name>Alessandro Nannini</name>
+        <power_scalar>0.97</power_scalar>
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.9</race_skill>
+        <stamina>0.86</stamina>
+        <start_reactions>0.9</start_reactions>
+        <tyre_management>0.8</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.81</vehicle_reliability>
+        <weather_tyre_changes>0.49</weather_tyre_changes>
+        <wet_skill>0.73</wet_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.93</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.95</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="HUNGARORING">
+        <qualifying_skill>0.95</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.92</qualifying_skill>
+        <vehicle_reliability>0.06</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.89</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #19 - A. Nannini" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.98</aggression>
+        <avoidance_of_forced_mistakes>0.16</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.16</avoidance_of_mistakes>
+        <qualifying_skill>0.91</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen">
+        <aggression>0.71</aggression>
+        <avoidance_of_forced_mistakes>0.63</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.63</avoidance_of_mistakes>
+        <blue_flag_conceding>0.39</blue_flag_conceding>
+        <consistency>0.86</consistency>
+        <country>BEL</country>
+        <defending>0.71</defending>
+        <drag_scalar>0.97</drag_scalar>
+        <fuel_management>0.76</fuel_management>
+        <name>Thierry Boutsen</name>
+        <power_scalar>0.97</power_scalar>
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.93</race_skill>
+        <stamina>0.86</stamina>
+        <start_reactions>0.86</start_reactions>
+        <tyre_management>0.76</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.89</vehicle_reliability>
+        <weather_tyre_changes>0.34</weather_tyre_changes>
+        <wet_skill>0.8</wet_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.78</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="HUNGARORING">
+        <consistency>0.95</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.93</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Kansai_GP,Kansai_Classic">
+        <consistency>0.95</consistency>
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Benetton #20 - T. Boutsen" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini">
+        <aggression>0.37</aggression>
+        <avoidance_of_forced_mistakes>0.38</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.38</avoidance_of_mistakes>
+        <blue_flag_conceding>0.74</blue_flag_conceding>
+        <consistency>0.75</consistency>
+        <country>ITA</country>
+        <defending>0.36</defending>
+        <drag_scalar>1.06</drag_scalar>
+        <fuel_management>0.55</fuel_management>
+        <name>Nicola Larini</name>
+        <power_scalar>0.93</power_scalar>
+        <qualifying_skill>0.65</qualifying_skill>
+        <race_skill>0.82</race_skill>
+        <stamina>0.74</stamina>
+        <start_reactions>0.28</start_reactions>
+        <tyre_management>0.56</tyre_management>
+        <weight_scalar>1.06</weight_scalar>
+        <vehicle_reliability>0.48</vehicle_reliability>
+        <weather_tyre_changes>0.63</weather_tyre_changes>
+        <wet_skill>0.38</wet_skill>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.64</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="HUNGARORING">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.64</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Osella #21 - N. Larini" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris">
+        <aggression>0.77</aggression>
+        <avoidance_of_forced_mistakes>0.22</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.22</avoidance_of_mistakes>
+        <blue_flag_conceding>0.3</blue_flag_conceding>
+        <consistency>0.82</consistency>
+        <country>ITA</country>
+        <defending>0.8</defending>
+        <drag_scalar>1.02</drag_scalar>
+        <fuel_management>0.66</fuel_management>
+        <name>Andrea de Cesaris</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.77</qualifying_skill>
+        <race_skill>0.75</race_skill>
+        <stamina>0.79</stamina>
+        <start_reactions>0.47</start_reactions>
+        <tyre_management>0.69</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.27</vehicle_reliability>
+        <weather_tyre_changes>0.51</weather_tyre_changes>
+        <wet_skill>0.34</wet_skill>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.72</qualifying_skill>
+        <vehicle_reliability>0.11</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="HUNGARORING">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <aggression>1.0</aggression>
+        <avoidance_of_forced_mistakes>0.11</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.11</avoidance_of_mistakes>
+        <qualifying_skill>0.72</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Rial #22 - A. De Cesaris" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.79</qualifying_skill>
+        <vehicle_reliability>0.01</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - A. Campos">
+        <aggression>0.11</aggression>
+        <avoidance_of_forced_mistakes>0.35</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.35</avoidance_of_mistakes>
+        <blue_flag_conceding>0.99</blue_flag_conceding>
+        <consistency>0.8</consistency>
+        <country>ESP</country>
+        <defending>0.11</defending>
+        <drag_scalar>1.04</drag_scalar>
+        <fuel_management>0.64</fuel_management>
+        <name>Adrian Campos</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.63</qualifying_skill>
+        <race_skill>0.74</race_skill>
+        <stamina>0.82</stamina>
+        <start_reactions>0.25</start_reactions>
+        <tyre_management>0.7</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.46</vehicle_reliability>
+        <weather_tyre_changes>0.34</weather_tyre_changes>
+        <wet_skill>0.36</wet_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - A. Campos" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - A. Campos" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - A. Campos" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - A. Campos" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala">
+        <aggression>0.17</aggression>
+        <avoidance_of_forced_mistakes>0.28</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.28</avoidance_of_mistakes>
+        <blue_flag_conceding>0.91</blue_flag_conceding>
+        <consistency>0.78</consistency>
+        <country>ESP</country>
+        <defending>0.19</defending>
+        <drag_scalar>1.04</drag_scalar>
+        <fuel_management>0.67</fuel_management>
+        <name>Luis Pérez-Sala</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.81</race_skill>
+        <stamina>0.78</stamina>
+        <start_reactions>0.28</start_reactions>
+        <tyre_management>0.65</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.46</vehicle_reliability>
+        <weather_tyre_changes>0.4</weather_tyre_changes>
+        <wet_skill>0.36</wet_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.79</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.69</qualifying_skill>
+        <race_skill>0.77</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <aggression>0.99</aggression>
+        <avoidance_of_forced_mistakes>0.06</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.06</avoidance_of_mistakes>
+        <qualifying_skill>0.74</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="HUNGARORING">
+        <qualifying_skill>0.85</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.72</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.65</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #24 - L. Pérez-Sala" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux">
+        <aggression>0.17</aggression>
+        <avoidance_of_forced_mistakes>0.5</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.5</avoidance_of_mistakes>
+        <blue_flag_conceding>0.99</blue_flag_conceding>
+        <consistency>0.76</consistency>
+        <country>FRA</country>
+        <defending>0.11</defending>
+        <drag_scalar>1.02</drag_scalar>
+        <fuel_management>0.56</fuel_management>
+        <name>René Arnoux</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.76</race_skill>
+        <stamina>0.73</stamina>
+        <start_reactions>0.22</start_reactions>
+        <tyre_management>0.51</tyre_management>
+        <weight_scalar>0.96</weight_scalar>
+        <vehicle_reliability>0.47</vehicle_reliability>
+        <weather_tyre_changes>0.27</weather_tyre_changes>
+        <wet_skill>0.35</wet_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.74</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.64</qualifying_skill>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.75</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="HUNGARORING">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <aggression>0.95</aggression>
+        <avoidance_of_forced_mistakes>0.18</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.18</avoidance_of_mistakes>
+        <qualifying_skill>0.75</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.65</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.72</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #25 - R. Arnoux" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.98</aggression>
+        <avoidance_of_forced_mistakes>0.16</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.16</avoidance_of_mistakes>
+        <qualifying_skill>0.67</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson">
+        <aggression>0.11</aggression>
+        <avoidance_of_forced_mistakes>0.34</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.34</avoidance_of_mistakes>
+        <blue_flag_conceding>0.95</blue_flag_conceding>
+        <consistency>0.74</consistency>
+        <country>SWE</country>
+        <defending>0.15</defending>
+        <drag_scalar>1.02</drag_scalar>
+        <fuel_management>0.57</fuel_management>
+        <name>Stefan Johansson</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.64</qualifying_skill>
+        <race_skill>0.85</race_skill>
+        <stamina>0.76</stamina>
+        <start_reactions>0.22</start_reactions>
+        <tyre_management>0.55</tyre_management>
+        <weight_scalar>0.96</weight_scalar>
+        <vehicle_reliability>0.44</vehicle_reliability>
+        <weather_tyre_changes>0.39</weather_tyre_changes>
+        <wet_skill>0.35</wet_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.69</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="HUNGARORING">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.8</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.69</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ligier #26 - S. Johansson" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto">
+        <aggression>0.33</aggression>
+        <avoidance_of_forced_mistakes>0.58</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.58</avoidance_of_mistakes>
+        <blue_flag_conceding>0.78</blue_flag_conceding>
+        <consistency>0.85</consistency>
+        <country>ITA</country>
+        <defending>0.32</defending>
+        <drag_scalar>0.95</drag_scalar>
+        <fuel_management>0.79</fuel_management>
+        <name>Michele Alboreto</name>
+        <power_scalar>1.06</power_scalar>
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.93</race_skill>
+        <stamina>0.85</stamina>
+        <start_reactions>0.82</start_reactions>
+        <tyre_management>0.78</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
+        <vehicle_reliability>0.88</vehicle_reliability>
+        <weather_tyre_changes>0.87</weather_tyre_changes>
+        <wet_skill>0.55</wet_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.88</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Azure_Circuit_2021">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.96</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.99</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="HUNGARORING">
+        <qualifying_skill>0.79</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.96</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Monza_1991,Monza_2020">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.88</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - M. Alboreto" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.92</aggression>
+        <avoidance_of_forced_mistakes>0.15</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.15</avoidance_of_mistakes>
+        <qualifying_skill>0.84</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger">
+        <aggression>0.74</aggression>
+        <avoidance_of_forced_mistakes>0.5</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.5</avoidance_of_mistakes>
+        <blue_flag_conceding>0.34</blue_flag_conceding>
+        <consistency>0.93</consistency>
+        <country>AUT</country>
+        <defending>0.76</defending>
+        <drag_scalar>0.95</drag_scalar>
+        <fuel_management>0.82</fuel_management>
+        <name>Gerhard Berger</name>
+        <power_scalar>1.06</power_scalar>
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.91</stamina>
+        <start_reactions>0.8</start_reactions>
+        <tyre_management>0.84</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
+        <vehicle_reliability>0.85</vehicle_reliability>
+        <weather_tyre_changes>0.85</weather_tyre_changes>
+        <wet_skill>0.74</wet_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Jacarepagua_Historic">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Azure_Circuit_2021">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>0.14</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="HUNGARORING">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Monza_1991,Monza_2020">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <aggression>0.93</aggression>
+        <avoidance_of_forced_mistakes>0.18</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.18</avoidance_of_mistakes>
+        <qualifying_skill>0.96</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Kansai_GP,Kansai_Classic">
+        <consistency>0.95</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #28 - G. Berger" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.96</aggression>
+        <avoidance_of_forced_mistakes>0.2</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.2</avoidance_of_mistakes>
+        <qualifying_skill>0.96</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas">
+        <aggression>0.38</aggression>
+        <avoidance_of_forced_mistakes>0.32</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.32</avoidance_of_mistakes>
+        <blue_flag_conceding>0.72</blue_flag_conceding>
+        <consistency>0.8</consistency>
+        <country>FRA</country>
+        <defending>0.38</defending>
+        <drag_scalar>1.03</drag_scalar>
+        <fuel_management>0.62</fuel_management>
+        <name>Yannick Dalmas</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.7</qualifying_skill>
+        <race_skill>0.81</race_skill>
+        <stamina>0.82</stamina>
+        <start_reactions>0.44</start_reactions>
+        <tyre_management>0.6</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.48</vehicle_reliability>
+        <weather_tyre_changes>0.79</weather_tyre_changes>
+        <wet_skill>0.31</wet_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.69</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.67</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.69</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="HUNGARORING">
+        <qualifying_skill>0.75</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.67</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.79</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #29 - Y. Dalmas" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.78</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot">
+        <aggression>0.39</aggression>
+        <avoidance_of_forced_mistakes>0.27</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.27</avoidance_of_mistakes>
+        <blue_flag_conceding>0.75</blue_flag_conceding>
+        <consistency>0.81</consistency>
+        <country>FRA</country>
+        <defending>0.35</defending>
+        <drag_scalar>1.03</drag_scalar>
+        <fuel_management>0.65</fuel_management>
+        <name>Philippe Alliot</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.74</qualifying_skill>
+        <race_skill>0.78</race_skill>
+        <stamina>0.82</stamina>
+        <start_reactions>0.4</start_reactions>
+        <tyre_management>0.68</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.46</vehicle_reliability>
+        <weather_tyre_changes>0.75</weather_tyre_changes>
+        <wet_skill>0.34</wet_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.78</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.79</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Azure_Circuit_2021">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.07</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.07</avoidance_of_mistakes>
+        <qualifying_skill>0.82</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <aggression>0.98</aggression>
+        <avoidance_of_forced_mistakes>0.1</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.1</avoidance_of_mistakes>
+        <qualifying_skill>0.71</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="HUNGARORING">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.78</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.7</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #30 - P. Alliot" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini">
+        <aggression>0.35</aggression>
+        <avoidance_of_forced_mistakes>0.48</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.48</avoidance_of_mistakes>
+        <blue_flag_conceding>0.8</blue_flag_conceding>
+        <consistency>0.75</consistency>
+        <country>ITA</country>
+        <defending>0.3</defending>
+        <drag_scalar>1.08</drag_scalar>
+        <fuel_management>0.51</fuel_management>
+        <name>Gabriele Tarquini</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.81</race_skill>
+        <stamina>0.75</stamina>
+        <start_reactions>0.42</start_reactions>
+        <tyre_management>0.57</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
+        <vehicle_reliability>0.41</vehicle_reliability>
+        <weather_tyre_changes>0.52</weather_tyre_changes>
+        <wet_skill>0.34</wet_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.2</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.75</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.55</qualifying_skill>
+        <race_skill>1.02</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="HUNGARORING">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.68</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Coloni #31 - G. Tarquini" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri">
+        <aggression>0.3</aggression>
+        <avoidance_of_forced_mistakes>0.33</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.33</avoidance_of_mistakes>
+        <blue_flag_conceding>0.79</blue_flag_conceding>
+        <consistency>0.74</consistency>
+        <country>ARG</country>
+        <defending>0.31</defending>
+        <drag_scalar>1.10</drag_scalar>
+        <fuel_management>0.58</fuel_management>
+        <name>Oscar Larrauri</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.61</qualifying_skill>
+        <race_skill>0.74</race_skill>
+        <stamina>0.73</stamina>
+        <start_reactions>0.26</start_reactions>
+        <tyre_management>0.52</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
+        <vehicle_reliability>0.28</vehicle_reliability>
+        <weather_tyre_changes>0.45</weather_tyre_changes>
+        <wet_skill>0.33</wet_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.62</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Azure_Circuit_2021">
+        <aggression>0.9</aggression>
+        <avoidance_of_forced_mistakes>0.1</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.1</avoidance_of_mistakes>
+        <qualifying_skill>0.74</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <aggression>0.98</aggression>
+        <avoidance_of_forced_mistakes>0.08</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.08</avoidance_of_mistakes>
+        <qualifying_skill>0.65</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.61</qualifying_skill>
+        <race_skill>1.02</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.74</race_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="HUNGARORING">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.55</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #32 - O. Larrauri" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena">
+        <aggression>0.56</aggression>
+        <avoidance_of_forced_mistakes>0.44</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.44</avoidance_of_mistakes>
+        <blue_flag_conceding>0.58</blue_flag_conceding>
+        <consistency>0.78</consistency>
+        <country>ITA</country>
+        <defending>0.52</defending>
+        <drag_scalar>1.10</drag_scalar>
+        <fuel_management>0.69</fuel_management>
+        <name>Stefano Modena</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.63</qualifying_skill>
+        <race_skill>0.79</race_skill>
+        <stamina>0.79</stamina>
+        <start_reactions>0.5</start_reactions>
+        <tyre_management>0.63</tyre_management>
+        <weight_scalar>0.98</weight_scalar>
+        <vehicle_reliability>0.28</vehicle_reliability>
+        <weather_tyre_changes>0.37</weather_tyre_changes>
+        <wet_skill>0.55</wet_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.65</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.6</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.72</qualifying_skill>
+        <vehicle_reliability>-0.5</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.64</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.8</race_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.64</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="HUNGARORING">
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.58</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.62</qualifying_skill>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Eurobrun #33 - S. Modena" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>-0.0</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Williams #5 - M. Brundle">
+        <aggression>0.58</aggression>
+        <avoidance_of_forced_mistakes>0.46</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.46</avoidance_of_mistakes>
+        <blue_flag_conceding>0.51</blue_flag_conceding>
+        <consistency>0.86</consistency>
+        <country>GBR</country>
+        <defending>0.59</defending>
+        <drag_scalar>0.98</drag_scalar>
+        <fuel_management>0.79</fuel_management>
+        <name>Martin Brundle</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.88</race_skill>
+        <stamina>0.85</stamina>
+        <start_reactions>0.8</start_reactions>
+        <tyre_management>0.77</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.89</vehicle_reliability>
+        <weather_tyre_changes>0.56</weather_tyre_changes>
+        <wet_skill>0.57</wet_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - M. Brundle" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - J-L. Schlesser">
+        <aggression>0.14</aggression>
+        <avoidance_of_forced_mistakes>0.22</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.22</avoidance_of_mistakes>
+        <blue_flag_conceding>0.95</blue_flag_conceding>
+        <consistency>0.78</consistency>
+        <country>FRA</country>
+        <defending>0.15</defending>
+        <drag_scalar>0.98</drag_scalar>
+        <fuel_management>0.65</fuel_management>
+        <name>Jean-Louis Schlesser</name>
+        <power_scalar>0.92</power_scalar>
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.82</race_skill>
+        <stamina>0.8</stamina>
+        <start_reactions>0.24</start_reactions>
+        <tyre_management>0.68</tyre_management>
+        <weight_scalar>0.95</weight_scalar>
+        <vehicle_reliability>0.61</vehicle_reliability>
+        <weather_tyre_changes>0.76</weather_tyre_changes>
+        <wet_skill>0.16</wet_skill>
+    </driver>
+    <driver livery_name="1988 Williams #5 - J-L. Schlesser" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.68</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini">
+        <aggression>0.36</aggression>
+        <avoidance_of_forced_mistakes>0.48</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.48</avoidance_of_mistakes>
+        <blue_flag_conceding>0.56</blue_flag_conceding>
+        <consistency>0.81</consistency>
+        <country>SWE</country>
+        <defending>0.54</defending>
+        <drag_scalar>1.04</drag_scalar>
+        <fuel_management>0.69</fuel_management>
+        <name>Pierluigi Martini</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.73</qualifying_skill>
+        <race_skill>0.79</race_skill>
+        <stamina>0.81</stamina>
+        <start_reactions>0.43</start_reactions>
+        <tyre_management>0.67</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.69</vehicle_reliability>
+        <weather_tyre_changes>0.5</weather_tyre_changes>
+        <wet_skill>0.37</wet_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.57</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="HUNGARORING">
+        <aggression>0.97</aggression>
+        <avoidance_of_forced_mistakes>0.16</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.16</avoidance_of_mistakes>
+        <qualifying_skill>0.78</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.6</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.81</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.71</qualifying_skill>
+        <vehicle_reliability>0.02</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.75</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1988 Minardi #23 - P. Martini" tracks="Adelaide_Historic,Adelaide_Modern">
+        <qualifying_skill>0.81</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - A. Suzuki">
+        <aggression>0.7</aggression>
+        <avoidance_of_forced_mistakes>0.37</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.37</avoidance_of_mistakes>
+        <blue_flag_conceding>0.72</blue_flag_conceding>
+        <consistency>0.81</consistency>
+        <country>JPN</country>
+        <defending>0.38</defending>
+        <drag_scalar>1.03</drag_scalar>
+        <fuel_management>0.62</fuel_management>
+        <name>Aguri Suzuki</name>
+        <power_scalar>0.90</power_scalar>
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.76</race_skill>
+        <stamina>0.8</stamina>
+        <start_reactions>0.48</start_reactions>
+        <tyre_management>0.68</tyre_management>
+        <weight_scalar>0.97</weight_scalar>
+        <vehicle_reliability>0.41</vehicle_reliability>
+        <weather_tyre_changes>0.34</weather_tyre_changes>
+        <wet_skill>0.39</wet_skill>
+    </driver>
+    <driver livery_name="1988 Lola #29 - A. Suzuki" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.71</qualifying_skill>
+        <race_skill>0.76</race_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet">
+        <aggression>0.4</aggression>
+        <avoidance_of_forced_mistakes>0.55</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.55</avoidance_of_mistakes>
+        <blue_flag_conceding>0.36</blue_flag_conceding>
+        <consistency>0.98</consistency>
+        <country>BRA</country>
+        <defending>0.74</defending>
+        <drag_scalar>0.90</drag_scalar>
+        <fuel_management>0.97</fuel_management>
+        <name>Nelson Piquet</name>
+        <power_scalar>1.10</power_scalar>
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.99</race_skill>
+        <stamina>0.99</stamina>
+        <start_reactions>0.9</start_reactions>
+        <tyre_management>0.94</tyre_management>
+        <weight_scalar>1.03</weight_scalar>
+        <vehicle_reliability>0.98</vehicle_reliability>
+        <weather_tyre_changes>0.34</weather_tyre_changes>
+        <wet_skill>0.39</wet_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Jacarepagua_Historic">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.99</qualifying_skill>
+        <vehicle_reliability>-0.6</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <consistency>0.97</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="HUNGARORING">
+        <consistency>0.97</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Kansai_GP,Kansai_Classic">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #1 - N. Piquet" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.95</consistency>
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost">
+        <aggression>0.71</aggression>
+        <avoidance_of_forced_mistakes>0.84</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.84</avoidance_of_mistakes>
+        <blue_flag_conceding>0.31</blue_flag_conceding>
+        <consistency>0.98</consistency>
+        <country>FRA</country>
+        <defending>0.79</defending>
+        <drag_scalar>0.90</drag_scalar>
+        <fuel_management>0.93</fuel_management>
+        <name>Alain Prost</name>
+        <power_scalar>1.10</power_scalar>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.99</race_skill>
+        <stamina>0.96</stamina>
+        <start_reactions>0.86</start_reactions>
+        <tyre_management>0.99</tyre_management>
+        <weight_scalar>1.03</weight_scalar>
+        <vehicle_reliability>0.96</vehicle_reliability>
+        <weather_tyre_changes>0.49</weather_tyre_changes>
+        <wet_skill>0.58</wet_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.99</qualifying_skill>
+        <vehicle_reliability>-0.4</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.97</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Azure_Circuit_2021">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <consistency>0.96</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="HUNGARORING">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <consistency>0.96</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Monza_1991,Monza_2020">
+        <consistency>0.99</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <consistency>0.95</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <consistency>0.99</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Kansai_GP,Kansai_Classic">
+        <consistency>0.96</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 McLaren #2 - A. Prost" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.96</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.75</avoidance_of_mistakes>
+        <blue_flag_conceding>0.2</blue_flag_conceding>
+        <consistency>0.98</consistency>
+        <country>BRA</country>
+        <defending>0.9</defending>
+        <drag_scalar>0.95</drag_scalar>
+        <fuel_management>0.94</fuel_management>
+        <name>Ayrton Senna</name>
+        <power_scalar>1.06</power_scalar>
+        <qualifying_skill>0.98</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.98</stamina>
+        <start_reactions>0.93</start_reactions>
+        <tyre_management>0.9</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
+        <vehicle_reliability>0.88</vehicle_reliability>
+        <weather_tyre_changes>0.5</weather_tyre_changes>
+        <wet_skill>0.98</wet_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Jacarepagua_Historic">
+        <consistency>0.96</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Azure_Circuit_2021">
+        <consistency>0.99</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>-0.3</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <consistency>0.97</consistency>
+        <qualifying_skill>1.0</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="HUNGARORING">
+        <consistency>0.96</consistency>
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.97</qualifying_skill>
+        <vehicle_reliability>-0.8</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Monza_1991,Monza_2020">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>1.0</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Kansai_GP,Kansai_Classic">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.99</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Ferrari #27 - A. Senna" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.97</qualifying_skill>
+        <race_skill>0.98</race_skill>
+        <stamina>0.95</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto">
+        <aggression>0.58</aggression>
+        <avoidance_of_forced_mistakes>0.35</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.35</avoidance_of_mistakes>
+        <blue_flag_conceding>0.53</blue_flag_conceding>
+        <consistency>0.87</consistency>
+        <country>ITA</country>
+        <defending>0.57</defending>
+        <drag_scalar>1.00</drag_scalar>
+        <fuel_management>0.78</fuel_management>
+        <name>Michele Alboreto</name>
+        <power_scalar>1.04</power_scalar>
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.93</race_skill>
+        <stamina>0.86</stamina>
+        <start_reactions>0.62</start_reactions>
+        <tyre_management>0.77</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
+        <vehicle_reliability>0.49</vehicle_reliability>
+        <weather_tyre_changes>0.87</weather_tyre_changes>
+        <wet_skill>0.56</wet_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Jacarepagua_Historic">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.95</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.97</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <consistency>0.99</consistency>
+        <qualifying_skill>0.96</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.99</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Azure_Circuit_2021">
+        <aggression>0.93</aggression>
+        <avoidance_of_forced_mistakes>0.16</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.16</avoidance_of_mistakes>
+        <qualifying_skill>0.85</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.96</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.92</qualifying_skill>
+        <race_skill>0.94</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <aggression>0.91</aggression>
+        <avoidance_of_forced_mistakes>0.09</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.09</avoidance_of_mistakes>
+        <qualifying_skill>0.95</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="HUNGARORING">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <consistency>0.97</consistency>
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.95</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Monza_1991,Monza_2020">
+        <aggression>0.97</aggression>
+        <avoidance_of_forced_mistakes>0.18</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.18</avoidance_of_mistakes>
+        <qualifying_skill>0.92</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>0.07</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <qualifying_skill>0.89</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.95</qualifying_skill>
+        <vehicle_reliability>-0.1</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #11 - M. Alboreto" tracks="Adelaide_Historic,Adelaide_Modern">
+        <consistency>0.98</consistency>
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.97</race_skill>
+        <stamina>0.98</stamina>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima">
+        <aggression>0.9</aggression>
+        <avoidance_of_forced_mistakes>0.39</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.39</avoidance_of_mistakes>
+        <blue_flag_conceding>0.51</blue_flag_conceding>
+        <consistency>0.85</consistency>
+        <country>JPN</country>
+        <defending>0.59</defending>
+        <drag_scalar>1.00</drag_scalar>
+        <fuel_management>0.72</fuel_management>
+        <name>Satoru Nakajima</name>
+        <power_scalar>1.04</power_scalar>
+        <qualifying_skill>0.83</qualifying_skill>
+        <race_skill>0.86</race_skill>
+        <stamina>0.87</stamina>
+        <start_reactions>0.47</start_reactions>
+        <tyre_management>0.78</tyre_management>
+        <weight_scalar>1.04</weight_scalar>
+        <vehicle_reliability>0.66</vehicle_reliability>
+        <weather_tyre_changes>0.69</weather_tyre_changes>
+        <wet_skill>0.39</wet_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Jacarepagua_Historic">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Imola_GP_2018,Imola_GP_1972,Imola_GP_1988,Imola_GP_2001">
+        <qualifying_skill>0.84</qualifying_skill>
+        <race_skill>0.86</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Azure_Circuit_2021">
+        <qualifying_skill>0.61</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Montreal_Historic,Montreal_Historic_1991,Montreal_Modern">
+        <qualifying_skill>0.82</qualifying_skill>
+        <race_skill>0.82</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Silverstone_1975,Silverstone_1975_No_Chicane,Silverstone_1991,Silverstone_2001,Silverstone_2001_International,Silverstone_GP,Silverstone_Intl_2019">
+        <qualifying_skill>0.88</qualifying_skill>
+        <race_skill>0.83</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Hockenheim_GP,Hockenheim_2001,Hockenheim_1988,Hockenheim_1977">
+        <qualifying_skill>0.91</qualifying_skill>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="HUNGARORING">
+        <qualifying_skill>0.72</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Spa_Francorchamps_1993,Spa_Francorchamps_2005,Spa_Francorchamps_2020,Spa_Francorchamps_2022">
+        <qualifying_skill>0.91</qualifying_skill>
+        <vehicle_reliability>0.01</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Monza_1991,Monza_2020">
+        <qualifying_skill>0.84</qualifying_skill>
+        <vehicle_reliability>0.11</vehicle_reliability>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Cascais,Cascais_1988,Cascais_Alternate">
+        <aggression>0.92</aggression>
+        <avoidance_of_forced_mistakes>0.06</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.06</avoidance_of_mistakes>
+        <qualifying_skill>0.78</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Jerez_GP1988,Jerez_GP2019,Jerez_Standard">
+        <aggression>1.0</aggression>
+        <avoidance_of_forced_mistakes>0.18</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.18</avoidance_of_mistakes>
+        <qualifying_skill>0.79</qualifying_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Kansai_GP,Kansai_Classic">
+        <qualifying_skill>0.93</qualifying_skill>
+        <race_skill>0.88</race_skill>
+    </driver>
+    <driver livery_name="1988 Lotus #12 - S. Nakajima" tracks="Adelaide_Historic,Adelaide_Modern">
+        <aggression>0.96</aggression>
+        <avoidance_of_forced_mistakes>0.16</avoidance_of_forced_mistakes>
+        <avoidance_of_mistakes>0.16</avoidance_of_mistakes>
+        <qualifying_skill>0.82</qualifying_skill>
+    </driver>
+</custom_ai_drivers>
