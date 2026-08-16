@@ -1,0 +1,602 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!--Custom AI by jusk - F1 1969 Season 
+
+The carset includes 26 slots, but I recommend using 18 AI opponents for most races (i.e. including only regular runners from the '69 season), and taking one of other/optional cars for yourself. Optional exta drivers are also included to make up a full grid as required. These can be activated by removing the comment tags around the relevant drivers. Recommended extras:
+- Kyalami: 19 opponents (Add De Klerk)
+- Silverstone 19 opponents (Add Bell)
+- Nordschleife 22 opponents (Add Attwood, Mitter, Pescarolo and Cevert)
+- Watkins Glen 20 opponents (add Lovely and Eaton)
+Or add them all and run with 26 if you want to!
+
+Changelog v0.1:
+- Initial version to match Alain Fry's skinpack
+
+***  1969 Season Calendar  ***
+#	Track				Date			AMS2 Track
+--------------------------------------------------------------------------------------------------
+1 	South African GP		01 Mar			Kyalami Historic 1976
+2 	Spanish GP			04 May
+3 	Monaco GP			18 May			Azure Circuit			
+4 	Dutch GP			21 June						
+5 	French GP			06 July				
+6 	British GP			19 July			Silverstone Historic 1975 (no chicane)			
+7 	German GP			03 Aug			Nurburgring Nordsleife (historic version expected soon)			
+8 	Italian GP			07 Sept			Monza 1971
+9 	Canadian GP			20 Sept			Mosport
+10 	USA GP		 		05 Oct			Watkins Glen Short			
+11 	Mexican GP	 		22 Oct			
+-->
+<custom_ai_drivers>
+	<driver livery_name="Lotus-Ford Cosworth #1 G. Hill">
+		<name>Graham Hill</name>
+		<country>GBR</country>
+		<race_skill>0.88</race_skill> 
+		<qualifying_skill>0.89</qualifying_skill>
+		<aggression>0.54</aggression>
+		<defending>0.40</defending>
+		<stamina>0.84</stamina>
+		<consistency>0.86</consistency>
+		<start_reactions>0.90</start_reactions>
+		<wet_skill>0.86</wet_skill>
+		<tyre_management>0.89</tyre_management>
+		<blue_flag_conceding>0.88</blue_flag_conceding>
+		<weather_tyre_changes>0.77</weather_tyre_changes>
+		<avoidance_of_mistakes>0.55</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.42</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.82</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.92</weight_scalar>
+		<drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #2 J. Rindt">
+		<name>Jochen Rindt</name>
+		<country>AUT</country>
+		<race_skill>0.93</race_skill> 
+		<qualifying_skill>0.98</qualifying_skill>
+		<aggression>0.54</aggression>
+		<defending>0.43</defending>
+		<stamina>0.88</stamina>
+		<consistency>0.74</consistency>
+		<start_reactions>0.90</start_reactions>
+		<wet_skill>0.90</wet_skill>
+		<tyre_management>0.86</tyre_management>
+		<blue_flag_conceding>0.89</blue_flag_conceding>
+		<weather_tyre_changes>0.68</weather_tyre_changes>
+		<avoidance_of_mistakes>0.49</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.41</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.49</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.92</weight_scalar>
+		<drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #9 M. Andretti">
+		<name>Mario Andretti</name>
+		<country>USA</country>
+		<race_skill>0.79</race_skill>
+		<qualifying_skill>0.81</qualifying_skill>
+		<aggression>0.44</aggression>
+		<defending>0.39</defending>
+		<stamina>0.91</stamina>
+		<consistency>0.62</consistency>
+		<start_reactions>0.92</start_reactions>
+		<wet_skill>0.88</wet_skill>
+		<tyre_management>0.83</tyre_management>
+		<blue_flag_conceding>0.97</blue_flag_conceding>
+		<weather_tyre_changes>0.68</weather_tyre_changes>
+		<avoidance_of_mistakes>0.46</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.29</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.26</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.92</weight_scalar>
+		<drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #10 J. Siffert">
+		<name>Jo Siffert</name>
+		<country>CHE</country>
+		<race_skill>0.87</race_skill> 
+		<qualifying_skill>0.88</qualifying_skill>
+		<aggression>0.49</aggression>
+		<defending>0.36</defending>
+		<stamina>0.81</stamina>
+		<consistency>0.70</consistency>
+		<start_reactions>0.88</start_reactions>
+		<wet_skill>0.80</wet_skill>
+		<tyre_management>0.87</tyre_management>
+		<blue_flag_conceding>0.92</blue_flag_conceding>
+		<weather_tyre_changes>0.81</weather_tyre_changes>
+		<avoidance_of_mistakes>0.48</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.36</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.48</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.92</weight_scalar>
+		<drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="McLaren-Ford Cosworth #5 D. Hulme">
+		<name>Denny Hulme</name>
+		<country>NZL</country>
+		<race_skill>0.90</race_skill> 
+		<qualifying_skill>0.93</qualifying_skill>
+		<aggression>0.59</aggression>
+		<defending>0.40</defending>
+		<stamina>0.88</stamina>
+		<consistency>0.90</consistency>
+		<start_reactions>0.91</start_reactions>
+		<wet_skill>0.81</wet_skill>
+		<tyre_management>0.88</tyre_management>
+		<blue_flag_conceding>0.90</blue_flag_conceding>
+		<weather_tyre_changes>0.74</weather_tyre_changes>
+		<avoidance_of_mistakes>0.75</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.66</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.58</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.97</weight_scalar>
+		<drag_scalar>0.96</drag_scalar>
+	</driver>
+	<driver livery_name="McLaren-Ford Cosworth #6 B. McLaren">
+		<name>Bruce McLaren</name>
+		<country>NZL</country>
+		<race_skill>0.86</race_skill> 
+		<qualifying_skill>0.87</qualifying_skill>
+		<aggression>0.51</aggression>
+		<defending>0.37</defending>
+		<stamina>0.79</stamina>
+		<consistency>0.85</consistency>
+		<start_reactions>0.89</start_reactions>
+		<wet_skill>0.78</wet_skill>
+		<tyre_management>0.79</tyre_management>
+		<blue_flag_conceding>0.91</blue_flag_conceding>
+		<weather_tyre_changes>0.86</weather_tyre_changes>
+		<avoidance_of_mistakes>0.38</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.30</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.67</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.97</weight_scalar>
+		<drag_scalar>0.96</drag_scalar>
+	</driver>
+	<driver livery_name="Matra-Ford Cosworth #7 J. Stewart">
+		<name>Jackie Stewart</name>
+		<country>GBR</country>
+		<race_skill>0.96</race_skill> 
+		<qualifying_skill>0.97</qualifying_skill>
+		<aggression>0.56</aggression>
+		<defending>0.41</defending>
+		<stamina>0.82</stamina>
+		<consistency>0.92</consistency>
+		<start_reactions>0.89</start_reactions>
+		<wet_skill>0.91</wet_skill>
+		<tyre_management>0.92</tyre_management>
+		<blue_flag_conceding>0.88</blue_flag_conceding>
+		<weather_tyre_changes>0.66</weather_tyre_changes>
+		<avoidance_of_mistakes>0.61</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.53</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.86</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.94</weight_scalar>
+		<drag_scalar>0.90</drag_scalar>
+	</driver>
+	<driver livery_name="Matra-Ford Cosworth #8 J-P. Beltoise">
+		<name>Jean-Pierre Beltoise</name>
+		<country>FRA</country>
+		<race_skill>0.84</race_skill> 
+		<qualifying_skill>0.85</qualifying_skill>
+		<aggression>0.38</aggression>
+		<defending>0.34</defending>
+		<stamina>0.79</stamina>
+		<consistency>0.79</consistency>
+		<start_reactions>0.82</start_reactions>
+		<wet_skill>0.71</wet_skill>
+		<tyre_management>0.73</tyre_management>
+		<blue_flag_conceding>0.94</blue_flag_conceding>
+		<weather_tyre_changes>0.79</weather_tyre_changes>
+		<avoidance_of_mistakes>0.40</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.26</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.73</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.94</weight_scalar>
+		<drag_scalar>0.90</drag_scalar>
+	</driver>
+	<driver livery_name="Matra-Ford Cosworth #8 J-P. Beltoise" tracks="Azure_Circuit_2021">
+		<race_skill>0.87</race_skill> 
+		<qualifying_skill>0.92</qualifying_skill>
+	</driver>
+	<driver livery_name="Ferrari #11 C. Amon">
+		<name>Chris Amon</name>
+		<country>NZL</country>
+		<race_skill>0.87</race_skill> 
+		<qualifying_skill>0.94</qualifying_skill>
+		<aggression>0.53</aggression>
+		<defending>0.42</defending>
+		<stamina>0.83</stamina>
+		<consistency>0.81</consistency>
+		<start_reactions>0.90</start_reactions>
+		<wet_skill>0.89</wet_skill>
+		<tyre_management>0.93</tyre_management>
+		<blue_flag_conceding>0.90</blue_flag_conceding>
+		<weather_tyre_changes>0.62</weather_tyre_changes>
+		<avoidance_of_mistakes>0.67</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.60</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.30</vehicle_reliability>
+		<power_scalar>1.06</power_scalar>
+		<weight_scalar>1.00</weight_scalar>
+		<drag_scalar>1.02</drag_scalar>
+	</driver>
+	<driver livery_name="Ferrari #11 C. Amon" tracks="Monza_1971">
+		<name>Tino Brambilla</name>
+		<country>ITA</country>
+		<race_skill>0.68</race_skill> 
+		<qualifying_skill>0.69</qualifying_skill>
+		<aggression>0.39</aggression>
+		<defending>0.31</defending>
+		<stamina>0.73</stamina>
+		<consistency>0.61</consistency>
+		<start_reactions>0.81</start_reactions>
+		<wet_skill>0.71</wet_skill>
+		<tyre_management>0.63</tyre_management>
+		<blue_flag_conceding>0.88</blue_flag_conceding>
+		<weather_tyre_changes>0.82</weather_tyre_changes>
+		<avoidance_of_mistakes>0.37</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.22</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.28</vehicle_reliability>
+	</driver>
+	<driver livery_name="Ferrari #12 P. Rodriguez">
+		<name>Pedro Rodríguez</name>
+		<country>MEX</country>
+		<race_skill>0.73</race_skill> 
+		<qualifying_skill>0.75</qualifying_skill>
+		<aggression>0.48</aggression>
+		<defending>0.38</defending>
+		<stamina>0.79</stamina>
+		<consistency>0.65</consistency>
+		<start_reactions>0.88</start_reactions>
+		<wet_skill>0.79</wet_skill>
+		<tyre_management>0.79</tyre_management>
+		<blue_flag_conceding>0.93</blue_flag_conceding>
+		<weather_tyre_changes>0.92</weather_tyre_changes>
+		<avoidance_of_mistakes>0.59</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.45</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.40</vehicle_reliability>
+		<power_scalar>1.06</power_scalar>
+		<weight_scalar>1.00</weight_scalar>
+		<drag_scalar>1.02</drag_scalar>
+	</driver>
+	<driver livery_name="BRM #14 J. Surtees">
+		<name>John Surtees</name>
+		<country>GBR</country>
+		<race_skill>0.81</race_skill> 
+		<qualifying_skill>0.82</qualifying_skill>
+		<aggression>0.65</aggression>
+		<defending>0.43</defending>
+		<stamina>0.76</stamina>
+		<consistency>0.79</consistency>
+		<start_reactions>0.91</start_reactions>
+		<wet_skill>0.88</wet_skill>
+		<tyre_management>0.84</tyre_management>
+		<blue_flag_conceding>0.89</blue_flag_conceding>
+		<weather_tyre_changes>0.88</weather_tyre_changes>
+		<avoidance_of_mistakes>0.64</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.56</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.40</vehicle_reliability>
+		<power_scalar>1.10</power_scalar>
+		<weight_scalar>1.02</weight_scalar>
+		<drag_scalar>1.05</drag_scalar>
+	</driver>
+	<driver livery_name="BRM #14 J. Surtees" tracks="Silverstone_1975_No_Chicane,Azure_Circuit_2021">
+		<race_skill>0.85</race_skill> 
+		<qualifying_skill>0.89</qualifying_skill>
+	</driver>
+	<driver livery_name="BRM #15 J. Oliver">
+		<name>Jackie Oliver</name>
+		<country>GBR</country>
+		<race_skill>0.72</race_skill>
+		<qualifying_skill>0.77</qualifying_skill>
+		<aggression>0.32</aggression>
+		<defending>0.36</defending>
+		<stamina>0.68</stamina>
+		<consistency>0.59</consistency>
+		<start_reactions>0.79</start_reactions>
+		<wet_skill>0.79</wet_skill>
+		<tyre_management>0.72</tyre_management>
+		<blue_flag_conceding>0.98</blue_flag_conceding>
+		<weather_tyre_changes>0.81</weather_tyre_changes>
+		<avoidance_of_mistakes>0.39</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.26</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.24</vehicle_reliability>
+		<power_scalar>1.10</power_scalar>
+		<weight_scalar>1.02</weight_scalar>
+		<drag_scalar>1.05</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Ford Cosworth #3 J. Brabham">
+		<name>Jack Brabham</name>
+		<country>AUS</country>
+		<race_skill>0.89</race_skill> 
+		<qualifying_skill>0.91</qualifying_skill>
+		<aggression>0.55</aggression>
+		<defending>0.42</defending>
+		<stamina>0.79</stamina>
+		<consistency>0.80</consistency>
+		<start_reactions>0.89</start_reactions>
+		<wet_skill>0.84</wet_skill>
+		<tyre_management>0.79</tyre_management>
+		<blue_flag_conceding>0.88</blue_flag_conceding>
+		<weather_tyre_changes>0.64</weather_tyre_changes>
+		<avoidance_of_mistakes>0.71</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.62</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.52</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.95</weight_scalar>
+		<drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Ford Cosworth #4 J. Ickx">
+		<name>Jacky Ickx</name>
+		<country>BEL</country>
+		<race_skill>0.91</race_skill> 
+		<qualifying_skill>0.915</qualifying_skill>
+		<aggression>0.48</aggression>
+		<defending>0.40</defending>
+		<stamina>0.78</stamina>
+		<consistency>0.88</consistency>
+		<start_reactions>0.85</start_reactions>
+		<wet_skill>0.84</wet_skill>
+		<tyre_management>0.84</tyre_management>
+		<blue_flag_conceding>0.90</blue_flag_conceding>
+		<weather_tyre_changes>0.88</weather_tyre_changes>
+		<avoidance_of_mistakes>0.62</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.54</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.72</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.95</weight_scalar>
+		<drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Ford Cosworth #32 P. Courage">
+		<name>Piers Courage</name>
+		<country>GBR</country>
+		<race_skill>0.83</race_skill> 
+		<qualifying_skill>0.84</qualifying_skill>
+		<aggression>0.41</aggression>
+		<defending>0.36</defending>
+		<stamina>0.76</stamina>
+		<consistency>0.76</consistency>
+		<start_reactions>0.87</start_reactions>
+		<wet_skill>0.75</wet_skill>
+		<tyre_management>0.78</tyre_management>
+		<blue_flag_conceding>0.96</blue_flag_conceding>
+		<weather_tyre_changes>0.86</weather_tyre_changes>
+		<avoidance_of_mistakes>0.40</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.29</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.47</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.95</weight_scalar>
+		<drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="McLaren-Ford Cosworth #18 V. Elford">
+		<name>Vic Elford</name>
+		<country>GBR</country>
+		<race_skill>0.79</race_skill>
+		<qualifying_skill>0.80</qualifying_skill>
+		<aggression>0.40</aggression>
+		<defending>0.41</defending>
+		<stamina>0.88</stamina>
+		<consistency>0.81</consistency>
+		<start_reactions>0.86</start_reactions>
+		<wet_skill>0.78</wet_skill>
+		<tyre_management>0.79</tyre_management>
+		<blue_flag_conceding>0.96</blue_flag_conceding>
+		<weather_tyre_changes>0.79</weather_tyre_changes>
+		<avoidance_of_mistakes>0.49</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.36</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.68</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.97</weight_scalar>
+		<drag_scalar>0.96</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Ford Cosworth #17 S. Moser">
+		<name>Silvio Moser</name>
+		<country>CHE</country>
+		<race_skill>0.71</race_skill> 
+		<qualifying_skill>0.72</qualifying_skill>
+		<aggression>0.32</aggression>
+		<defending>0.31</defending>
+		<stamina>0.75</stamina>
+		<consistency>0.62</consistency>
+		<start_reactions>0.78</start_reactions>
+		<wet_skill>0.69</wet_skill>
+		<tyre_management>0.71</tyre_management>
+		<blue_flag_conceding>0.99</blue_flag_conceding>
+		<weather_tyre_changes>0.94</weather_tyre_changes>
+		<avoidance_of_mistakes>0.39</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.22</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.36</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.95</weight_scalar>
+		<drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #16 J. Bonnier">
+		<name>Jo Bonnier</name>
+		<country>SWE</country>
+		<race_skill>0.65</race_skill>
+		<qualifying_skill>0.67</qualifying_skill>
+		<aggression>0.35</aggression>
+		<defending>0.40</defending>
+		<stamina>0.68</stamina>
+		<consistency>0.59</consistency>
+		<start_reactions>0.86</start_reactions>
+		<wet_skill>0.68</wet_skill>
+		<tyre_management>0.76</tyre_management>
+		<blue_flag_conceding>0.97</blue_flag_conceding>
+		<weather_tyre_changes>0.66</weather_tyre_changes>
+		<avoidance_of_mistakes>0.41</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.30</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.31</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.92</weight_scalar>
+		<drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Repco #19 P. de Klerk">
+		<name>Peter de Klerk</name>
+		<country>ZAF</country>
+		<race_skill>0.66</race_skill>
+		<qualifying_skill>0.68</qualifying_skill>
+		<aggression>0.30</aggression>
+		<defending>0.41</defending>
+		<stamina>0.65</stamina>
+		<consistency>0.55</consistency>
+		<start_reactions>0.81</start_reactions>
+		<wet_skill>0.61</wet_skill>
+		<tyre_management>0.71</tyre_management>
+		<blue_flag_conceding>0.99</blue_flag_conceding>
+		<weather_tyre_changes>0.86</weather_tyre_changes>
+		<avoidance_of_mistakes>0.38</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.27</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.38</vehicle_reliability>
+		<power_scalar>0.93</power_scalar>
+		<weight_scalar>1.03</weight_scalar>
+		<drag_scalar>1.06</drag_scalar>
+	</driver>
+	<driver livery_name="McLaren-Ford Cosworth #20 D. Bell">
+		<name>Derek Bell</name>
+		<country>GBR</country>
+		<race_skill>0.70</race_skill>
+		<qualifying_skill>0.71</qualifying_skill>
+		<aggression>0.41</aggression>
+		<defending>0.53</defending>
+		<stamina>0.72</stamina>
+		<consistency>0.61</consistency>
+		<start_reactions>0.78</start_reactions>
+		<wet_skill>0.76</wet_skill>
+		<tyre_management>0.86</tyre_management>
+		<blue_flag_conceding>0.98</blue_flag_conceding>
+		<weather_tyre_changes>0.85</weather_tyre_changes>
+		<avoidance_of_mistakes>0.45</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.34</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.6</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.97</weight_scalar>
+		<drag_scalar>0.96</drag_scalar>
+	</driver>
+	<driver livery_name="Lotus-Ford Cosworth #25 P. Lovely">
+		<name>Pete Lovely</name>
+		<country>USA</country>
+		<race_skill>0.69</race_skill>
+		<qualifying_skill>0.70</qualifying_skill>
+		<aggression>0.33</aggression>
+		<defending>0.43</defending>
+		<stamina>0.69</stamina>
+		<consistency>0.58</consistency>
+		<start_reactions>0.84</start_reactions>
+		<wet_skill>0.66</wet_skill>
+		<tyre_management>0.76</tyre_management>
+		<blue_flag_conceding>0.97</blue_flag_conceding>
+		<weather_tyre_changes>0.80</weather_tyre_changes>
+		<avoidance_of_mistakes>0.40</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.29</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.59</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.92</weight_scalar>
+		<drag_scalar>0.98</drag_scalar>
+	</driver>
+	<driver livery_name="BRM #22 G. Eaton">
+		<name>George Eaton</name>
+		<country>CAN</country>
+		<race_skill>0.65</race_skill>
+		<qualifying_skill>0.66</qualifying_skill>
+		<aggression>0.31</aggression>
+		<defending>0.36</defending>
+		<stamina>0.70</stamina>
+		<consistency>0.59</consistency>
+		<start_reactions>0.80</start_reactions>
+		<wet_skill>0.68</wet_skill>
+		<tyre_management>0.78</tyre_management>
+		<blue_flag_conceding>0.96</blue_flag_conceding>
+		<weather_tyre_changes>0.88</weather_tyre_changes>
+		<avoidance_of_mistakes>0.36</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.24</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.18</vehicle_reliability>
+		<power_scalar>1.10</power_scalar>
+		<weight_scalar>1.02</weight_scalar>
+		<drag_scalar>1.05</drag_scalar>
+	</driver>
+	<driver livery_name="Brabham-Ford Cosworth #29 R. Attwood">
+		<name>Richard Attwood</name>
+		<country>GBR</country>
+		<race_skill>0.52</race_skill> 
+		<qualifying_skill>0.56</qualifying_skill>
+		<aggression>0.44</aggression>
+		<defending>0.39</defending>
+		<stamina>0.70</stamina>
+		<consistency>0.62</consistency>
+		<start_reactions>0.89</start_reactions>
+		<wet_skill>0.81</wet_skill>
+		<tyre_management>0.74</tyre_management>
+		<blue_flag_conceding>0.96</blue_flag_conceding>
+		<weather_tyre_changes>0.82</weather_tyre_changes>
+		<avoidance_of_mistakes>0.52</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.41</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.57</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.95</weight_scalar>
+		<drag_scalar>0.93</drag_scalar>
+	</driver>
+	<driver livery_name="BMW #24 G. Mitter">
+		<name>Gerhard Mitter</name>
+		<country>DEU</country>
+		<race_skill>0.49</race_skill>
+		<qualifying_skill>0.50</qualifying_skill>
+		<aggression>0.25</aggression>
+		<defending>0.44</defending>
+		<stamina>0.75</stamina>
+		<consistency>0.65</consistency>
+		<start_reactions>0.79</start_reactions>
+		<wet_skill>0.71</wet_skill>
+		<tyre_management>0.81</tyre_management>
+		<blue_flag_conceding>0.98</blue_flag_conceding>
+		<weather_tyre_changes>0.76</weather_tyre_changes>
+		<avoidance_of_mistakes>0.36</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.22</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.41</vehicle_reliability>
+		<power_scalar>0.90</power_scalar>
+		<weight_scalar>1.05</weight_scalar>
+		<drag_scalar>1.08</drag_scalar>
+	</driver>
+	<driver livery_name="Matra-Ford Cosworth #26 H. Pescarolo">
+		<name>Henri Pescarolo</name>
+		<country>FRA</country>
+		<race_skill>0.57</race_skill>
+		<qualifying_skill>0.59</qualifying_skill>
+		<aggression>0.32</aggression>
+		<defending>0.48</defending>
+		<stamina>0.65</stamina>
+		<consistency>0.66</consistency>
+		<start_reactions>0.73</start_reactions>
+		<wet_skill>0.71</wet_skill>
+		<tyre_management>0.74</tyre_management>
+		<blue_flag_conceding>1.0</blue_flag_conceding>
+		<weather_tyre_changes>0.91</weather_tyre_changes>
+		<avoidance_of_mistakes>0.39</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.26</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.75</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>0.94</weight_scalar>
+		<drag_scalar>0.90</drag_scalar>
+	</driver>
+	<driver livery_name="Tecno-Ford Cosworth #28 F. Cevert">
+		<name>François Cevert</name>
+		<country>FRA</country>
+		<race_skill>0.59</race_skill>
+		<qualifying_skill>0.60</qualifying_skill>
+		<aggression>0.38</aggression>
+		<defending>0.44</defending>
+		<stamina>0.81</stamina>
+		<consistency>0.78</consistency>
+		<start_reactions>0.88</start_reactions>
+		<wet_skill>0.72</wet_skill>
+		<tyre_management>0.78</tyre_management>
+		<blue_flag_conceding>0.95</blue_flag_conceding>
+		<weather_tyre_changes>0.74</weather_tyre_changes>
+		<avoidance_of_mistakes>0.43</avoidance_of_mistakes>
+		<avoidance_of_forced_mistakes>0.34</avoidance_of_forced_mistakes>
+		<vehicle_reliability>0.26</vehicle_reliability>
+		<power_scalar>1.04</power_scalar>
+		<weight_scalar>1.06</weight_scalar>
+		<drag_scalar>1.10</drag_scalar>
+	</driver>
+</custom_ai_drivers>
