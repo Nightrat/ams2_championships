@@ -48,6 +48,7 @@ fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
 fn champ_eligibility(
     config_path: &std::path::Path,
     champ: &Championship,
+    champs: &[Championship],
     sessions: &[ams2_championship::data_store::RecordedSession],
 ) -> Option<(
     ams2_championship::driver_rating::Reputation,
@@ -63,12 +64,14 @@ fn champ_eligibility(
     let skills = classes[own].skills.clone();
 
     // The rating spans the driver's whole career — a seat is earned by racing, not by racing
-    // this particular car — while the requirement comes from this class's own grid.
+    // this particular car — while the requirement comes from this class's own grid. Only
+    // sessions committed to a championship count toward it.
     let contexts: Vec<driver_rating::RatingContext> =
         classes.into_iter().map(|c| c.ctx).collect();
+    let rated = driver_rating::assigned_sessions(champs, sessions);
     let reputation = driver_rating::compute_reputation_global(
         None,
-        sessions,
+        &rated,
         &contexts,
         champ.player_team.as_deref(),
     );
@@ -173,7 +176,11 @@ fn handle(
         }
 
         let classes = load_classes(&config_path);
-        let sessions = store.read().unwrap().sessions.clone();
+        // Only sessions committed to a championship are rated.
+        let sessions = {
+            let data = store.read().unwrap();
+            driver_rating::assigned_sessions(&data.championships, &data.sessions)
+        };
 
         let class_rows: Vec<ClassRow> = classes
             .iter()
@@ -334,7 +341,7 @@ fn handle(
             return;
         };
         let enforced = ams2_championship::config::load_or_create(&config_path).enforce_team_eligibility;
-        let body = match champ_eligibility(&config_path, champ, &data.sessions) {
+        let body = match champ_eligibility(&config_path, champ, &data.championships, &data.sessions) {
             Some((reputation, teams)) => Body { enforced, rated: true, reputation, teams },
             None => Body {
                 enforced,
@@ -466,7 +473,8 @@ fn handle(
         // switched enforcement off in Config.
         if ams2_championship::config::load_or_create(&config_path).enforce_team_eligibility {
             if let (true, Some(team)) = (changed, claimed) {
-                let refused = champ_eligibility(&config_path, &prospective, &data.sessions)
+                let refused =
+                    champ_eligibility(&config_path, &prospective, &data.championships, &data.sessions)
                     .filter(|(_, elig)| !ams2_championship::driver_rating::is_allowed(elig, &team))
                     .map(|(rep, elig)| {
                         let need = elig

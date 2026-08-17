@@ -18,7 +18,7 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.77</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.46</vehicle_reliability>
-        <power_scalar>1.09</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <weight_scalar>1.02</weight_scalar>
         <drag_scalar>0.95</drag_scalar>
      </driver>
@@ -39,7 +39,7 @@
 	<avoidance_of_mistakes>0.72</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.33</vehicle_reliability>
-        <power_scalar>1.09</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <weight_scalar>1.02</weight_scalar>
         <drag_scalar>0.95</drag_scalar>
      </driver>    
@@ -60,7 +60,7 @@
 	<avoidance_of_mistakes>0.66</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.36</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.96</weight_scalar>
         <drag_scalar>0.97</drag_scalar>
     </driver>
@@ -81,7 +81,7 @@
 	<avoidance_of_mistakes>0.75</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.4</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.96</weight_scalar>
         <drag_scalar>0.97</drag_scalar>
     </driver>
@@ -102,7 +102,7 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.5</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.93</weight_scalar>
         <drag_scalar>0.90</drag_scalar>
     </driver>
@@ -123,7 +123,7 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.4</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.93</weight_scalar>
         <drag_scalar>0.90</drag_scalar>
     </driver>
@@ -144,7 +144,7 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.35</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.98</weight_scalar>
         <drag_scalar>1.01</drag_scalar>
     </driver>
@@ -165,7 +165,7 @@
 	<avoidance_of_mistakes>0.70</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.3</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.98</weight_scalar>
         <drag_scalar>1.01</drag_scalar>
     </driver>
@@ -186,7 +186,7 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.2</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>1.04</weight_scalar>
         <drag_scalar>1.09</drag_scalar>
     </driver>
@@ -207,7 +207,7 @@
 	<avoidance_of_mistakes>0.75</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.2</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>1.04</weight_scalar>
         <drag_scalar>1.09</drag_scalar>
     </driver>    
@@ -228,7 +228,7 @@
 	<avoidance_of_mistakes>0.77</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.72</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.46</vehicle_reliability>
-        <power_scalar>1.07</power_scalar>
+        <power_scalar>0.98</power_scalar>
         <weight_scalar>0.97</weight_scalar>
         <drag_scalar>0.94</drag_scalar>
     </driver>
@@ -249,7 +249,7 @@
 	<avoidance_of_mistakes>0.75</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.44</vehicle_reliability>
-        <power_scalar>1.07</power_scalar>
+        <power_scalar>0.98</power_scalar>
         <weight_scalar>0.97</weight_scalar>
         <drag_scalar>0.94</drag_scalar>
     </driver>
@@ -270,7 +270,7 @@
 	<avoidance_of_mistakes>0.75</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.32</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.99</weight_scalar>
         <drag_scalar>1.00</drag_scalar>
     </driver>
@@ -291,7 +291,7 @@
 	<avoidance_of_mistakes>0.66</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.66</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.15</vehicle_reliability>
-        <power_scalar>1.10</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <weight_scalar>1.07</weight_scalar>
         <drag_scalar>1.06</drag_scalar>
     </driver>
@@ -312,7 +312,7 @@
 	<avoidance_of_mistakes>0.70</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.68</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.25</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>1.00</weight_scalar>
         <drag_scalar>1.04</drag_scalar>
     </driver>
@@ -333,7 +333,7 @@
 	<avoidance_of_mistakes>0.70</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.25</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>1.00</weight_scalar>
         <drag_scalar>1.04</drag_scalar>
     </driver>
@@ -354,7 +354,7 @@
 	<avoidance_of_mistakes>0.60</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.60</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.2</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>1.03</weight_scalar>
         <drag_scalar>1.07</drag_scalar>
     </driver>
@@ -375,7 +375,7 @@
 	<avoidance_of_mistakes>0.78</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.72</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.38</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.97</weight_scalar>
         <drag_scalar>0.98</drag_scalar>
     </driver>
@@ -396,7 +396,7 @@
 	<avoidance_of_mistakes>0.55</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.50</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.22</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>1.00</weight_scalar>
         <drag_scalar>1.00</drag_scalar>
     </driver>
@@ -438,7 +438,7 @@
 	<avoidance_of_mistakes>0.78</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.76</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.27</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.98</weight_scalar>
         <drag_scalar>1.02</drag_scalar>
     </driver>
@@ -459,7 +459,7 @@
 	<avoidance_of_mistakes>0.65</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.60</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.18</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>1.04</weight_scalar>
         <drag_scalar>1.10</drag_scalar>
     </driver>
@@ -480,7 +480,7 @@
 	<avoidance_of_mistakes>0.72</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.65</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.35</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.99</weight_scalar>
         <drag_scalar>1.02</drag_scalar>
     </driver>
@@ -501,7 +501,7 @@
 	<avoidance_of_mistakes>0.75</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.25</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <weight_scalar>0.99</weight_scalar>
         <drag_scalar>1.02</drag_scalar>
     </driver>

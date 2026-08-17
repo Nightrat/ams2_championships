@@ -4,7 +4,7 @@
         <name>Keke Rosberg</name>
         <country>FIN</country>
         <drag_scalar>0.940</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.920</weight_scalar>
         <race_skill>1</race_skill>
         <qualifying_skill>1</qualifying_skill>
@@ -27,7 +27,7 @@
         <name>Jacques Laffite</name>
         <country>FRA</country>
         <drag_scalar>0.940</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.920</weight_scalar>
         <race_skill>0.94</race_skill>
         <qualifying_skill>0.92</qualifying_skill>
@@ -51,7 +51,7 @@
         <name>Michele Alboreto</name>
         <country>ITA</country>
         <drag_scalar>1.015</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.965</weight_scalar>
         <race_skill>0.9</race_skill>
         <qualifying_skill>0.91</qualifying_skill>
@@ -74,7 +74,7 @@
         <name>Danny Sullivan</name>
         <country>USA</country>
         <drag_scalar>1.020</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.965</weight_scalar>
         <race_skill>0.85</race_skill>
         <qualifying_skill>0.85</qualifying_skill>
@@ -98,7 +98,7 @@
         <name>Nelson Piquet</name>
         <country>BRA</country>
         <drag_scalar>1.025</drag_scalar>
-        <power_scalar>1.020</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <weight_scalar>0.996</weight_scalar>
         <race_skill>0.86</race_skill>
         <qualifying_skill>0.89</qualifying_skill>
@@ -121,7 +121,7 @@
         <name>Riccardo Patrese</name>
         <country>ITA</country>
         <drag_scalar>1.025</drag_scalar>
-        <power_scalar>1.020</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <weight_scalar>0.996</weight_scalar>
         <race_skill>0.75</race_skill>
         <qualifying_skill>0.82</qualifying_skill>
@@ -145,7 +145,7 @@
         <name>John Watson</name>
         <country>GBR</country>
         <drag_scalar>0.960</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.950</weight_scalar>
         <race_skill>0.83</race_skill>
         <qualifying_skill>0.87</qualifying_skill>
@@ -168,7 +168,7 @@
         <name>Niki Lauda</name>
         <country>AUT</country>
         <drag_scalar>0.960</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.950</weight_scalar>
         <race_skill>0.89</race_skill>
         <qualifying_skill>0.85</qualifying_skill>
@@ -192,7 +192,7 @@
         <name>Manfred Winkelhock</name>
         <country>DEU</country>
         <drag_scalar>1.030</drag_scalar>
-        <power_scalar>1.020</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <weight_scalar>0.998</weight_scalar>
         <race_skill>0.75</race_skill>
         <qualifying_skill>0.89</qualifying_skill>
@@ -216,7 +216,7 @@
         <name>Elio de Angelis</name>
         <country>ITA</country>
         <drag_scalar>1.029</drag_scalar>
-        <power_scalar>1.000</power_scalar>
+        <power_scalar>0.96</power_scalar>
         <weight_scalar>1.000</weight_scalar>
         <race_skill>0.8</race_skill>
         <qualifying_skill>0.8</qualifying_skill>
@@ -239,7 +239,7 @@
         <name>Nigel Mansell</name>
         <country>GBR</country>
         <drag_scalar>1.015</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.950</weight_scalar>
         <race_skill>0.9</race_skill>
         <qualifying_skill>0.88</qualifying_skill>
@@ -263,7 +263,7 @@
         <name>Alain Prost</name>
         <country>FRA</country>
         <drag_scalar>1.000</drag_scalar>
-        <power_scalar>1.000</power_scalar>
+        <power_scalar>0.96</power_scalar>
         <weight_scalar>1.000</weight_scalar>
         <race_skill>1.0</race_skill>
         <qualifying_skill>1.0</qualifying_skill>
@@ -287,7 +287,7 @@
         <name>Eddie Cheever</name>
         <country>USA</country>
         <drag_scalar>1.000</drag_scalar>
-        <power_scalar>1.000</power_scalar>
+        <power_scalar>0.96</power_scalar>
         <weight_scalar>1.000</weight_scalar>
         <race_skill>0.90</race_skill>
         <qualifying_skill>0.90</qualifying_skill>
@@ -311,7 +311,7 @@
         <name>Andrea de Cesaris</name>
         <country>ITA</country>
         <drag_scalar>1.015</drag_scalar>
-        <power_scalar>0.990</power_scalar>
+        <power_scalar>0.95</power_scalar>
         <weight_scalar>0.990</weight_scalar>
         <race_skill>0.87</race_skill>
         <qualifying_skill>0.87</qualifying_skill>
@@ -334,7 +334,7 @@
         <name>Mauro Baldi</name>
         <country>ITA</country>
         <drag_scalar>1.015</drag_scalar>
-        <power_scalar>0.990</power_scalar>
+        <power_scalar>0.95</power_scalar>
         <weight_scalar>0.990</weight_scalar>
         <race_skill>0.77</race_skill>
         <qualifying_skill>0.75</qualifying_skill>
@@ -358,7 +358,7 @@
         <name>Jean Pierre Jarier</name>
         <country>FRA</country>
         <drag_scalar>1.085</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.995</weight_scalar>
         <race_skill>0.88</race_skill>
         <qualifying_skill>0.89</qualifying_skill>
@@ -381,7 +381,7 @@
         <name>Raul Boesel</name>
         <country>BRA</country>
         <drag_scalar>1.085</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.995</weight_scalar>
         <race_skill>0.85</race_skill>
         <qualifying_skill>0.85</qualifying_skill>
@@ -405,7 +405,7 @@
         <name>Patrick Tambay</name>
         <country>FRA</country>
         <drag_scalar>0.960</drag_scalar>
-		<power_scalar>0.998</power_scalar>
+		<power_scalar>0.96</power_scalar>
 		<weight_scalar>1.002</weight_scalar>
         <race_skill>0.96</race_skill>
         <qualifying_skill>1</qualifying_skill>
@@ -428,7 +428,7 @@
         <name>René Arnoux</name>
         <country>FRA</country>
         <drag_scalar>0.960</drag_scalar>
-		<power_scalar>0.998</power_scalar>
+		<power_scalar>0.96</power_scalar>
 		<weight_scalar>1.002</weight_scalar>
         <race_skill>0.98</race_skill>
         <qualifying_skill>1</qualifying_skill>
@@ -452,7 +452,7 @@
         <name>Marc Surer</name>
         <country>CHE</country>
         <drag_scalar>1.035</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.970</weight_scalar>
         <race_skill>0.9</race_skill>
         <qualifying_skill>0.9</qualifying_skill>
@@ -475,7 +475,7 @@
         <name>Thierry Boutsen</name>
         <country>BEL</country>
         <drag_scalar>1.035</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.970</weight_scalar>
         <race_skill>0.88</race_skill>
         <qualifying_skill>0.88</qualifying_skill>
@@ -499,7 +499,7 @@
         <name>Roberto Guerrero</name>
         <country>COL</country>
         <drag_scalar>1.050</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.980</weight_scalar>
         <race_skill>0.84</race_skill>
         <qualifying_skill>0.84</qualifying_skill>
@@ -522,7 +522,7 @@
         <name>Johnny Cecotto</name>
         <country>VEN</country>
         <drag_scalar>1.050</drag_scalar>
-        <power_scalar>0.970</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <weight_scalar>0.980</weight_scalar>
         <race_skill>0.78</race_skill>
         <qualifying_skill>0.8</qualifying_skill>
@@ -546,7 +546,7 @@
         <name>Derek Warwick</name>
         <country>GBR</country>
         <drag_scalar>1.020</drag_scalar>
-        <power_scalar>0.975</power_scalar>
+        <power_scalar>0.92</power_scalar>
         <weight_scalar>0.985</weight_scalar>
         <race_skill>0.85</race_skill>
         <qualifying_skill>0.85</qualifying_skill>
@@ -569,7 +569,7 @@
         <name>Bruno Giacomelli</name>
         <country>ITA</country>
         <drag_scalar>1.020</drag_scalar>
-        <power_scalar>0.975</power_scalar>
+        <power_scalar>0.92</power_scalar>
         <weight_scalar>0.985</weight_scalar>
         <race_skill>0.80</race_skill>
         <qualifying_skill>0.80</qualifying_skill>
@@ -593,7 +593,7 @@
         <name>Stefan Johansson</name>
         <country>SWE</country>
         <drag_scalar>1.045</drag_scalar>
-        <power_scalar>0.965</power_scalar>
+        <power_scalar>0.90</power_scalar>
         <weight_scalar>1.030</weight_scalar>
         <race_skill>0.70</race_skill>
         <qualifying_skill>0.70</qualifying_skill>

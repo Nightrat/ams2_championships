@@ -220,6 +220,53 @@ fn class_b_session(id: &str, at: u64, player_pos: u32) -> RecordedSession {
 }
 
 #[test]
+fn test_assigned_sessions_keeps_only_what_a_championship_claims() {
+    use crate::data_store::{Championship, ChampionshipStatus, Round};
+    let sessions: Vec<RecordedSession> =
+        (0..4).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    let champ = Championship {
+        id: "c1".into(),
+        name: "Season".into(),
+        status: ChampionshipStatus::Progress,
+        points_system: vec![25, 18],
+        manufacturer_scoring: false,
+        rounds: vec![Round { session_ids: vec!["0".into()] }, Round { session_ids: vec!["2".into()] }],
+        session_ids: vec![],
+        custom_ai_file: None,
+        player_team: None,
+    };
+    let kept = assigned_sessions(&[champ], &sessions);
+    assert_eq!(kept.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), vec!["0", "2"]);
+    // No championships at all means nothing is rateable — a fresh install starts from neutral.
+    assert!(assigned_sessions(&[], &sessions).is_empty());
+}
+
+#[test]
+fn test_rating_ignores_unassigned_sessions() {
+    use crate::data_store::{Championship, ChampionshipStatus, Round};
+    let ctxs = contexts();
+    let winning: Vec<RecordedSession> =
+        (0..6).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    // Six wins recorded, but only three claimed by a championship.
+    let champ = Championship {
+        id: "c1".into(),
+        name: "Season".into(),
+        status: ChampionshipStatus::Progress,
+        points_system: vec![25],
+        manufacturer_scoring: false,
+        rounds: vec![Round { session_ids: vec!["0".into(), "1".into(), "2".into()] }],
+        session_ids: vec![],
+        custom_ai_file: None,
+        player_team: None,
+    };
+    let rated = assigned_sessions(&[champ], &winning);
+    let r = compute_reputation_global(Some("Nightrat"), &rated, &ctxs, None);
+    assert_eq!(r.sp_races, 3, "unassigned races must not count");
+    let all = compute_reputation_global(Some("Nightrat"), &winning, &ctxs, None);
+    assert!(all.value > r.value, "shrinkage means the larger claimed sample rates higher");
+}
+
+#[test]
 fn test_global_rating_combines_classes() {
     let ctxs = contexts();
     let mut sessions: Vec<RecordedSession> =
@@ -291,19 +338,31 @@ fn reference_contexts() -> Vec<RatingContext> {
         .collect()
 }
 
+/// The fixture's sessions, filtered exactly as the server filters them.
+fn reference_rated() -> Vec<RecordedSession> {
+    let data = reference_career();
+    assigned_sessions(&data.championships, &data.sessions)
+}
+
+#[test]
+fn test_reference_career_is_fully_assigned() {
+    let data = reference_career();
+    // The snapshots below only mean something while every session is claimed by a championship.
+    assert_eq!(reference_rated().len(), data.sessions.len(), "fixture should be fully assigned");
+    assert_eq!(data.championships.len(), 5);
+}
+
 #[test]
 fn test_reference_career_finds_only_the_human_drivers() {
-    let data = reference_career();
-    let players = recorded_players_global(&data.sessions, &reference_contexts());
+    let players = recorded_players_global(&reference_rated(), &reference_contexts());
     // Every AI is either a roster entry or carries the "(AI)" lobby marker.
     assert_eq!(players, vec!["Nightrat".to_string(), "Wiper".to_string()]);
 }
 
 #[test]
 fn test_reference_career_rating_snapshot() {
-    let data = reference_career();
     let ctxs = reference_contexts();
-    let r = compute_reputation_global(Some("Nightrat"), &data.sessions, &ctxs, None);
+    let r = compute_reputation_global(Some("Nightrat"), &reference_rated(), &ctxs, None);
 
     assert_eq!(r.sp_races, 24, "race starts");
     assert_eq!(r.mp_races, 7, "online races");
@@ -312,23 +371,25 @@ fn test_reference_career_rating_snapshot() {
     assert!((r.finish_rate - 17.0 / 24.0).abs() < 0.001, "finish_rate {}", r.finish_rate);
     assert!(r.pace > 0.0 && r.quali > 0.0, "beat the car on average");
     assert!(r.mp_bonus < 0.0, "a losing online record must cost, not pay");
-    assert!((r.value - 56.4).abs() < 0.5, "rating {}", r.value);
+    // Snapshot value shifts whenever docs/custom_ai_files_with_perf_scalars/*.xml's scalars change
+    // (power_scalar was rescaled so the fastest car in each class is 1.00, not up to 1.10).
+    assert!((r.value - 51.66).abs() < 0.5, "rating {}", r.value);
 }
 
 #[test]
 fn test_reference_career_skips_classes_without_a_roster() {
-    let data = reference_career();
+    let rated = reference_rated();
     let ctxs = reference_contexts();
     // The career contains F-Junior sessions, and no F-Junior Custom AI file exists, so they
     // cannot be scored — they must not silently count as races.
     assert!(
-        data.sessions.iter().any(|s| s.car_class == "F-Junior"),
+        rated.iter().any(|s| s.car_class == "F-Junior"),
         "fixture should still contain the unrateable class"
     );
     assert!(!ctxs.iter().any(|c| c.class == "F-Junior"));
-    let all = compute_reputation_global(Some("Nightrat"), &data.sessions, &ctxs, None);
+    let all = compute_reputation_global(Some("Nightrat"), &rated, &ctxs, None);
     let without: Vec<_> =
-        data.sessions.iter().filter(|s| s.car_class != "F-Junior").cloned().collect();
+        rated.iter().filter(|s| s.car_class != "F-Junior").cloned().collect();
     let trimmed = compute_reputation_global(Some("Nightrat"), &without, &ctxs, None);
     assert_eq!(all.sp_races, trimmed.sp_races);
     assert!((all.value - trimmed.value).abs() < 0.001);
@@ -336,13 +397,13 @@ fn test_reference_career_skips_classes_without_a_roster() {
 
 #[test]
 fn test_reference_career_second_human_is_online_only() {
-    let data = reference_career();
-    let r = compute_reputation_global(Some("Wiper"), &data.sessions, &reference_contexts(), None);
+    let rated = reference_rated();
+    let r = compute_reputation_global(Some("Wiper"), &rated, &reference_contexts(), None);
     // Wiper appears only in multiplayer, so there is no car-relative pace to rate — the value
     // is the neutral 50 plus his online record, which mirrors Nightrat's exactly.
     assert_eq!(r.sp_races, 0);
     assert_eq!((r.mp_wins, r.mp_losses), (5, 2));
-    let me = compute_reputation_global(Some("Nightrat"), &data.sessions, &reference_contexts(), None);
+    let me = compute_reputation_global(Some("Nightrat"), &rated, &reference_contexts(), None);
     assert!((r.mp_bonus + me.mp_bonus).abs() < 0.001, "head-to-head must be zero-sum");
     assert!((r.value - (50.0 + r.mp_bonus)).abs() < 0.001);
 }

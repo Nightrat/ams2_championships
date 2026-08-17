@@ -10,7 +10,7 @@
         <drag_scalar>0.97</drag_scalar>
         <fuel_management>0.94</fuel_management>
         <name>Alain Prost</name>
-        <power_scalar>1.07</power_scalar>
+        <power_scalar>0.98</power_scalar>
         <qualifying_skill>0.93</qualifying_skill>
         <race_skill>0.96</race_skill>
         <stamina>0.98</stamina>
@@ -82,7 +82,7 @@
         <drag_scalar>0.97</drag_scalar>
         <fuel_management>0.8</fuel_management>
         <name>Keke Rosberg</name>
-        <power_scalar>1.07</power_scalar>
+        <power_scalar>0.98</power_scalar>
         <qualifying_skill>0.9</qualifying_skill>
         <race_skill>0.9</race_skill>
         <stamina>0.86</stamina>
@@ -152,7 +152,7 @@
         <drag_scalar>1.01</drag_scalar>
         <fuel_management>0.67</fuel_management>
         <name>Martin Brundle</name>
-        <power_scalar>0.99</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <qualifying_skill>0.73</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.82</stamina>
@@ -224,7 +224,7 @@
         <drag_scalar>1.01</drag_scalar>
         <fuel_management>0.58</fuel_management>
         <name>Philippe Streiff</name>
-        <power_scalar>0.99</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <qualifying_skill>0.7</qualifying_skill>
         <race_skill>0.77</race_skill>
         <stamina>0.79</stamina>
@@ -294,7 +294,7 @@
         <drag_scalar>0.95</drag_scalar>
         <fuel_management>0.88</fuel_management>
         <name>Nigel Mansell</name>
-        <power_scalar>1.10</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <qualifying_skill>0.96</qualifying_skill>
         <race_skill>0.98</race_skill>
         <stamina>0.9</stamina>
@@ -366,7 +366,7 @@
         <drag_scalar>0.95</drag_scalar>
         <fuel_management>0.92</fuel_management>
         <name>Nelson Piquet</name>
-        <power_scalar>1.10</power_scalar>
+        <power_scalar>1.00</power_scalar>
         <qualifying_skill>0.94</qualifying_skill>
         <race_skill>0.98</race_skill>
         <stamina>0.97</stamina>
@@ -436,7 +436,7 @@
         <drag_scalar>0.90</drag_scalar>
         <fuel_management>0.72</fuel_management>
         <name>Riccardo Patrese</name>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <qualifying_skill>0.8</qualifying_skill>
         <race_skill>0.81</race_skill>
         <stamina>0.9</stamina>
@@ -510,7 +510,7 @@
         <drag_scalar>0.90</drag_scalar>
         <fuel_management>0.7</fuel_management>
         <name>Elio De Angelis</name>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <qualifying_skill>0.71</qualifying_skill>
         <race_skill>0.79</race_skill>
         <stamina>0.8</stamina>
@@ -544,7 +544,7 @@
         <drag_scalar>1.05</drag_scalar>
         <fuel_management>0.78</fuel_management>
         <name>Michele Alboreto</name>
-        <power_scalar>1.04</power_scalar>
+        <power_scalar>0.97</power_scalar>
         <qualifying_skill>0.81</qualifying_skill>
         <race_skill>0.89</race_skill>
         <stamina>0.87</stamina>
@@ -618,7 +618,7 @@
         <drag_scalar>1.05</drag_scalar>
         <fuel_management>0.78</fuel_management>
         <name>Stefan Johansson</name>
-        <power_scalar>1.04</power_scalar>
+        <power_scalar>0.97</power_scalar>
         <qualifying_skill>0.79</qualifying_skill>
         <race_skill>0.89</race_skill>
         <stamina>0.9</stamina>
@@ -694,7 +694,7 @@
         <drag_scalar>0.96</drag_scalar>
         <fuel_management>0.4</fuel_management>
         <name>Johnny Dumfries</name>
-        <power_scalar>1.06</power_scalar>
+        <power_scalar>0.98</power_scalar>
         <qualifying_skill>0.74</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.72</stamina>
@@ -766,7 +766,7 @@
         <drag_scalar>0.96</drag_scalar>
         <fuel_management>0.81</fuel_management>
         <name>Ayrton Senna</name>
-        <power_scalar>1.06</power_scalar>
+        <power_scalar>0.98</power_scalar>
         <qualifying_skill>0.98</qualifying_skill>
         <race_skill>0.96</race_skill>
         <stamina>0.9</stamina>
@@ -836,7 +836,7 @@
         <drag_scalar>1.08</drag_scalar>
         <fuel_management>0.41</fuel_management>
         <name>Jonathan Palmer</name>
-        <power_scalar>0.93</power_scalar>
+        <power_scalar>0.92</power_scalar>
         <qualifying_skill>0.68</qualifying_skill>
         <race_skill>0.7</race_skill>
         <stamina>0.7</stamina>
@@ -908,7 +908,7 @@
         <drag_scalar>1.08</drag_scalar>
         <fuel_management>0.32</fuel_management>
         <name>Huub Rothengatter</name>
-        <power_scalar>0.93</power_scalar>
+        <power_scalar>0.92</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.7</race_skill>
         <stamina>0.68</stamina>
@@ -970,7 +970,7 @@
         <drag_scalar>1.03</drag_scalar>
         <fuel_management>0.55</fuel_management>
         <name>Alan Jones</name>
-        <power_scalar>0.96</power_scalar>
+        <power_scalar>0.93</power_scalar>
         <qualifying_skill>0.71</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.78</stamina>
@@ -1046,7 +1046,7 @@
         <drag_scalar>1.03</drag_scalar>
         <fuel_management>0.55</fuel_management>
         <name>Patrick Tambay</name>
-        <power_scalar>0.96</power_scalar>
+        <power_scalar>0.93</power_scalar>
         <qualifying_skill>0.77</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.79</stamina>
@@ -1122,7 +1122,7 @@
         <drag_scalar>1.02</drag_scalar>
         <fuel_management>0.56</fuel_management>
         <name>Marc Surer</name>
-        <power_scalar>1.01</power_scalar>
+        <power_scalar>0.96</power_scalar>
         <qualifying_skill>0.7</qualifying_skill>
         <race_skill>0.76</race_skill>
         <stamina>0.79</stamina>
@@ -1160,7 +1160,7 @@
         <drag_scalar>1.02</drag_scalar>
         <fuel_management>0.67</fuel_management>
         <name>Thierry Boutsen</name>
-        <power_scalar>1.01</power_scalar>
+        <power_scalar>0.96</power_scalar>
         <qualifying_skill>0.71</qualifying_skill>
         <race_skill>0.78</race_skill>
         <stamina>0.85</stamina>
@@ -1230,7 +1230,7 @@
         <drag_scalar>0.99</drag_scalar>
         <fuel_management>0.68</fuel_management>
         <name>Teo Fabi</name>
-        <power_scalar>1.08</power_scalar>
+        <power_scalar>0.99</power_scalar>
         <qualifying_skill>0.83</qualifying_skill>
         <race_skill>0.79</race_skill>
         <stamina>0.83</stamina>
@@ -1304,7 +1304,7 @@
         <drag_scalar>0.99</drag_scalar>
         <fuel_management>0.72</fuel_management>
         <name>Gerhard Berger</name>
-        <power_scalar>1.08</power_scalar>
+        <power_scalar>0.99</power_scalar>
         <qualifying_skill>0.88</qualifying_skill>
         <race_skill>0.83</race_skill>
         <stamina>0.87</stamina>
@@ -1376,7 +1376,7 @@
         <drag_scalar>1.09</drag_scalar>
         <fuel_management>0.37</fuel_management>
         <name>Piercarlo Ghinzani</name>
-        <power_scalar>0.91</power_scalar>
+        <power_scalar>0.90</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.66</race_skill>
         <stamina>0.66</stamina>
@@ -1450,7 +1450,7 @@
         <drag_scalar>1.09</drag_scalar>
         <fuel_management>0.38</fuel_management>
         <name>Christian Danner</name>
-        <power_scalar>0.91</power_scalar>
+        <power_scalar>0.90</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.62</race_skill>
         <stamina>0.68</stamina>
@@ -1492,7 +1492,7 @@
         <drag_scalar>1.07</drag_scalar>
         <fuel_management>0.48</fuel_management>
         <name>Andre De Cesaris</name>
-        <power_scalar>0.92</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <qualifying_skill>0.67</qualifying_skill>
         <race_skill>0.67</race_skill>
         <stamina>0.74</stamina>
@@ -1564,7 +1564,7 @@
         <drag_scalar>1.07</drag_scalar>
         <fuel_management>0.45</fuel_management>
         <name>Alessandro Nannini</name>
-        <power_scalar>0.92</power_scalar>
+        <power_scalar>0.91</power_scalar>
         <qualifying_skill>0.67</qualifying_skill>
         <race_skill>0.67</race_skill>
         <stamina>0.74</stamina>
@@ -1640,7 +1640,7 @@
         <drag_scalar>1.00</drag_scalar>
         <fuel_management>0.76</fuel_management>
         <name>René Arnoux</name>
-        <power_scalar>1.00</power_scalar>
+        <power_scalar>0.95</power_scalar>
         <qualifying_skill>0.85</qualifying_skill>
         <race_skill>0.85</race_skill>
         <stamina>0.87</stamina>
@@ -1710,7 +1710,7 @@
         <drag_scalar>1.00</drag_scalar>
         <fuel_management>0.71</fuel_management>
         <name>Jacques Laffite</name>
-        <power_scalar>1.00</power_scalar>
+        <power_scalar>0.95</power_scalar>
         <qualifying_skill>0.8</qualifying_skill>
         <race_skill>0.88</race_skill>
         <stamina>0.85</stamina>
@@ -1784,7 +1784,7 @@
         <drag_scalar>0.90</drag_scalar>
         <fuel_management>0.61</fuel_management>
         <name>Derek Warwick</name>
-        <power_scalar>0.98</power_scalar>
+        <power_scalar>0.94</power_scalar>
         <qualifying_skill>0.76</qualifying_skill>
         <race_skill>0.78</race_skill>
         <stamina>0.82</stamina>
@@ -1836,7 +1836,7 @@
         <drag_scalar>1.00</drag_scalar>
         <fuel_management>0.58</fuel_management>
         <name>Philippe Alliot</name>
-        <power_scalar>1.00</power_scalar>
+        <power_scalar>0.95</power_scalar>
         <qualifying_skill>0.79</qualifying_skill>
         <race_skill>0.75</race_skill>
         <stamina>0.80</stamina>
@@ -1878,7 +1878,7 @@
         <drag_scalar>1.02</drag_scalar>
         <fuel_management>0.60</fuel_management>
         <name>Christian Danner</name>
-        <power_scalar>1.01</power_scalar>
+        <power_scalar>0.96</power_scalar>
         <qualifying_skill>0.62</qualifying_skill>
         <race_skill>0.79</race_skill>
         <stamina>0.76</stamina>
@@ -1926,7 +1926,7 @@
         <drag_scalar>1.09</drag_scalar>
         <fuel_management>0.30</fuel_management>
         <name>Allan Berg</name>
-        <power_scalar>0.91</power_scalar>
+        <power_scalar>0.90</power_scalar>
         <qualifying_skill>0.6</qualifying_skill>
         <race_skill>0.67</race_skill>
         <stamina>0.69</stamina>
@@ -1966,7 +1966,7 @@
         <drag_scalar>1.03</drag_scalar>
         <fuel_management>0.59</fuel_management>
         <name>Eddie Cheever</name>
-        <power_scalar>0.96</power_scalar>
+        <power_scalar>0.93</power_scalar>
         <qualifying_skill>0.73</qualifying_skill>
         <race_skill>0.8</race_skill>
         <stamina>0.76</stamina>

@@ -13,12 +13,12 @@
 //! are never constants — they are read from, or cancelled out of, each session individually, so
 //! the same code works for someone racing twenty humans at a different difficulty.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
 use crate::custom_ai::{name_key, GridEntry, PlayerSeat, SeatEntry};
-use crate::data_store::{RecordedSession, SessionResult};
+use crate::data_store::{Championship, RecordedSession, SessionResult};
 
 /// Marker AMS2 appends to lobby-fill AI names. It appears only in multiplayer — single-player
 /// grids built from a Custom AI Driver file carry the roster's real names — which makes it a
@@ -43,6 +43,24 @@ const OFFER_MARGIN: f32 = 10.0;
 
 /// Allowance against the incumbent's `race_skill`, in the same 0–1 units.
 const INCUMBENT_MARGIN: f32 = 0.05;
+
+/// The sessions a rating is allowed to see: those committed to a round of some championship.
+///
+/// A recorded session is not yet part of a career — the recorder captures every practice,
+/// qualifying and race the moment AMS2 ends one, including throwaway runs and restarts.
+/// Assigning it to a championship is the deliberate act that makes it count, so everything
+/// downstream rates only what the user has actually claimed.
+pub fn assigned_sessions(
+    champs: &[Championship],
+    sessions: &[RecordedSession],
+) -> Vec<RecordedSession> {
+    let assigned: HashSet<&str> = champs
+        .iter()
+        .flat_map(|c| c.rounds.iter())
+        .flat_map(|r| r.session_ids.iter().map(|s| s.as_str()))
+        .collect();
+    sessions.iter().filter(|s| assigned.contains(s.id.as_str())).cloned().collect()
+}
 
 /// True when the session was run online. See [`AI_SUFFIX`].
 pub fn is_multiplayer(session: &RecordedSession) -> bool {
