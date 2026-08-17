@@ -949,6 +949,27 @@ table { border-collapse: collapse; width: 100%; }
 }
 .career-export-btn:hover { background: #1a1a3a; color: #e0e0e0; }
 
+/* ── Car Performance tab ─────────────────────────────────────────────────────── */
+#carperf-container { padding: 1rem; }
+.carperf-note { font-size: 0.82rem; color: #999; margin: 0 0 1.25rem; }
+.carperf-class { margin-bottom: 2rem; }
+.carperf-class-hidden { display: none; }
+.carperf-heading { font-size: 1.05rem; color: #e0e0e0; margin: 0 0 0.5rem; }
+.carperf-year { color: #999; font-weight: 400; font-size: 0.9em; }
+.carperf-fastest { color: #4caf50; font-weight: 600; }
+.carperf-filter-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem;
+  background: #1a1a2e; border: 1px solid #333; border-radius: 6px;
+  padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+}
+.carperf-filter-actions { display: flex; gap: 0.4rem; }
+.carperf-filter-checks { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
+.carperf-filter-check {
+  display: flex; align-items: center; gap: 0.35rem; cursor: pointer;
+  font-size: 0.85rem; color: #ccc; white-space: nowrap;
+}
+.carperf-filter-check input[type="checkbox"] { accent-color: #e74c3c; cursor: pointer; }
+
 /* ── Config tab ──────────────────────────────────────────────────────────────── */
 .config-panel { max-width: 640px; padding: 1.5rem 1rem; }
 .config-heading { font-size: 1.1rem; color: #e0e0e0; margin: 0 0 0.5rem; }

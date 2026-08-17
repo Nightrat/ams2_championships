@@ -70,6 +70,18 @@ fn handle(
         return;
     }
 
+    // GET /api/car-performance — ranked power/weight/drag table per car class
+    if method == "GET" && path == "/api/car-performance" {
+        let cfg = ams2_championship::config::load_or_create(&config_path);
+        let classes = match cfg.custom_ai_dir {
+            Some(dir) => ams2_championship::custom_ai::class_performance(std::path::Path::new(&dir)),
+            None => vec![],
+        };
+        let json = serde_json::to_vec(&classes).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
     // GET /api/championships
     if method == "GET" && path == "/api/championships" {
         let data = store.read().unwrap();

@@ -18,6 +18,7 @@ fn generate_html() -> String {
     <button class="tab-btn" data-tab="career">&#127942; Career</button>
     <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
     <button class="tab-btn" data-tab="config">&#9965; Config</button>
+    <button class="tab-btn" data-tab="carperf">&#128202; Car Performance</button>
   </div>
 </header>
 <main>
@@ -201,6 +202,9 @@ fn generate_html() -> String {
       </form>
     </div>
   </div>
+  <div id="tab-carperf" class="tab-panel tab-panel-hidden">
+    <div id="carperf-container"></div>
+  </div>
 </main>
 <script>{js_utils}</script>
 <script>{js_telemetry}</script>
@@ -209,6 +213,7 @@ fn generate_html() -> String {
 <script>{js_career}</script>
 <script>{js_manage}</script>
 <script>{js_config}</script>
+<script>{js_carperf}</script>
 <script>{js_main}</script>
 </body>
 </html>"##,
@@ -220,6 +225,7 @@ fn generate_html() -> String {
         js_career    = JS_CAREER,
         js_manage    = JS_MANAGE,
         js_config    = JS_CONFIG,
+        js_carperf   = JS_CARPERF,
         js_main      = JS_MAIN,
     )
 }
@@ -243,4 +249,5 @@ const JS_LIVE:      &str = include_str!("assets/live.js");
 const JS_CAREER:    &str = include_str!("assets/career.js");
 const JS_MANAGE:    &str = include_str!("assets/manage.js");
 const JS_CONFIG:    &str = include_str!("assets/config.js");
+const JS_CARPERF:   &str = include_str!("assets/car_performance.js");
 const JS_MAIN:      &str = include_str!("assets/main.js");
