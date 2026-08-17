@@ -51,6 +51,10 @@ pub struct Config {
     /// Used to look up team/livery names for drivers in a championship.
     #[serde(default)]
     pub custom_ai_dir: Option<String>,
+    /// Refuse to set a championship's player team when the driver rating has not earned that
+    /// seat. Turning this off keeps the ratings visible but stops them blocking anything.
+    #[serde(default = "default_true")]
+    pub enforce_team_eligibility: bool,
 }
 
 impl Default for Config {
@@ -69,6 +73,7 @@ impl Default for Config {
             spotter_voice: None,
             spotter_name: None,
             custom_ai_dir: None,
+            enforce_team_eligibility: default_true(),
         }
     }
 }

@@ -957,6 +957,22 @@ table { border-collapse: collapse; width: 100%; }
 .carperf-heading { font-size: 1.05rem; color: #e0e0e0; margin: 0 0 0.5rem; }
 .carperf-year { color: #999; font-weight: 400; font-size: 0.9em; }
 .carperf-fastest { color: #4caf50; font-weight: 600; }
+.carperf-ratings {
+  background: #1a1a2e; border: 1px solid #333; border-radius: 6px;
+  padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+}
+.carperf-ratings .carperf-heading { margin-bottom: 0.5rem; }
+.carperf-players-empty { margin: 0 0 1.5rem; }
+.carperf-players {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem;
+}
+.carperf-player { font-size: 0.85rem; color: #bbb; }
+.carperf-player-name { color: #e0e0e0; font-weight: 600; }
+.carperf-player-rating { color: #6aa9ff; font-weight: 600; }
+.carperf-player-races { color: #888; font-size: 0.92em; }
+.carperf-req-met { color: #4caf50; }
+.carperf-req-unmet { color: #b0603a; }
 .carperf-filter-bar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem;
   background: #1a1a2e; border: 1px solid #333; border-radius: 6px;

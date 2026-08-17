@@ -280,6 +280,205 @@ fn test_route_delete_round_out_of_bounds_returns_404() {
 
 // ── POST /api/championships/:id/rounds/:r/sessions/:sid ──────────────────────
 
+// ── GET /api/championships/:id/team-eligibility ──────────────────────────────
+
+#[test]
+fn test_route_team_eligibility_unrated_without_custom_ai_file() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(make_champ("c1"));
+    }
+    let resp = get(store, path.clone(), "/api/championships/c1/team-eligibility");
+    assert!(status_line(&resp).contains("200"));
+    // No roster to rate against, so nothing is gated — but enforcement state is still reported.
+    assert!(resp.contains("\"rated\":false"), "got {resp}");
+    assert!(resp.contains("\"enforced\":true"), "enforcement defaults on: {resp}");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_team_eligibility_unknown_championship_is_404() {
+    let (store, path) = make_test_store();
+    let resp = get(store, path.clone(), "/api/championships/nope/team-eligibility");
+    assert!(status_line(&resp).contains("404"));
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_explicit_null_clears_assignments() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        champ.player_team = Some("Brabham".into());
+        data.championships.push(champ);
+    }
+    // A plain Option<Option<_>> collapses an explicit null into "key absent", which silently
+    // made these impossible to clear — the UI's "(none)" choice did nothing.
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"player_team":null}"#);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(store.read().unwrap().championships[0].player_team, None);
+
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"custom_ai_file":null}"#);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(store.read().unwrap().championships[0].custom_ai_file, None);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_omitted_key_leaves_assignment_untouched() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        champ.player_team = Some("Brabham".into());
+        data.championships.push(champ);
+    }
+    // The other half of the contract: absent means "leave alone", not "clear".
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"name":"Renamed"}"#);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    let data = store.read().unwrap();
+    assert_eq!(data.championships[0].player_team.as_deref(), Some("Brabham"));
+    assert_eq!(data.championships[0].custom_ai_file.as_deref(), Some("F-Classic_Gen1.xml"));
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_player_team_locked_once_a_session_is_assigned() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        champ.player_team = Some("Brabham".into());
+        champ.rounds.push(Round { session_ids: vec!["sess1".into()] });
+        data.championships.push(champ);
+    }
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"player_team":"Williams"}"#);
+    assert!(status_line(&resp).contains("409"), "got {resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_team.as_deref(),
+        Some("Brabham"),
+        "a rejected change must leave the team untouched"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_locked_team_still_allows_other_edits() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        champ.player_team = Some("Brabham".into());
+        champ.rounds.push(Round { session_ids: vec!["sess1".into()] });
+        data.championships.push(champ);
+    }
+    // Renaming touches no team, so the lock must not stand in the way.
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"name":"1986 Season"}"#);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(store.read().unwrap().championships[0].name, "1986 Season");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_team_changeable_before_any_session() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        // An empty round is not a started championship.
+        champ.rounds.push(Round::default());
+        data.championships.push(champ);
+    }
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"player_team":"Williams"}"#);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_team.as_deref(),
+        Some("Williams")
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_locked_team_blocks_clearing_the_custom_ai_file() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        champ.player_team = Some("Brabham".into());
+        champ.rounds.push(Round { session_ids: vec!["sess1".into()] });
+        data.championships.push(champ);
+    }
+    // Unassigning the roster clears the team as a side effect, which is still a team change.
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"custom_ai_file":null}"#);
+    assert!(status_line(&resp).contains("409"), "got {resp}");
+    let data = store.read().unwrap();
+    assert_eq!(data.championships[0].custom_ai_file.as_deref(), Some("F-Classic_Gen1.xml"));
+    assert_eq!(data.championships[0].player_team.as_deref(), Some("Brabham"));
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_player_team_is_not_gated_without_a_roster() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        data.championships.push(champ);
+    }
+    // With no custom_ai_dir configured the rating cannot be computed, and an unrateable team
+    // must never be blocked.
+    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
+        br#"{"player_team":"Williams"}"#);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_team.as_deref(),
+        Some("Williams")
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+// ── GET /api/championships/:id/session-eligibility ───────────────────────────
+
+#[test]
+fn test_route_session_eligibility_not_enforced_without_player_team() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        // A Custom AI file alone is not enough — a selected team is what turns enforcement on.
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        data.championships.push(champ);
+    }
+    let resp = get(store, path.clone(), "/api/championships/c1/session-eligibility");
+    assert!(status_line(&resp).contains("200"));
+    assert!(resp.contains("\"enforced\":false"), "got {resp}");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_session_eligibility_unknown_championship_is_404() {
+    let (store, path) = make_test_store();
+    let resp = get(store, path.clone(), "/api/championships/nope/session-eligibility");
+    assert!(status_line(&resp).contains("404"));
+    let _ = std::fs::remove_file(&path);
+}
+
 #[test]
 fn test_route_post_session_to_round_adds_it() {
     let (store, path) = make_test_store();

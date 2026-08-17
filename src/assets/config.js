@@ -20,6 +20,7 @@ function loadConfig() {
       document.getElementById('cfg-record-practice').checked = cfg.record_practice;
       document.getElementById('cfg-record-qualify').checked  = cfg.record_qualify;
       document.getElementById('cfg-record-race').checked     = cfg.record_race;
+      document.getElementById('cfg-enforce-team-eligibility').checked = cfg.enforce_team_eligibility;
       document.getElementById('cfg-show-track-map').checked        = cfg.show_track_map;
       document.getElementById('cfg-track-map-max-points').value    = cfg.track_map_max_points;
       applyTrackMapConfig(cfg);
@@ -77,6 +78,7 @@ document.getElementById('config-form').addEventListener('submit', function (e) {
     record_practice:      document.getElementById('cfg-record-practice').checked,
     record_qualify:       document.getElementById('cfg-record-qualify').checked,
     record_race:          document.getElementById('cfg-record-race').checked,
+    enforce_team_eligibility: document.getElementById('cfg-enforce-team-eligibility').checked,
     show_track_map:       document.getElementById('cfg-show-track-map').checked,
     track_map_max_points: parseInt(document.getElementById('cfg-track-map-max-points').value, 10),
   };

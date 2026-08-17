@@ -8,6 +8,74 @@ use ams2_championship::http::{send_response, json_ok, json_err, read_full_reques
 use ams2_championship::spotter::Focus;
 use ams2_championship::websocket::handle_websocket;
 
+/// The configured Custom AI Drivers folder, if one is set and non-empty.
+fn cfg_custom_ai_dir(config_path: &std::path::Path) -> Option<PathBuf> {
+    ams2_championship::config::load_or_create(config_path)
+        .custom_ai_dir
+        .filter(|d| !d.trim().is_empty())
+        .map(PathBuf::from)
+}
+
+/// Everything needed to rate and rank one car class.
+struct ClassData {
+    perf: ams2_championship::custom_ai::ClassPerformance,
+    ctx: ams2_championship::driver_rating::RatingContext,
+    /// Weaker incumbent's `race_skill` per team.
+    skills: std::collections::HashMap<String, f32>,
+}
+
+/// Loads every readable car class from the configured Custom AI Drivers folder.
+fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
+    use ams2_championship::{custom_ai, driver_rating};
+    let Some(dir) = cfg_custom_ai_dir(config_path) else { return vec![] };
+    custom_ai::class_performance(&dir)
+        .into_iter()
+        .map(|perf| {
+            let path = dir.join(format!("{}.xml", perf.class));
+            let pace: std::collections::HashMap<String, f32> =
+                perf.cars.iter().map(|c| (c.team.clone(), c.pace_delta_pct)).collect();
+            let ctx =
+                driver_rating::RatingContext::new(&perf.class, custom_ai::parse_seats(&path), &pace);
+            ClassData { skills: custom_ai::parse_team_skills(&path), ctx, perf }
+        })
+        .collect()
+}
+
+/// Driver rating and per-team eligibility for a championship.
+///
+/// `None` when the championship has no Custom AI file, or no folder is configured — without a
+/// roster there are no teams, no car pace figures, and nothing to rate against.
+fn champ_eligibility(
+    config_path: &std::path::Path,
+    champ: &Championship,
+    sessions: &[ams2_championship::data_store::RecordedSession],
+) -> Option<(
+    ams2_championship::driver_rating::Reputation,
+    Vec<ams2_championship::driver_rating::TeamEligibility>,
+)> {
+    use ams2_championship::driver_rating;
+
+    let file = champ.custom_ai_file.as_deref()?;
+    let class = std::path::Path::new(file).file_stem()?.to_str()?;
+    let classes = load_classes(config_path);
+    let own = classes.iter().position(|c| c.perf.class == class)?;
+    let expected = classes[own].ctx.expected.clone();
+    let skills = classes[own].skills.clone();
+
+    // The rating spans the driver's whole career — a seat is earned by racing, not by racing
+    // this particular car — while the requirement comes from this class's own grid.
+    let contexts: Vec<driver_rating::RatingContext> =
+        classes.into_iter().map(|c| c.ctx).collect();
+    let reputation = driver_rating::compute_reputation_global(
+        None,
+        sessions,
+        &contexts,
+        champ.player_team.as_deref(),
+    );
+    let eligibility = driver_rating::team_eligibility(reputation.value, &expected, &skills);
+    Some((reputation, eligibility))
+}
+
 fn handle(
     mut stream: TcpStream,
     html: Arc<Vec<u8>>,
@@ -70,14 +138,90 @@ fn handle(
         return;
     }
 
-    // GET /api/car-performance — ranked power/weight/drag table per car class
+    // GET /api/car-performance — ranked power/weight/drag table per car class, each team's
+    // required driver rating, and the rating of every human recorded in that class.
     if method == "GET" && path == "/api/car-performance" {
-        let cfg = ams2_championship::config::load_or_create(&config_path);
-        let classes = match cfg.custom_ai_dir {
-            Some(dir) => ams2_championship::custom_ai::class_performance(std::path::Path::new(&dir)),
-            None => vec![],
-        };
-        let json = serde_json::to_vec(&classes).unwrap_or_default();
+        use ams2_championship::{custom_ai, driver_rating};
+
+        #[derive(serde::Serialize)]
+        struct CarRow {
+            #[serde(flatten)]
+            car: custom_ai::CarPerformanceRow,
+            /// Reputation needed to claim this seat, 0–100.
+            required_rating: f32,
+        }
+        #[derive(serde::Serialize)]
+        struct PlayerRow {
+            name: String,
+            rating: f32,
+            sp_races: u32,
+            mp_races: u32,
+            mp_wins: u32,
+            mp_losses: u32,
+        }
+        #[derive(serde::Serialize)]
+        struct ClassRow {
+            class: String,
+            year: Option<u16>,
+            cars: Vec<CarRow>,
+        }
+        #[derive(serde::Serialize)]
+        struct Body {
+            /// Career ratings across every class, not per class.
+            players: Vec<PlayerRow>,
+            classes: Vec<ClassRow>,
+        }
+
+        let classes = load_classes(&config_path);
+        let sessions = store.read().unwrap().sessions.clone();
+
+        let class_rows: Vec<ClassRow> = classes
+            .iter()
+            .map(|cd| {
+                let required: std::collections::HashMap<String, f32> =
+                    driver_rating::team_requirements(&cd.ctx.expected, &cd.skills)
+                        .into_iter()
+                        .collect();
+                ClassRow {
+                    class: cd.perf.class.clone(),
+                    year: cd.perf.year,
+                    cars: cd
+                        .perf
+                        .cars
+                        .iter()
+                        .map(|c| CarRow {
+                            required_rating: required.get(&c.team).copied().unwrap_or(0.0),
+                            car: c.clone(),
+                        })
+                        .collect(),
+                }
+            })
+            .collect();
+
+        let contexts: Vec<driver_rating::RatingContext> =
+            classes.into_iter().map(|c| c.ctx).collect();
+        let players: Vec<PlayerRow> =
+            driver_rating::recorded_players_global(&sessions, &contexts)
+                .into_iter()
+                .map(|name| {
+                    let r = driver_rating::compute_reputation_global(
+                        Some(&name),
+                        &sessions,
+                        &contexts,
+                        None,
+                    );
+                    PlayerRow {
+                        name,
+                        rating: r.value,
+                        sp_races: r.sp_races,
+                        mp_races: r.mp_races,
+                        mp_wins: r.mp_wins,
+                        mp_losses: r.mp_losses,
+                    }
+                })
+                .collect();
+
+        let json = serde_json::to_vec(&Body { players, classes: class_rows }).unwrap_or_default();
         json_ok(&mut stream, &json);
         return;
     }
@@ -172,6 +316,83 @@ fn handle(
         return;
     }
 
+    // GET /api/championships/:id/team-eligibility — driver rating plus which teams it opens.
+    if method == "GET" && segs.len() == 4 && segs[0] == "api" && segs[1] == "championships" && segs[3] == "team-eligibility" {
+        #[derive(serde::Serialize)]
+        struct Body {
+            /// False when the config checkbox is off — tiers are then advisory only.
+            enforced: bool,
+            /// False when the championship has no Custom AI file to rate against.
+            rated: bool,
+            reputation: ams2_championship::driver_rating::Reputation,
+            teams: Vec<ams2_championship::driver_rating::TeamEligibility>,
+        }
+        let id = segs[2];
+        let data = store.read().unwrap();
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        let enforced = ams2_championship::config::load_or_create(&config_path).enforce_team_eligibility;
+        let body = match champ_eligibility(&config_path, champ, &data.sessions) {
+            Some((reputation, teams)) => Body { enforced, rated: true, reputation, teams },
+            None => Body {
+                enforced,
+                rated: false,
+                reputation: Default::default(),
+                teams: vec![],
+            },
+        };
+        let json = serde_json::to_vec(&body).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // GET /api/championships/:id/session-eligibility — which recorded sessions may join this
+    // championship. `enforced` is false unless a Custom AI file *and* a player team are both
+    // set; the session picker only hides anything when it is true.
+    if method == "GET" && segs.len() == 4 && segs[0] == "api" && segs[1] == "championships" && segs[3] == "session-eligibility" {
+        #[derive(serde::Serialize)]
+        struct Eligibility {
+            enforced: bool,
+            blocked: std::collections::HashMap<String, String>,
+        }
+        let id = segs[2];
+        let data = store.read().unwrap();
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        let mut out = Eligibility { enforced: false, blocked: Default::default() };
+        if let (Some(dir), Some(file), Some(team)) = (
+            cfg_custom_ai_dir(&config_path),
+            champ.custom_ai_file.as_deref(),
+            champ.player_team.as_deref().filter(|t| !t.trim().is_empty()),
+        ) {
+            let seats = ams2_championship::custom_ai::parse_seats(&dir.join(file));
+            out.enforced = true;
+            for s in &data.sessions {
+                let grid: Vec<ams2_championship::custom_ai::GridEntry> = s
+                    .results
+                    .iter()
+                    .map(|r| ams2_championship::custom_ai::GridEntry {
+                        name: &r.name,
+                        car_name: &r.car_name,
+                        is_player: r.is_player,
+                    })
+                    .collect();
+                if let ams2_championship::custom_ai::TeamCheck::Failed(reason) =
+                    ams2_championship::custom_ai::check_player_team(&seats, &grid, team)
+                {
+                    out.blocked.insert(s.id.clone(), reason);
+                }
+            }
+        }
+        let json = serde_json::to_vec(&out).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
     // PATCH /api/championships/:id
     if method == "PATCH" && segs.len() == 3 && segs[0] == "api" && segs[1] == "championships" {
         let id = segs[2];
@@ -183,16 +404,89 @@ fn handle(
             manufacturer_scoring: Option<bool>,
             // Outer Option = key present or not (leave unchanged if absent);
             // inner Option = explicit null clears the assignment.
-            #[serde(default)]
+            #[serde(default, deserialize_with = "double_option")]
             custom_ai_file: Option<Option<String>>,
-            #[serde(default)]
+            #[serde(default, deserialize_with = "double_option")]
             player_team: Option<Option<String>>,
+        }
+        /// Distinguishes an absent key from an explicit `null`.
+        ///
+        /// Plain `Option<Option<T>>` cannot: serde collapses a `null` into the *outer* `None`,
+        /// which reads as "leave unchanged" and makes the assignment impossible to clear.
+        fn double_option<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            serde::Deserialize::deserialize(de).map(Some)
         }
         let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
             json_err(&mut stream, "400 Bad Request", "invalid body");
             return;
         };
         let mut data = store.write().unwrap();
+        let Some(current) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+
+        // The championship as it would be after this request, used by both checks below so a
+        // rejection leaves it untouched.
+        let mut prospective = current.clone();
+        if let Some(caf) = body.custom_ai_file.clone() {
+            prospective.custom_ai_file = caf;
+            if prospective.custom_ai_file.is_none() { prospective.player_team = None; }
+        }
+        if let Some(pt) = body.player_team.clone() {
+            prospective.player_team =
+                if prospective.custom_ai_file.is_some() { pt } else { None };
+        }
+        let claimed = prospective.player_team.clone().filter(|t| !t.trim().is_empty());
+        // Only a *change* of team is gated; leaving an existing one alone must keep working even
+        // if the rating has since dropped, or the roster has changed underneath it.
+        let changed = claimed.as_deref() != current.player_team.as_deref();
+
+        // ── The team is committed once the championship is under way ─────────
+        // Swapping seats mid-season would rewrite the meaning of results already scored, so the
+        // first assigned session locks it in. This is a championship integrity rule rather than
+        // a rating one, so the Config switch does not disable it. Note it also blocks
+        // unassigning the Custom AI file, since that would clear the team as a side effect.
+        if changed && current.rounds.iter().any(|r| !r.session_ids.is_empty()) {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "The team is locked once a championship has its first session. \
+                 Remove the assigned sessions first to change it.",
+            );
+            return;
+        }
+
+        // ── Team eligibility enforcement ─────────────────────────────────────
+        // Claiming a seat the driver rating has not earned is refused, unless the user has
+        // switched enforcement off in Config.
+        if ams2_championship::config::load_or_create(&config_path).enforce_team_eligibility {
+            if let (true, Some(team)) = (changed, claimed) {
+                let refused = champ_eligibility(&config_path, &prospective, &data.sessions)
+                    .filter(|(_, elig)| !ams2_championship::driver_rating::is_allowed(elig, &team))
+                    .map(|(rep, elig)| {
+                        let need = elig
+                            .iter()
+                            .find(|e| e.team.eq_ignore_ascii_case(team.trim()))
+                            .map(|e| e.required)
+                            .unwrap_or(100.0);
+                        format!(
+                            "{team} needs a driver rating of {need:.0}; yours is {:.0}. \
+                             Race for a slower team first, or turn off team enforcement in Config.",
+                            rep.value
+                        )
+                    });
+                if let Some(reason) = refused {
+                    json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));
+                    return;
+                }
+            }
+        }
+
         // Only one championship may be Active at a time.
         if body.status == Some(ChampionshipStatus::Active) {
             for c in data.championships.iter_mut() {
@@ -209,8 +503,15 @@ fn handle(
         if let Some(status) = body.status { champ.status = status; }
         if let Some(ps) = body.points_system { champ.points_system = ps; }
         if let Some(ms) = body.manufacturer_scoring { champ.manufacturer_scoring = ms; }
-        if let Some(caf) = body.custom_ai_file { champ.custom_ai_file = caf; }
-        if let Some(pt) = body.player_team { champ.player_team = pt; }
+        if let Some(caf) = body.custom_ai_file {
+            champ.custom_ai_file = caf;
+            // A player team is only meaningful against a Custom AI roster — it is what the
+            // seat inference checks it against — so unassigning the file also clears the team.
+            if champ.custom_ai_file.is_none() { champ.player_team = None; }
+        }
+        if let Some(pt) = body.player_team {
+            champ.player_team = if champ.custom_ai_file.is_some() { pt } else { None };
+        }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         persist(&store, &data_path);
@@ -290,7 +591,7 @@ fn handle(
     {
         let (id, ridx, sid) = (segs[2], segs[4].parse::<usize>().unwrap_or(usize::MAX), segs[6]);
         let mut data = store.write().unwrap();
-        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
             json_err(&mut stream, "404 Not Found", "not found");
             return;
         };
@@ -298,6 +599,41 @@ fn handle(
             json_err(&mut stream, "404 Not Found", "round not found");
             return;
         }
+
+        // ── Player-team enforcement ──────────────────────────────────────────
+        // Applies only when the championship has a Custom AI file, which is also the only way
+        // a player team can be set (see the PATCH route). Without that roster there is nothing
+        // to infer the player's seat from, so the session is accepted unchecked.
+        let rejection: Option<String> = (|| {
+            let dir = cfg_custom_ai_dir(&config_path)?;
+            let file = champ.custom_ai_file.as_deref()?;
+            let team = champ.player_team.as_deref().filter(|t| !t.trim().is_empty())?;
+            let session = data.sessions.iter().find(|s| s.id == sid)?;
+            let seats = ams2_championship::custom_ai::parse_seats(&dir.join(file));
+            let grid: Vec<ams2_championship::custom_ai::GridEntry> = session
+                .results
+                .iter()
+                .map(|r| ams2_championship::custom_ai::GridEntry {
+                    name: &r.name,
+                    car_name: &r.car_name,
+                    is_player: r.is_player,
+                })
+                .collect();
+            match ams2_championship::custom_ai::check_player_team(&seats, &grid, team) {
+                ams2_championship::custom_ai::TeamCheck::Failed(reason) => Some(reason),
+                _ => None,
+            }
+        })();
+        if let Some(reason) = rejection {
+            // json_err interpolates the message straight into JSON — keep quotes out of it.
+            json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));
+            return;
+        }
+
+        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
         let round = &mut champ.rounds[ridx];
         if !round.session_ids.contains(&sid.to_string()) {
             round.session_ids.push(sid.to_string());
@@ -361,7 +697,10 @@ fn handle(
             show_track_map: bool, track_map_max_points: u32, move_data_file: bool,
             #[serde(default)]
             custom_ai_dir: Option<String>,
+            #[serde(default = "yes")]
+            enforce_team_eligibility: bool,
         }
+        fn yes() -> bool { true }
         let req_body: PatchConfig = match serde_json::from_slice(&req.body) {
             Ok(v) => v,
             Err(e) => { json_err(&mut stream, "400 Bad Request", &e.to_string()); return; }
@@ -403,6 +742,7 @@ fn handle(
             spotter_voice:   old_cfg.spotter_voice,
             spotter_name:    old_cfg.spotter_name,
             custom_ai_dir:   req_body.custom_ai_dir,
+            enforce_team_eligibility: req_body.enforce_team_eligibility,
         };
         match serde_json::to_string_pretty(&new_cfg) {
             Ok(text) => { if let Err(e) = std::fs::write(config_path.as_ref(), text) {

@@ -94,6 +94,16 @@ fn test_config_default_values() {
     assert!(cfg.show_track_map);
     assert_eq!(cfg.track_map_max_points, 5000);
     assert!(cfg.data_file.is_none());
+    assert!(cfg.enforce_team_eligibility);
+}
+
+#[test]
+fn test_enforce_team_eligibility_defaults_on_for_existing_configs() {
+    // Config files written before this setting existed must not silently disable enforcement.
+    let path = tmp_path();
+    fs::write(&path, r#"{"port":8080}"#).unwrap();
+    assert!(load_or_create(&path).enforce_team_eligibility);
+    let _ = fs::remove_file(&path);
 }
 
 #[test]

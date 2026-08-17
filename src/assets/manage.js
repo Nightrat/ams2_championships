@@ -110,7 +110,19 @@ function renderChampDetail(id) {
   var aiHint = manageState.customAiFiles.length
     ? 'Driver names matching a &lt;name&gt; entry in this file show its livery/team name instead of the AMS2 car class.'
     : 'No .xml files found. Set a Custom AI Drivers folder in the Config tab.';
-  var playerTeamHint = 'AMS2 does not expose your team/livery in telemetry — set it manually here. Applies to your own result rows only.';
+  // A player team is only checkable against a Custom AI roster, so without a file assigned the
+  // field is disabled and the server keeps player_team null — that is also what switches
+  // session enforcement off.
+  var hasAi = !!champ.custom_ai_file;
+  // The team is committed once the championship has a session: changing it would rewrite the
+  // meaning of results already scored, so the server refuses it too.
+  var started = rounds.some(function (r) { return (r.session_ids || []).length > 0; });
+  var teamLocked = !hasAi || started;
+  var playerTeamHint = !hasAi
+    ? 'Assign a Custom AI Drivers file first — its roster is what your seat is checked against.'
+    : started
+      ? 'Locked in: the championship has started. Remove its assigned sessions to change teams.'
+      : 'AMS2 exposes no livery field. Your seat is inferred from the car you drove plus which roster drivers are on the grid, and sessions that contradict it are rejected.';
 
   var roundsHtml = rounds.length === 0
     ? '<div class="manage-empty">No rounds yet. Click \u201c+ Add Round\u201d to create one.</div>'
@@ -155,8 +167,18 @@ function renderChampDetail(id) {
       '<label>Points&nbsp;<input class="manage-input champ-points-input" value="' + esc(champ.points_system.join(',')) + '" data-id="' + esc(champ.id) + '" size="32" title="Comma-separated points per finishing position"></label>' +
       '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
       '<label title="' + aiHint + '">Custom AI Drivers&nbsp;<select class="manage-select champ-custom-ai-select">' + aiOptions + '</select></label>' +
-      '<label title="' + esc(playerTeamHint) + '">My Team&nbsp;<input class="manage-input champ-player-team-input" list="player-team-datalist" placeholder="e.g. Brabham-Repco" value="' + esc(champ.player_team || '') + '"></label>' +
-      '<datalist id="player-team-datalist"></datalist>' +
+      // Teams are picked, never typed: a free-text seat could name a team that is not in the
+      // roster at all, which the rating cannot judge and so would silently never be enforced.
+      // Options arrive from loadPlayerTeamOptions; until then only the current value is listed.
+      '<label title="' + esc(playerTeamHint) + '">My Team&nbsp;' +
+        '<select class="manage-select champ-player-team-select"' + (teamLocked ? ' disabled' : '') + '>' +
+          '<option value="">' + (hasAi ? '(none)' : 'needs a Custom AI file') + '</option>' +
+          (champ.player_team
+            ? '<option value="' + esc(champ.player_team) + '" selected>' + esc(champ.player_team) + '</option>'
+            : '') +
+        '</select>' +
+      '</label>' +
+      '<span class="config-hint" id="player-team-rating"></span>' +
     '</div>' +
     '<div class="champ-rounds-header">' +
       '<span>Rounds&nbsp;(' + rounds.length + ')</span>' +
@@ -180,10 +202,15 @@ function renderChampDetail(id) {
   right.querySelector('.champ-custom-ai-select').addEventListener('change', function () {
     patchChamp(champ.id, { custom_ai_file: this.value || null });
   });
-  right.querySelector('.champ-player-team-input').addEventListener('blur', function () {
-    var val = this.value.trim();
+  right.querySelector('.champ-player-team-select').addEventListener('change', function () {
+    var val = this.value;
     if (val === (champ.player_team || '')) return;
-    patchChamp(champ.id, { player_team: val || null });
+    var select = this;
+    patchChamp(champ.id, { player_team: val || null }, function (err) {
+      // 409 = the driver rating has not earned this seat.
+      alert(err);
+      select.value = champ.player_team || '';
+    });
   });
   loadPlayerTeamOptions(champ.id);
   right.querySelector('.champ-delete-btn').addEventListener('click', function () {
@@ -225,16 +252,67 @@ function renderChampDetail(id) {
 }
 
 function loadPlayerTeamOptions(champId) {
-  fetch('/api/championships/' + champId + '/teams').then(function (r) { return r.json(); })
-    .then(function (teams) {
+  fetch('/api/championships/' + champId + '/team-eligibility').then(function (r) { return r.json(); })
+    .then(function (el) {
       if (manageState.selectedId !== champId) return; // user navigated away before this resolved
-      var datalist = document.getElementById('player-team-datalist');
-      if (!datalist) return;
-      datalist.innerHTML = (teams || []).map(function (t) { return '<option value="' + esc(t) + '">'; }).join('');
+      var select = document.querySelector('.champ-player-team-select');
+      var note = document.getElementById('player-team-rating');
+      if (!select) return;
+      var champ = manageState.champs.find(function (c) { return c.id === champId; });
+      var current = (champ && champ.player_team) || '';
+      if (!el || !el.rated) {
+        if (note) note.textContent = '';
+        return;
+      }
+      if (select.disabled) {
+        // Committed for this championship — the option list is moot, but the rating still is not.
+        if (note) {
+          note.textContent = 'Driver rating ' + Math.round(el.reputation.value) + '/100' +
+            ' — team locked in, this championship has already started.';
+        }
+        return;
+      }
+      // Offer only what the rating has earned; locked teams stay out of the list and are
+      // refused by the server too, unless enforcement is switched off in Config.
+      var teams = el.teams || [];
+      var offerable = teams.filter(function (t) { return t.tier !== 'locked'; });
+      var listed = el.enforced ? offerable : teams;
+      var opts = '<option value="">(none)</option>';
+      // An already-claimed seat stays selectable even if the rating has since dropped below it,
+      // so opening the panel can never silently drop the team that is already saved.
+      if (current && !listed.some(function (t) { return t.team === current; })) {
+        opts += '<option value="' + esc(current) + '">' + esc(current) + ' (current)</option>';
+      }
+      opts += listed.map(function (t) {
+        var label = t.team + ' — needs ' + Math.round(t.required) +
+          (t.tier === 'offer_possible' ? ', within reach' : '');
+        return '<option value="' + esc(t.team) + '">' + esc(label) + '</option>';
+      }).join('');
+      select.innerHTML = opts;
+      select.value = current;
+      if (note) {
+        var locked = teams.filter(function (t) { return t.tier === 'locked'; }).length;
+        var soon = teams.filter(function (t) { return t.tier === 'offer_possible'; })
+          .map(function (t) { return t.team; });
+        note.textContent = 'Driver rating ' + Math.round(el.reputation.value) + '/100' +
+          (el.enforced ? '' : ' (enforcement off)') +
+          ' — ' + offerable.length + ' of ' + teams.length + ' teams open' +
+          (locked ? ', ' + locked + ' locked' : '') +
+          (soon.length ? '. Within reach: ' + soon.join(', ') : '');
+      }
     }).catch(function () {});
 }
 
 function renderAvailableSessions(champId) {
+  // Eligibility is server-side; it only blocks anything when the championship has both a
+  // Custom AI file and a selected team. Failing open keeps the picker usable if it errors.
+  fetch('/api/championships/' + champId + '/session-eligibility')
+    .then(function (r) { return r.json(); })
+    .catch(function () { return null; })
+    .then(function (elig) { renderAvailableSessionsWith(champId, elig || {}); });
+}
+
+function renderAvailableSessionsWith(champId, elig) {
   var assignedIds = [];
   manageState.champs.forEach(function (c) {
     (c.rounds || []).forEach(function (round) {
@@ -243,13 +321,26 @@ function renderAvailableSessions(champId) {
   });
   var ridx = manageState.currentRidx || 0;
   var available = manageState.sessions.filter(function (s) { return !assignedIds.includes(s.id); });
+  var blocked = elig.blocked || {};
+  var hidden = 0;
+  if (elig.enforced) {
+    available = available.filter(function (s) {
+      if (!blocked[s.id]) return true;
+      hidden++;
+      return false;
+    });
+  }
+  var hiddenNote = hidden
+    ? '<div class="manage-empty">' + hidden + ' session' + (hidden === 1 ? '' : 's') +
+      ' hidden — they contradict your team for this championship.</div>'
+    : '';
   var el = document.getElementById('available-sessions');
   if (!el) return;
   if (!available.length) {
-    el.innerHTML = '<div class="manage-empty">No unassigned sessions.</div>';
+    el.innerHTML = hiddenNote || '<div class="manage-empty">No unassigned sessions.</div>';
     return;
   }
-  el.innerHTML = available.map(function (s) {
+  el.innerHTML = hiddenNote + available.map(function (s) {
     var typeLabel = SESSION_TYPE_LABELS[s.session_type] || '?';
     return '<div class="session-card">' +
       '<div class="session-card-info">' +
@@ -268,7 +359,13 @@ function renderAvailableSessions(champId) {
     btn.addEventListener('click', function () {
       fetch('/api/championships/' + btn.dataset.cid + '/rounds/' + btn.dataset.ridx + '/sessions/' + btn.dataset.sid,
             { method: 'POST' })
-        .then(function () {
+        .then(function (r) {
+          // 409 = the session contradicts the championship's declared player team.
+          if (!r.ok) {
+            return r.json().then(function (e) {
+              alert('Session not added: ' + (e && e.error ? e.error : 'rejected by the server.'));
+            });
+          }
           loadManage();
           renderChampDetail(champId);
           renderAvailableSessions(champId);
@@ -277,12 +374,17 @@ function renderAvailableSessions(champId) {
   });
 }
 
-function patchChamp(id, patch) {
+function patchChamp(id, patch, onError) {
   fetch('/api/championships/' + id, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch)
-  }).then(function () { loadManage(); });
+  }).then(function (r) {
+    if (!r.ok && onError) {
+      return r.json().then(function (e) { onError(e && e.error ? e.error : 'Rejected.'); });
+    }
+    loadManage();
+  });
 }
 
 // New championship form wiring

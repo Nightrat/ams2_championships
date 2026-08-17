@@ -185,6 +185,13 @@ fn generate_html() -> String {
         </div>
         <div class="config-group config-group-check">
           <label class="config-label config-label-check">
+            <input id="cfg-enforce-team-eligibility" name="enforce_team_eligibility" type="checkbox" />
+            Enforce team eligibility
+          </label>
+          <span class="config-hint">Only let a championship's My Team be set to a team your driver rating has earned. Turn off to keep the ratings visible without blocking anything.</span>
+        </div>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
             <input id="cfg-show-track-map" name="show_track_map" type="checkbox" />
             Show track radar in live view
           </label>
