@@ -116,6 +116,39 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
     Ok(())
 }
 
+/// Records every participant's position each time the leader completes a lap.
+///
+/// `leader_laps` is a high-water mark, so a *falling* lap count is the only signal available
+/// that the race was restarted: AMS2 keeps `session_state` at RACE across a restart and never
+/// disconnects, so neither of the loop's other reset points fires. Without this the mark would
+/// stay at the abandoned run's maximum and every lap of the new run below it would be dropped,
+/// leaving a chart that begins partway through — or, if the restart got no further than before,
+/// a single final-lap column.
+pub(crate) fn accumulate_lap_chart(
+    lap_chart: &mut Vec<LapChartEntry>,
+    leader_laps: &mut u32,
+    session: &LiveSessionData,
+) {
+    if session.num_participants == 0 {
+        return;
+    }
+    let max_laps = session.participants.iter().map(|p| p.laps_completed).max().unwrap_or(0);
+    if max_laps < *leader_laps {
+        lap_chart.clear();
+        *leader_laps = 0;
+    }
+    if max_laps > *leader_laps {
+        *leader_laps = max_laps;
+        for p in &session.participants {
+            lap_chart.push(LapChartEntry {
+                lap: max_laps,
+                driver: p.name.clone(),
+                position: p.race_position,
+            });
+        }
+    }
+}
+
 pub(crate) fn should_capture(cached: &LiveSessionData) -> bool {
     if cached.num_participants == 0 {
         return false;
@@ -201,19 +234,8 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             }
 
             // ── Accumulate per-lap positions during a race ────────────────────
-            if session_state == SESSION_RACE && session.num_participants > 0 {
-                let max_laps = session.participants.iter().map(|p| p.laps_completed).max().unwrap_or(0);
-                if max_laps > leader_laps {
-                    // A new lap was completed — snapshot every participant's position.
-                    leader_laps = max_laps;
-                    for p in &session.participants {
-                        lap_chart.push(LapChartEntry {
-                            lap: max_laps,
-                            driver: p.name.clone(),
-                            position: p.race_position,
-                        });
-                    }
-                }
+            if session_state == SESSION_RACE {
+                accumulate_lap_chart(&mut lap_chart, &mut leader_laps, &session);
             }
 
             // ── Always refresh the rolling cache ─────────────────────────────

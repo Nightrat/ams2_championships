@@ -51,6 +51,72 @@ fn make_session(session_state: u32, participants: Vec<ParticipantData>) -> LiveS
     }
 }
 
+// ── lap chart accumulation ────────────────────────────────────────────────────
+
+/// Drives the accumulator through a race where the leader reaches `laps`.
+fn run_laps(chart: &mut Vec<LapChartEntry>, leader: &mut u32, laps: u32) {
+    for lap in 1..=laps {
+        let s = make_session(5, vec![
+            make_participant("A", 1, lap, 90.0, "Ferrari"),
+            make_participant("B", 2, lap.saturating_sub(1), 91.0, "Ferrari"),
+        ]);
+        accumulate_lap_chart(chart, leader, &s);
+    }
+}
+
+#[test]
+fn test_lap_chart_records_every_lap() {
+    let (mut chart, mut leader) = (vec![], 0);
+    run_laps(&mut chart, &mut leader, 5);
+    let laps: std::collections::BTreeSet<u32> = chart.iter().map(|e| e.lap).collect();
+    assert_eq!(laps.into_iter().collect::<Vec<_>>(), vec![1, 2, 3, 4, 5]);
+    assert_eq!(chart.len(), 10, "two drivers snapshotted per lap");
+}
+
+#[test]
+fn test_lap_chart_ignores_repeated_polls_within_a_lap() {
+    let (mut chart, mut leader) = (vec![], 0);
+    let s = make_session(5, vec![make_participant("A", 1, 3, 90.0, "Ferrari")]);
+    accumulate_lap_chart(&mut chart, &mut leader, &s);
+    accumulate_lap_chart(&mut chart, &mut leader, &s);
+    accumulate_lap_chart(&mut chart, &mut leader, &s);
+    assert_eq!(chart.len(), 1);
+}
+
+#[test]
+fn test_lap_chart_restarts_when_the_race_is_restarted() {
+    // Run to lap 5, then restart and run to lap 3. AMS2 keeps session_state at RACE across a
+    // restart, so the falling lap count is the only evidence the earlier run was abandoned.
+    let (mut chart, mut leader) = (vec![], 0);
+    run_laps(&mut chart, &mut leader, 5);
+    run_laps(&mut chart, &mut leader, 3);
+    let laps: std::collections::BTreeSet<u32> = chart.iter().map(|e| e.lap).collect();
+    assert_eq!(
+        laps.into_iter().collect::<Vec<_>>(),
+        vec![1, 2, 3],
+        "the abandoned run must be discarded, not merged"
+    );
+    assert_eq!(leader, 3);
+}
+
+#[test]
+fn test_lap_chart_restart_does_not_leave_a_single_final_lap() {
+    // The failure this guards: a stale high-water mark of 38 means a fresh 39-lap race records
+    // only lap 39 — one column per driver, which is what a broken chart looked like.
+    let (mut chart, mut leader) = (vec![], 38);
+    run_laps(&mut chart, &mut leader, 39);
+    let laps: std::collections::BTreeSet<u32> = chart.iter().map(|e| e.lap).collect();
+    assert_eq!(laps.len(), 39, "got {:?}", laps);
+}
+
+#[test]
+fn test_lap_chart_ignores_empty_grids() {
+    let (mut chart, mut leader) = (vec![], 0);
+    accumulate_lap_chart(&mut chart, &mut leader, &make_session(5, vec![]));
+    assert!(chart.is_empty());
+    assert_eq!(leader, 0);
+}
+
 fn make_store() -> (SharedStore, PathBuf) {
     let store = Arc::new(RwLock::new(CareerData::default()));
     let ns = std::time::SystemTime::now()
