@@ -886,7 +886,7 @@
         <stamina>0.85</stamina>
         <start_reactions>0.7</start_reactions>
         <tyre_management>0.72</tyre_management>
-        <weight_scalar>0.95</weight_scalar>
+        <weight_scalar>0.97</weight_scalar>
         <vehicle_reliability>0.62</vehicle_reliability>
         <weather_tyre_changes>0.61</weather_tyre_changes>
         <wet_skill>0.58</wet_skill>
@@ -966,7 +966,7 @@
         <stamina>0.86</stamina>
         <start_reactions>0.65</start_reactions>
         <tyre_management>0.79</tyre_management>
-        <weight_scalar>0.95</weight_scalar>
+        <weight_scalar>0.97</weight_scalar>
         <vehicle_reliability>0.64</vehicle_reliability>
         <weather_tyre_changes>0.58</weather_tyre_changes>
         <wet_skill>0.54</wet_skill>
