@@ -111,7 +111,12 @@ pub struct CareerData {
 
 pub type SharedStore = Arc<RwLock<CareerData>>;
 
-pub fn load_store(path: &PathBuf) -> SharedStore {
+/// Path of the *active* career save file. Shared and mutable so that switching saves at
+/// runtime repoints both the HTTP handler and the recorder thread, which each hold a clone.
+pub type SavePath = Arc<RwLock<PathBuf>>;
+
+/// Read one career save file from disk. A missing or unparsable file yields an empty career.
+pub fn load_data(path: &Path) -> CareerData {
     let mut data: CareerData = if path.exists() {
         let content = fs::read_to_string(path).unwrap_or_default();
         serde_json::from_str(&content).unwrap_or_default()
@@ -124,11 +129,17 @@ pub fn load_store(path: &PathBuf) -> SharedStore {
             champ.rounds = champ
                 .session_ids
                 .drain(..)
-                .map(|sid| Round { session_ids: vec![sid] })
+                .map(|sid| Round {
+                    session_ids: vec![sid],
+                })
                 .collect();
         }
     }
-    Arc::new(RwLock::new(data))
+    data
+}
+
+pub fn load_store(path: &Path) -> SharedStore {
+    Arc::new(RwLock::new(load_data(path)))
 }
 
 // ── Career computation ────────────────────────────────────────────────────────
@@ -230,8 +241,13 @@ pub struct CareerResponse {
     pub track_stats: Vec<TrackStat>,
 }
 
-fn resolve_sessions<'a>(ids: &[String], sessions: &'a [RecordedSession]) -> Vec<&'a RecordedSession> {
-    ids.iter().filter_map(|id| sessions.iter().find(|s| s.id == *id)).collect()
+fn resolve_sessions<'a>(
+    ids: &[String],
+    sessions: &'a [RecordedSession],
+) -> Vec<&'a RecordedSession> {
+    ids.iter()
+        .filter_map(|id| sessions.iter().find(|s| s.id == *id))
+        .collect()
 }
 
 fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<StandingsEntry> {
@@ -239,7 +255,9 @@ fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Standing
     let mut wins: HashMap<String, u32> = HashMap::new();
     for round in &champ.rounds {
         for s in resolve_sessions(&round.session_ids, sessions) {
-            if s.session_type != 5 { continue; }
+            if s.session_type != 5 {
+                continue;
+            }
             for r in &s.results {
                 let p = pts.entry(r.name.clone()).or_insert(0);
                 wins.entry(r.name.clone()).or_insert(0);
@@ -255,9 +273,14 @@ fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Standing
             }
         }
     }
-    let mut out: Vec<StandingsEntry> = pts.into_iter().map(|(name, points)| StandingsEntry {
-        points, wins: wins.get(&name).copied().unwrap_or(0), name,
-    }).collect();
+    let mut out: Vec<StandingsEntry> = pts
+        .into_iter()
+        .map(|(name, points)| StandingsEntry {
+            points,
+            wins: wins.get(&name).copied().unwrap_or(0),
+            name,
+        })
+        .collect();
     out.sort_by(|a, b| b.points.cmp(&a.points).then(b.wins.cmp(&a.wins)));
     out
 }
@@ -266,22 +289,36 @@ fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Standing
 /// AMS2 shared memory has no livery/team field, so this is the only way to give the
 /// player's row a team name when their profile name doesn't match a Custom AI Driver entry.
 fn resolve_player_team<'a>(r: &SessionResult, champ: &'a Championship) -> Option<&'a str> {
-    if !r.is_player { return None; }
+    if !r.is_player {
+        return None;
+    }
     champ.player_team.as_deref().filter(|t| !t.is_empty())
 }
 
-fn constructors(champ: &Championship, sessions: &[RecordedSession], team_map: &HashMap<String, String>) -> Vec<StandingsEntry> {
+fn constructors(
+    champ: &Championship,
+    sessions: &[RecordedSession],
+    team_map: &HashMap<String, String>,
+) -> Vec<StandingsEntry> {
     let mut pts: HashMap<String, i32> = HashMap::new();
     let mut wins: HashMap<String, u32> = HashMap::new();
     for round in &champ.rounds {
         for s in resolve_sessions(&round.session_ids, sessions) {
-            if s.session_type != 5 { continue; }
+            if s.session_type != 5 {
+                continue;
+            }
             for r in &s.results {
-                let key = if let Some(team) = team_map.get(&r.name) { team.to_string() }
-                          else if let Some(team) = resolve_player_team(r, champ) { team.to_string() }
-                          else if !r.car_name.is_empty() { r.car_name.clone() }
-                          else if !r.car_class.is_empty() { r.car_class.clone() }
-                          else { continue };
+                let key = if let Some(team) = team_map.get(&r.name) {
+                    team.to_string()
+                } else if let Some(team) = resolve_player_team(r, champ) {
+                    team.to_string()
+                } else if !r.car_name.is_empty() {
+                    r.car_name.clone()
+                } else if !r.car_class.is_empty() {
+                    r.car_class.clone()
+                } else {
+                    continue;
+                };
                 let p = pts.entry(key.clone()).or_insert(0);
                 wins.entry(key.clone()).or_insert(0);
                 if !r.dnf {
@@ -296,9 +333,14 @@ fn constructors(champ: &Championship, sessions: &[RecordedSession], team_map: &H
             }
         }
     }
-    let mut out: Vec<StandingsEntry> = pts.into_iter().map(|(name, points)| StandingsEntry {
-        points, wins: wins.get(&name).copied().unwrap_or(0), name,
-    }).collect();
+    let mut out: Vec<StandingsEntry> = pts
+        .into_iter()
+        .map(|(name, points)| StandingsEntry {
+            points,
+            wins: wins.get(&name).copied().unwrap_or(0),
+            name,
+        })
+        .collect();
     out.sort_by(|a, b| b.points.cmp(&a.points).then(b.wins.cmp(&a.wins)));
     out
 }
@@ -319,9 +361,28 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
 
 /// Like [`compute_career`], but resolves each championship's assigned Custom AI Driver file
 /// (relative to `ai_dir`) to substitute team/livery names for driver car labels.
-pub fn compute_career_full(champs: &[Championship], sessions: &[RecordedSession], ai_dir: Option<&Path>) -> CareerResponse {
+pub fn compute_career_full(
+    champs: &[Championship],
+    sessions: &[RecordedSession],
+    ai_dir: Option<&Path>,
+) -> CareerResponse {
     #[derive(Default)]
-    struct Accum { races: u32, p1: u32, p2: u32, p3: u32, top10: u32, dnf: u32, quali_p1: u32, quali_p2: u32, quali_p3: u32, quali_top10: u32, champ_wins: u32, champ_p2: u32, champ_p3: u32, total_pos: u32 }
+    struct Accum {
+        races: u32,
+        p1: u32,
+        p2: u32,
+        p3: u32,
+        top10: u32,
+        dnf: u32,
+        quali_p1: u32,
+        quali_p2: u32,
+        quali_p3: u32,
+        quali_top10: u32,
+        champ_wins: u32,
+        champ_p2: u32,
+        champ_p3: u32,
+        total_pos: u32,
+    }
     let mut accum: HashMap<String, Accum> = HashMap::new();
     let mut championships: Vec<ChampionshipView> = Vec::new();
 
@@ -344,7 +405,8 @@ pub fn compute_career_full(champs: &[Championship], sessions: &[RecordedSession]
 
         let mut rounds: Vec<RoundView> = Vec::new();
         for round in &champ.rounds {
-            let mut rsessions: Vec<&RecordedSession> = resolve_sessions(&round.session_ids, sessions);
+            let mut rsessions: Vec<&RecordedSession> =
+                resolve_sessions(&round.session_ids, sessions);
             rsessions.sort_by_key(|s| s.session_type);
 
             let mut session_views: Vec<SessionView> = Vec::new();
@@ -355,42 +417,77 @@ pub fn compute_career_full(champs: &[Championship], sessions: &[RecordedSession]
                     let a = accum.entry(r.name.clone()).or_default();
                     let points_earned = if is_race && !r.dnf {
                         let pos = r.race_position as usize;
-                        if pos > 0 && pos <= champ.points_system.len() { champ.points_system[pos - 1] } else { 0 }
-                    } else { 0 };
+                        if pos > 0 && pos <= champ.points_system.len() {
+                            champ.points_system[pos - 1]
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    };
                     if is_race {
                         a.races += 1;
-                        if r.dnf { a.dnf += 1; }
-                        else {
-                            if r.race_position == 1 { a.p1 += 1; }
-                            if r.race_position == 2 { a.p2 += 1; }
-                            if r.race_position == 3 { a.p3 += 1; }
-                            if r.race_position <= 10 { a.top10 += 1; }
+                        if r.dnf {
+                            a.dnf += 1;
+                        } else {
+                            if r.race_position == 1 {
+                                a.p1 += 1;
+                            }
+                            if r.race_position == 2 {
+                                a.p2 += 1;
+                            }
+                            if r.race_position == 3 {
+                                a.p3 += 1;
+                            }
+                            if r.race_position <= 10 {
+                                a.top10 += 1;
+                            }
                         }
                         a.total_pos += r.race_position;
                     } else if s.session_type == 3 {
-                        if r.race_position == 1  { a.quali_p1 += 1; }
-                        if r.race_position == 2  { a.quali_p2 += 1; }
-                        if r.race_position == 3  { a.quali_p3 += 1; }
-                        if r.race_position <= 10 { a.quali_top10 += 1; }
+                        if r.race_position == 1 {
+                            a.quali_p1 += 1;
+                        }
+                        if r.race_position == 2 {
+                            a.quali_p2 += 1;
+                        }
+                        if r.race_position == 3 {
+                            a.quali_p3 += 1;
+                        }
+                        if r.race_position <= 10 {
+                            a.quali_top10 += 1;
+                        }
                     }
-                    let car_name = team_map.get(&r.name).cloned()
+                    let car_name = team_map
+                        .get(&r.name)
+                        .cloned()
                         .or_else(|| resolve_player_team(r, champ).map(|s| s.to_string()))
                         .unwrap_or_else(|| r.car_name.clone());
                     result_views.push(SessionResultView {
-                        name: r.name.clone(), car_name,
-                        car_class: r.car_class.clone(), race_position: r.race_position,
-                        laps_completed: r.laps_completed, fastest_lap: r.fastest_lap,
-                        last_lap: r.last_lap, dnf: r.dnf, points_earned,
+                        name: r.name.clone(),
+                        car_name,
+                        car_class: r.car_class.clone(),
+                        race_position: r.race_position,
+                        laps_completed: r.laps_completed,
+                        fastest_lap: r.fastest_lap,
+                        last_lap: r.last_lap,
+                        dnf: r.dnf,
+                        points_earned,
                     });
                 }
                 session_views.push(SessionView {
-                    id: s.id.clone(), recorded_at: s.recorded_at, track: s.track.clone(),
-                    track_variation: s.track_variation.clone(), session_type: s.session_type,
+                    id: s.id.clone(),
+                    recorded_at: s.recorded_at,
+                    track: s.track.clone(),
+                    track_variation: s.track_variation.clone(),
+                    session_type: s.session_type,
                     results: result_views,
                     lap_chart: s.lap_chart.clone(),
                 });
             }
-            rounds.push(RoundView { sessions: session_views });
+            rounds.push(RoundView {
+                sessions: session_views,
+            });
         }
 
         championships.push(ChampionshipView {
@@ -405,57 +502,128 @@ pub fn compute_career_full(champs: &[Championship], sessions: &[RecordedSession]
         });
     }
 
-    let mut driver_stats: Vec<DriverStat> = accum.into_iter().map(|(name, a)| DriverStat {
-        avg_pos: if a.races > 0 { a.total_pos as f32 / a.races as f32 } else { 0.0 },
-        name, races: a.races, p1: a.p1, p2: a.p2, p3: a.p3, top10: a.top10,
-        dnf: a.dnf, quali_p1: a.quali_p1, quali_p2: a.quali_p2, quali_p3: a.quali_p3, quali_top10: a.quali_top10,
-        champ_wins: a.champ_wins, champ_p2: a.champ_p2, champ_p3: a.champ_p3,
-    }).collect();
-    driver_stats.sort_by(|a, b| b.p1.cmp(&a.p1).then(b.p2.cmp(&a.p2)).then(b.races.cmp(&a.races)));
+    let mut driver_stats: Vec<DriverStat> = accum
+        .into_iter()
+        .map(|(name, a)| DriverStat {
+            avg_pos: if a.races > 0 {
+                a.total_pos as f32 / a.races as f32
+            } else {
+                0.0
+            },
+            name,
+            races: a.races,
+            p1: a.p1,
+            p2: a.p2,
+            p3: a.p3,
+            top10: a.top10,
+            dnf: a.dnf,
+            quali_p1: a.quali_p1,
+            quali_p2: a.quali_p2,
+            quali_p3: a.quali_p3,
+            quali_top10: a.quali_top10,
+            champ_wins: a.champ_wins,
+            champ_p2: a.champ_p2,
+            champ_p3: a.champ_p3,
+        })
+        .collect();
+    driver_stats.sort_by(|a, b| {
+        b.p1.cmp(&a.p1)
+            .then(b.p2.cmp(&a.p2))
+            .then(b.races.cmp(&a.races))
+    });
 
     // ── Track stats — grouped by (track, variation, player car) ──────────────
     #[derive(Default)]
     struct TrackAccum {
-        races: u32, qualifyings: u32, last_visited: u64,
+        races: u32,
+        qualifyings: u32,
+        last_visited: u64,
         // driver_name -> (best_lap_time, result_car)
         driver_bests: HashMap<String, (f32, String)>,
     }
     let mut track_accum: HashMap<(String, String, String), TrackAccum> = HashMap::new();
     for s in sessions {
-        let car = if !s.car_name.is_empty() { s.car_name.clone() } else { s.car_class.clone() };
+        let car = if !s.car_name.is_empty() {
+            s.car_name.clone()
+        } else {
+            s.car_class.clone()
+        };
         let key = (s.track.clone(), s.track_variation.clone(), car);
         let a = track_accum.entry(key).or_default();
-        if s.session_type == 5 { a.races += 1; }
-        if s.session_type == 3 { a.qualifyings += 1; }
-        if s.recorded_at > a.last_visited { a.last_visited = s.recorded_at; }
+        if s.session_type == 5 {
+            a.races += 1;
+        }
+        if s.session_type == 3 {
+            a.qualifyings += 1;
+        }
+        if s.recorded_at > a.last_visited {
+            a.last_visited = s.recorded_at;
+        }
         for r in &s.results {
-            if r.fastest_lap <= 0.0 { continue; }
-            let result_car = if !r.car_name.is_empty() { r.car_name.clone() } else { r.car_class.clone() };
-            let entry = a.driver_bests.entry(r.name.clone()).or_insert((f32::MAX, String::new()));
-            if r.fastest_lap < entry.0 { *entry = (r.fastest_lap, result_car); }
+            if r.fastest_lap <= 0.0 {
+                continue;
+            }
+            let result_car = if !r.car_name.is_empty() {
+                r.car_name.clone()
+            } else {
+                r.car_class.clone()
+            };
+            let entry = a
+                .driver_bests
+                .entry(r.name.clone())
+                .or_insert((f32::MAX, String::new()));
+            if r.fastest_lap < entry.0 {
+                *entry = (r.fastest_lap, result_car);
+            }
         }
     }
-    fn lap_slot(driver_bests: &HashMap<String, (f32, String)>, rank: usize) -> (f32, String, String) {
+    fn lap_slot(
+        driver_bests: &HashMap<String, (f32, String)>,
+        rank: usize,
+    ) -> (f32, String, String) {
         let mut sorted: Vec<(&String, &(f32, String))> = driver_bests.iter().collect();
-        sorted.sort_by(|a, b| a.1.0.partial_cmp(&b.1.0).unwrap_or(std::cmp::Ordering::Equal));
-        sorted.get(rank).map(|(name, (t, c))| (*t, (*name).clone(), c.clone()))
+        sorted.sort_by(|a, b| {
+            a.1 .0
+                .partial_cmp(&b.1 .0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        sorted
+            .get(rank)
+            .map(|(name, (t, c))| (*t, (*name).clone(), c.clone()))
             .unwrap_or((0.0, String::new(), String::new()))
     }
-    let mut track_stats: Vec<TrackStat> = track_accum.into_iter().map(|((track, track_variation, car), a)| {
-        let (best_lap, best_lap_driver, best_lap_car)     = lap_slot(&a.driver_bests, 0);
-        let (second_lap, second_lap_driver, second_lap_car) = lap_slot(&a.driver_bests, 1);
-        let (third_lap, third_lap_driver, third_lap_car)  = lap_slot(&a.driver_bests, 2);
-        TrackStat {
-            track, track_variation, car, races: a.races, qualifyings: a.qualifyings,
-            best_lap, best_lap_driver, best_lap_car,
-            second_lap, second_lap_driver, second_lap_car,
-            third_lap, third_lap_driver, third_lap_car,
-            last_visited: a.last_visited,
-        }
-    }).collect();
+    let mut track_stats: Vec<TrackStat> = track_accum
+        .into_iter()
+        .map(|((track, track_variation, car), a)| {
+            let (best_lap, best_lap_driver, best_lap_car) = lap_slot(&a.driver_bests, 0);
+            let (second_lap, second_lap_driver, second_lap_car) = lap_slot(&a.driver_bests, 1);
+            let (third_lap, third_lap_driver, third_lap_car) = lap_slot(&a.driver_bests, 2);
+            TrackStat {
+                track,
+                track_variation,
+                car,
+                races: a.races,
+                qualifyings: a.qualifyings,
+                best_lap,
+                best_lap_driver,
+                best_lap_car,
+                second_lap,
+                second_lap_driver,
+                second_lap_car,
+                third_lap,
+                third_lap_driver,
+                third_lap_car,
+                last_visited: a.last_visited,
+            }
+        })
+        .collect();
     track_stats.sort_by(|a, b| b.last_visited.cmp(&a.last_visited));
 
-    CareerResponse { championships, driver_stats, track_stats }
+    CareerResponse {
+        championships,
+        driver_stats,
+        track_stats,
+    }
 }
 
 pub fn persist(store: &SharedStore, path: &PathBuf) {

@@ -1,69 +1,96 @@
 use crate::ams2_shared_memory::{read_live_session, LiveSessionData};
 
 #[derive(PartialEq, Clone, Copy)]
-enum GapCategory { Close, Medium, Clear }
+enum GapCategory {
+    Close,
+    Medium,
+    Clear,
+}
 
 // Simplified flag state for transition detection
 #[derive(PartialEq, Clone, Copy)]
-enum FlagState { None, Yellow, SafetyCar, Red }
+enum FlagState {
+    None,
+    Yellow,
+    SafetyCar,
+    Red,
+}
 
 #[derive(PartialEq, Clone, Copy)]
-enum FuelWarning { Ok, Low, Critical }
+enum FuelWarning {
+    Ok,
+    Low,
+    Critical,
+}
 
 #[derive(PartialEq, Clone, Copy)]
-enum TyreWarning { Ok, Worn, Critical }
+enum TyreWarning {
+    Ok,
+    Worn,
+    Critical,
+}
 
 pub struct SpotterState {
-    prev_position:    u32,   // last announced position
-    pending_position: u32,   // real-time position; may differ while debouncing
-    pos_cooldown:     u32,   // frames until pending_position is announced
-    prev_laps:        u32,
-    prev_gap_ahead:   GapCategory,
-    prev_gap_behind:  GapCategory,
-    prev_flag:        FlagState,
-    prev_fuel:        FuelWarning,
-    prev_tyre:        [TyreWarning; 4],
-    prev_best_lap:    f32,
-    start_fuel:       f32,
-    track_key:        String,
+    prev_position: u32,    // last announced position
+    pending_position: u32, // real-time position; may differ while debouncing
+    pos_cooldown: u32,     // frames until pending_position is announced
+    prev_laps: u32,
+    prev_gap_ahead: GapCategory,
+    prev_gap_behind: GapCategory,
+    prev_flag: FlagState,
+    prev_fuel: FuelWarning,
+    prev_tyre: [TyreWarning; 4],
+    prev_best_lap: f32,
+    start_fuel: f32,
+    track_key: String,
 }
 
 fn fmt_lap_tts(secs: f32) -> String {
     let mins = secs as u32 / 60;
     let s = secs - mins as f32 * 60.0;
-    if mins > 0 { format!("{mins} {s:.1}") } else { format!("{s:.1}") }
+    if mins > 0 {
+        format!("{mins} {s:.1}")
+    } else {
+        format!("{s:.1}")
+    }
+}
+
+impl Default for SpotterState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SpotterState {
     pub fn new() -> Self {
         Self {
-            prev_position:   0,
+            prev_position: 0,
             pending_position: 0,
-            pos_cooldown:    0,
-            prev_laps:       0,
-            prev_gap_ahead:  GapCategory::Clear,
+            pos_cooldown: 0,
+            prev_laps: 0,
+            prev_gap_ahead: GapCategory::Clear,
             prev_gap_behind: GapCategory::Clear,
-            prev_flag:       FlagState::None,
-            prev_fuel:       FuelWarning::Ok,
-            prev_tyre:       [TyreWarning::Ok; 4],
-            prev_best_lap:   0.0,
-            start_fuel:      0.0,
-            track_key:       String::new(),
+            prev_flag: FlagState::None,
+            prev_fuel: FuelWarning::Ok,
+            prev_tyre: [TyreWarning::Ok; 4],
+            prev_best_lap: 0.0,
+            start_fuel: 0.0,
+            track_key: String::new(),
         }
     }
 
     fn reset_session(&mut self) {
-        self.prev_position    = 0;
+        self.prev_position = 0;
         self.pending_position = 0;
-        self.pos_cooldown     = 0;
-        self.prev_laps        = 0;
-        self.prev_gap_ahead  = GapCategory::Clear;
+        self.pos_cooldown = 0;
+        self.prev_laps = 0;
+        self.prev_gap_ahead = GapCategory::Clear;
         self.prev_gap_behind = GapCategory::Clear;
-        self.prev_flag       = FlagState::None;
-        self.prev_fuel       = FuelWarning::Ok;
-        self.prev_tyre       = [TyreWarning::Ok; 4];
-        self.prev_best_lap   = 0.0;
-        self.start_fuel      = 0.0;
+        self.prev_flag = FlagState::None;
+        self.prev_fuel = FuelWarning::Ok;
+        self.prev_tyre = [TyreWarning::Ok; 4];
+        self.prev_best_lap = 0.0;
+        self.start_fuel = 0.0;
     }
 
     /// `focus`: if `Some(name)`, track that participant by name; otherwise track the viewed player.
@@ -77,7 +104,10 @@ impl SpotterState {
 
         // Reset on track, session, or focus change
         let focus_key = focus.as_deref().unwrap_or("");
-        let key = format!("{}|{}|{}|{}", data.track_location, data.track_variation, data.session_state, focus_key);
+        let key = format!(
+            "{}|{}|{}|{}",
+            data.track_location, data.track_variation, data.session_state, focus_key
+        );
         if key != self.track_key {
             self.track_key = key;
             self.reset_session();
@@ -86,7 +116,7 @@ impl SpotterState {
 
         let player = match focus {
             Some(name) => data.participants.iter().find(|p| p.name == *name),
-            None       => data.participants.iter().find(|p| p.is_player),
+            None => data.participants.iter().find(|p| p.is_player),
         };
         let Some(player) = player else {
             return events;
@@ -131,7 +161,9 @@ impl SpotterState {
         let best = player.fastest_lap_time;
         if best > 0.0 && best != self.prev_best_lap {
             if self.prev_best_lap > 0.0 {
-                let overall_best = data.participants.iter()
+                let overall_best = data
+                    .participants
+                    .iter()
                     .filter(|p| p.fastest_lap_time > 0.0)
                     .map(|p| p.fastest_lap_time)
                     .fold(f32::MAX, f32::min);
@@ -157,7 +189,9 @@ impl SpotterState {
             if cat != self.prev_gap_ahead {
                 match cat {
                     GapCategory::Close => {
-                        let name = data.participants.iter()
+                        let name = data
+                            .participants
+                            .iter()
                             .find(|p| p.race_position == player.race_position - 1)
                             .map(|p| p.name.as_str())
                             .unwrap_or("car ahead");
@@ -175,7 +209,9 @@ impl SpotterState {
         // ── Gap behind advisory (race only) ───────────────────────────────────
         // The car directly behind has interval_gap_secs equal to its gap to us.
         if is_race && player.race_position > 1 {
-            let behind = data.participants.iter()
+            let behind = data
+                .participants
+                .iter()
                 .find(|p| p.race_position == player.race_position + 1);
 
             if let Some(behind) = behind {
@@ -191,7 +227,10 @@ impl SpotterState {
                 if cat != self.prev_gap_behind {
                     match cat {
                         GapCategory::Close => {
-                            events.push(format!("{:.1} seconds to {} behind", behind_gap, behind.name));
+                            events.push(format!(
+                                "{:.1} seconds to {} behind",
+                                behind_gap, behind.name
+                            ));
                         }
                         GapCategory::Clear if self.prev_gap_behind != GapCategory::Clear => {
                             events.push("Clear behind".to_string());
@@ -216,7 +255,7 @@ impl SpotterState {
 
         if flag != self.prev_flag {
             match flag {
-                FlagState::Yellow    => events.push("Yellow flag".to_string()),
+                FlagState::Yellow => events.push("Yellow flag".to_string()),
                 FlagState::SafetyCar => {
                     if data.race_flag_reason == 7 {
                         events.push("Safety Car returning".to_string());
@@ -224,13 +263,11 @@ impl SpotterState {
                         events.push("Safety Car deployed".to_string());
                     }
                 }
-                FlagState::Red  => events.push("Red flag".to_string()),
-                FlagState::None => {
-                    match self.prev_flag {
-                        FlagState::None => {}
-                        _ => events.push("Green flag".to_string()),
-                    }
-                }
+                FlagState::Red => events.push("Red flag".to_string()),
+                FlagState::None => match self.prev_flag {
+                    FlagState::None => {}
+                    _ => events.push("Green flag".to_string()),
+                },
             }
             self.prev_flag = flag;
         }
@@ -259,20 +296,25 @@ impl SpotterState {
                 Some(l) if l <= 5 => FuelWarning::Low,
                 None if data.player_telemetry.fuel_capacity > 0.0 => {
                     let pct = lvl / data.player_telemetry.fuel_capacity;
-                    if pct < 0.05 { FuelWarning::Critical }
-                    else if pct < 0.15 { FuelWarning::Low }
-                    else { FuelWarning::Ok }
+                    if pct < 0.05 {
+                        FuelWarning::Critical
+                    } else if pct < 0.15 {
+                        FuelWarning::Low
+                    } else {
+                        FuelWarning::Ok
+                    }
                 }
                 _ => FuelWarning::Ok,
             };
 
             if fuel != self.prev_fuel {
-                let laps_str = fuel_laps.map(|l| format!("{l} laps remaining"))
+                let laps_str = fuel_laps
+                    .map(|l| format!("{l} laps remaining"))
                     .unwrap_or_else(|| format!("{lvl:.0} litres remaining"));
                 match fuel {
-                    FuelWarning::Low      => events.push(format!("Low fuel, {laps_str}")),
+                    FuelWarning::Low => events.push(format!("Low fuel, {laps_str}")),
                     FuelWarning::Critical => events.push(format!("Fuel critical, {laps_str}")),
-                    FuelWarning::Ok       => {}
+                    FuelWarning::Ok => {}
                 }
                 self.prev_fuel = fuel;
             }
@@ -281,9 +323,11 @@ impl SpotterState {
         // ── Tyre wear warning (race only) ─────────────────────────────────────
         if is_race {
             const TYRE_NAMES: [&str; 4] = ["front left", "front right", "rear left", "rear right"];
-            for i in 0..4 {
+            for (i, tyre) in TYRE_NAMES.iter().enumerate() {
                 let wear = data.player_telemetry.tyre_wear[i];
-                if wear <= 0.0 { continue; }
+                if wear <= 0.0 {
+                    continue;
+                }
                 let tw = if wear >= 0.9 {
                     TyreWarning::Critical
                 } else if wear >= 0.7 {
@@ -293,9 +337,9 @@ impl SpotterState {
                 };
                 if tw != self.prev_tyre[i] {
                     match tw {
-                        TyreWarning::Worn     => events.push(format!("{} tyre worn", TYRE_NAMES[i])),
-                        TyreWarning::Critical => events.push(format!("{} tyre critical", TYRE_NAMES[i])),
-                        TyreWarning::Ok       => {}
+                        TyreWarning::Worn => events.push(format!("{tyre} tyre worn")),
+                        TyreWarning::Critical => events.push(format!("{tyre} tyre critical")),
+                        TyreWarning::Ok => {}
                     }
                     self.prev_tyre[i] = tw;
                 }
@@ -316,7 +360,7 @@ fn spawn_tts(voice: Option<&str>) -> Option<std::io::BufWriter<std::process::Chi
     use std::process::{Command, Stdio};
     let voice_cmd = match voice {
         Some(v) => format!("$v.SelectVoice('{}');", v.replace('\'', "''")),
-        None    => String::new(),
+        None => String::new(),
     };
     let script = format!(
         "Add-Type -AssemblyName System.Speech;\
@@ -346,7 +390,9 @@ pub fn list_voices() -> Vec<String> {
     let Ok(out) = Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .output()
-    else { return vec![]; };
+    else {
+        return vec![];
+    };
     String::from_utf8_lossy(&out.stdout)
         .lines()
         .map(|l| l.trim().to_string())
@@ -355,13 +401,15 @@ pub fn list_voices() -> Vec<String> {
 }
 
 #[cfg(not(windows))]
-pub fn list_voices() -> Vec<String> { vec![] }
+pub fn list_voices() -> Vec<String> {
+    vec![]
+}
 
 #[derive(Clone, Default)]
 pub struct SpotterConfig {
     pub enabled: bool,
-    pub name:    Option<String>,
-    pub voice:   Option<String>,
+    pub name: Option<String>,
+    pub voice: Option<String>,
 }
 
 /// Shared spotter configuration (enabled flag, focused player name, TTS voice).
@@ -396,7 +444,9 @@ pub fn start(poll_ms: u64, focus: Focus) {
                             break;
                         }
                     }
-                    if failed { tts = None; }
+                    if failed {
+                        tts = None;
+                    }
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(poll_ms));

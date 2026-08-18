@@ -59,7 +59,11 @@ pub fn assigned_sessions(
         .flat_map(|c| c.rounds.iter())
         .flat_map(|r| r.session_ids.iter().map(|s| s.as_str()))
         .collect();
-    sessions.iter().filter(|s| assigned.contains(s.id.as_str())).cloned().collect()
+    sessions
+        .iter()
+        .filter(|s| assigned.contains(s.id.as_str()))
+        .cloned()
+        .collect()
 }
 
 /// True when the session was run online. See [`AI_SUFFIX`].
@@ -78,7 +82,12 @@ pub fn retired(r: &SessionResult, leader_laps: u32) -> bool {
 }
 
 fn leader_laps(session: &RecordedSession) -> u32 {
-    session.results.iter().map(|r| r.laps_completed).max().unwrap_or(0)
+    session
+        .results
+        .iter()
+        .map(|r| r.laps_completed)
+        .max()
+        .unwrap_or(0)
 }
 
 /// Expected finishing position for each team, derived from car pace alone.
@@ -98,7 +107,9 @@ pub fn expected_positions(
     distinct.sort_by(|a, b| {
         let (x, y) = (pace.get(a.1).copied(), pace.get(b.1).copied());
         // Teams with no pace figure sort last rather than poisoning the order.
-        x.unwrap_or(f32::MAX).partial_cmp(&y.unwrap_or(f32::MAX)).unwrap_or(std::cmp::Ordering::Equal)
+        x.unwrap_or(f32::MAX)
+            .partial_cmp(&y.unwrap_or(f32::MAX))
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     let mut ranks: HashMap<&str, Vec<f32>> = HashMap::new();
     for (i, (_, team)) in distinct.iter().enumerate() {
@@ -143,10 +154,11 @@ fn player_row<'a>(
     if is_multiplayer(session) {
         return None;
     }
-    let mut strangers = session
-        .results
-        .iter()
-        .filter(|r| !seats.iter().any(|e| name_key(&e.driver) == name_key(&r.name)));
+    let mut strangers = session.results.iter().filter(|r| {
+        !seats
+            .iter()
+            .any(|e| name_key(&e.driver) == name_key(&r.name))
+    });
     match (strangers.next(), strangers.next()) {
         (Some(only), None) => Some(only),
         _ => None,
@@ -159,7 +171,11 @@ fn player_row<'a>(
 /// across single-player sessions — which recovers the name from older recordings and then makes
 /// it usable for the online ones.
 pub fn infer_player_name(sessions: &[RecordedSession], seats: &[SeatEntry]) -> Option<String> {
-    if let Some(r) = sessions.iter().flat_map(|s| &s.results).find(|r| r.is_player) {
+    if let Some(r) = sessions
+        .iter()
+        .flat_map(|s| &s.results)
+        .find(|r| r.is_player)
+    {
         return Some(r.name.clone());
     }
     let mut tally: HashMap<&str, usize> = HashMap::new();
@@ -168,7 +184,10 @@ pub fn infer_player_name(sessions: &[RecordedSession], seats: &[SeatEntry]) -> O
             *tally.entry(r.name.as_str()).or_default() += 1;
         }
     }
-    tally.into_iter().max_by_key(|(_, n)| *n).map(|(name, _)| name.to_string())
+    tally
+        .into_iter()
+        .max_by_key(|(_, n)| *n)
+        .map(|(name, _)| name.to_string())
 }
 
 /// Which team the player was driving for in a session, preferring the declared team whenever the
@@ -182,7 +201,11 @@ fn session_team(
     let grid: Vec<GridEntry> = session
         .results
         .iter()
-        .map(|r| GridEntry { name: &r.name, car_name: &r.car_name, is_player: r.is_player })
+        .map(|r| GridEntry {
+            name: &r.name,
+            car_name: &r.car_name,
+            is_player: r.is_player,
+        })
         .collect();
     match crate::custom_ai::infer_player_seat(seats, &grid) {
         PlayerSeat::Derived(seat) => Some(seat.team),
@@ -192,7 +215,9 @@ fn session_team(
                     return Some(hit.team.clone());
                 }
             }
-            v.into_iter().find(|s| expected.contains_key(&s.team)).map(|s| s.team)
+            v.into_iter()
+                .find(|s| expected.contains_key(&s.team))
+                .map(|s| s.team)
         }
         _ => None,
     }
@@ -248,7 +273,11 @@ pub struct RatingContext {
 impl RatingContext {
     pub fn new(class: &str, seats: Vec<SeatEntry>, pace: &HashMap<String, f32>) -> Self {
         let expected = expected_positions(pace, &seats);
-        RatingContext { class: class.to_string(), seats, expected }
+        RatingContext {
+            class: class.to_string(),
+            seats,
+            expected,
+        }
     }
 
     /// True when a session was run in this class. AMS2 exposes aero variants as separate
@@ -319,9 +348,11 @@ pub fn recorded_players_global(
             if r.name.contains(AI_SUFFIX) || out.iter().any(|n| n == &r.name) {
                 continue;
             }
-            let in_a_roster = contexts
-                .iter()
-                .any(|c| c.seats.iter().any(|e| name_key(&e.driver) == name_key(&r.name)));
+            let in_a_roster = contexts.iter().any(|c| {
+                c.seats
+                    .iter()
+                    .any(|e| name_key(&e.driver) == name_key(&r.name))
+            });
             if !in_a_roster {
                 out.push(r.name.clone());
             }
@@ -340,7 +371,11 @@ fn compute_reputation_inner(
 ) -> Reputation {
     // A single-class rating is the global one over a roster that covers everything it is given.
     let expected = expected_positions(pace, seats);
-    let ctx = RatingContext { class: String::new(), seats: seats.to_vec(), expected };
+    let ctx = RatingContext {
+        class: String::new(),
+        seats: seats.to_vec(),
+        expected,
+    };
     accumulate_covering_all(player_name, sessions, &ctx, declared_team)
 }
 
@@ -383,19 +418,27 @@ fn accumulate_with<'a>(
         // A session in a class with no Custom AI file has no roster and no car pace, so there
         // is nothing to measure it against.
         let Some(ctx) = context_for(s) else { continue };
-        let Some(me) = player_row(s, &ctx.seats, player_name) else { continue };
+        let Some(me) = player_row(s, &ctx.seats, player_name) else {
+            continue;
+        };
         let field = s.results.len() as f32;
 
         if is_multiplayer(s) {
             // Absolute position online depends on an unrecorded difficulty slider, so only the
             // result against other humans is trustworthy. Weighting by the number of human
             // opponents lets a large lobby count for more without assuming a lobby size.
-            let humans: Vec<&SessionResult> =
-                s.results.iter().filter(|r| !r.name.contains(AI_SUFFIX)).collect();
+            let humans: Vec<&SessionResult> = s
+                .results
+                .iter()
+                .filter(|r| !r.name.contains(AI_SUFFIX))
+                .collect();
             if humans.len() < 2 || s.session_type != 5 {
                 continue;
             }
-            let beaten = humans.iter().filter(|r| r.race_position > me.race_position).count();
+            let beaten = humans
+                .iter()
+                .filter(|r| r.race_position > me.race_position)
+                .count();
             let opponents = humans.len() - 1;
             let score = 2.0 * (beaten as f32 / opponents as f32) - 1.0;
             mps.push((score, opponents as f32));
@@ -410,7 +453,9 @@ fn accumulate_with<'a>(
         let Some(team) = session_team(s, &ctx.seats, &ctx.expected, declared_team) else {
             continue;
         };
-        let Some(&exp) = ctx.expected.get(&team) else { continue };
+        let Some(&exp) = ctx.expected.get(&team) else {
+            continue;
+        };
 
         match s.session_type {
             5 => {
@@ -430,7 +475,11 @@ fn accumulate_with<'a>(
 
     let pace_score = weighted_mean(&races);
     let quali_score = weighted_mean(&qualis);
-    let finish_rate = if starts > 0 { finishes as f32 / starts as f32 } else { 0.0 };
+    let finish_rate = if starts > 0 {
+        finishes as f32 / starts as f32
+    } else {
+        0.0
+    };
 
     // Drop qualifying's share onto race pace when no qualifying has been recorded, so its
     // absence does not silently drag the rating toward neutral.
@@ -494,8 +543,14 @@ pub struct TeamEligibility {
 /// would beat the driver already in the seat. That is why a midfield car staffed by two greats
 /// can ask for more than a quicker one with a weak line-up.
 pub fn required_rating(rank: usize, total: f32, incumbent_skill: Option<f32>) -> f32 {
-    let grid = if total > 0.0 { 100.0 * (1.0 - (rank as f32 + 1.0) / total) } else { 0.0 };
-    let incumbent = incumbent_skill.map(|s| 100.0 * (s - INCUMBENT_MARGIN)).unwrap_or(0.0);
+    let grid = if total > 0.0 {
+        100.0 * (1.0 - (rank as f32 + 1.0) / total)
+    } else {
+        0.0
+    };
+    let incumbent = incumbent_skill
+        .map(|s| 100.0 * (s - INCUMBENT_MARGIN))
+        .unwrap_or(0.0);
     grid.max(incumbent).clamp(0.0, 100.0)
 }
 
@@ -512,7 +567,10 @@ pub fn team_requirements(
         .into_iter()
         .enumerate()
         .map(|(i, (team, _))| {
-            (team.clone(), required_rating(i, total, skills.get(team).copied()))
+            (
+                team.clone(),
+                required_rating(i, total, skills.get(team).copied()),
+            )
         })
         .collect()
 }
@@ -526,7 +584,10 @@ pub fn recorded_players(sessions: &[RecordedSession], seats: &[SeatEntry]) -> Ve
             if r.name.contains(AI_SUFFIX) || out.iter().any(|n| n == &r.name) {
                 continue;
             }
-            if seats.iter().any(|e| name_key(&e.driver) == name_key(&r.name)) {
+            if seats
+                .iter()
+                .any(|e| name_key(&e.driver) == name_key(&r.name))
+            {
                 continue;
             }
             out.push(r.name.clone());
@@ -577,10 +638,7 @@ pub fn team_eligibility(
     // driver has, locking every seat and leaving no way into the sport. The least demanding
     // team is therefore always open, whatever the rating.
     if !out.iter().any(|e| e.tier == Tier::Available) {
-        let floor = out
-            .iter()
-            .map(|e| e.required)
-            .fold(f32::MAX, f32::min);
+        let floor = out.iter().map(|e| e.required).fold(f32::MAX, f32::min);
         for e in out.iter_mut().filter(|e| e.required <= floor) {
             e.tier = Tier::Available;
         }

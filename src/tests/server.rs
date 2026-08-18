@@ -1,7 +1,7 @@
 use super::*;
 use ams2_championship::data_store::{CareerData, Championship, ChampionshipStatus, Round};
-use ams2_championship::http::{Request, parse_request, track_slug};
-use ams2_championship::websocket::{sha1, base64_encode, ws_accept_key, ws_send_text};
+use ams2_championship::http::{parse_request, track_slug, Request};
+use ams2_championship::websocket::{base64_encode, sha1, ws_accept_key, ws_send_text};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex, RwLock};
@@ -12,7 +12,10 @@ fn req(raw: &[u8]) -> Request {
 
 // ── HTTP route integration helpers ────────────────────────────────────────────
 
-fn make_test_store() -> (ams2_championship::data_store::SharedStore, std::path::PathBuf) {
+fn make_test_store() -> (
+    ams2_championship::data_store::SharedStore,
+    std::path::PathBuf,
+) {
     let store = Arc::new(RwLock::new(CareerData::default()));
     let ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -31,7 +34,14 @@ fn call(
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let html = Arc::new(b"<html/>".to_vec());
-    let dp = Arc::new(data_path);
+    // Saves live alongside the career file, as they do under championships/ in production.
+    let saves_dir = Arc::new(
+        data_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(std::env::temp_dir),
+    );
+    let dp: ams2_championship::data_store::SavePath = Arc::new(RwLock::new(data_path));
     let ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -42,7 +52,19 @@ fn call(
     let s = store;
     std::thread::spawn(move || {
         let (conn, _) = listener.accept().unwrap();
-        handle(conn, html, s, dp, layouts_dir, config_path, 200, Arc::new(Mutex::new(ams2_championship::spotter::SpotterConfig::default())));
+        handle(
+            conn,
+            html,
+            s,
+            dp,
+            saves_dir,
+            layouts_dir,
+            config_path,
+            200,
+            Arc::new(Mutex::new(
+                ams2_championship::spotter::SpotterConfig::default(),
+            )),
+        );
     });
     let mut client = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
     client.write_all(&request_bytes).unwrap();
@@ -51,24 +73,58 @@ fn call(
     String::from_utf8_lossy(&resp).into_owned()
 }
 
-fn get(store: ams2_championship::data_store::SharedStore, data_path: std::path::PathBuf, path: &str) -> String {
-    call(store, data_path, format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").into_bytes())
+fn get(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    path: &str,
+) -> String {
+    call(
+        store,
+        data_path,
+        format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").into_bytes(),
+    )
 }
 
-fn post(store: ams2_championship::data_store::SharedStore, data_path: std::path::PathBuf, path: &str, body: &[u8]) -> String {
-    let mut req = format!("POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n", body.len()).into_bytes();
+fn post(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    path: &str,
+    body: &[u8],
+) -> String {
+    let mut req = format!(
+        "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
     req.extend_from_slice(body);
     call(store, data_path, req)
 }
 
-fn patch(store: ams2_championship::data_store::SharedStore, data_path: std::path::PathBuf, path: &str, body: &[u8]) -> String {
-    let mut req = format!("PATCH {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n", body.len()).into_bytes();
+fn patch(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    path: &str,
+    body: &[u8],
+) -> String {
+    let mut req = format!(
+        "PATCH {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
     req.extend_from_slice(body);
     call(store, data_path, req)
 }
 
-fn delete(store: ams2_championship::data_store::SharedStore, data_path: std::path::PathBuf, path: &str) -> String {
-    call(store, data_path, format!("DELETE {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").into_bytes())
+fn delete(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    path: &str,
+) -> String {
+    call(
+        store,
+        data_path,
+        format!("DELETE {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").into_bytes(),
+    )
 }
 
 fn status_line(resp: &str) -> &str {
@@ -85,7 +141,8 @@ fn body_json(resp: &str) -> serde_json::Value {
 
 fn make_champ(id: &str) -> Championship {
     Championship {
-        id: id.into(), name: "Test Champ".into(),
+        id: id.into(),
+        name: "Test Champ".into(),
         status: ChampionshipStatus::Active,
         points_system: vec![25, 18, 15],
         manufacturer_scoring: false,
@@ -133,7 +190,10 @@ fn test_route_default_returns_html() {
     let (store, path) = make_test_store();
     let resp = get(store, path.clone(), "/");
     assert!(status_line(&resp).contains("200"));
-    assert!(body(&resp).contains("<html"), "default route should return HTML");
+    assert!(
+        body(&resp).contains("<html"),
+        "default route should return HTML"
+    );
     let _ = std::fs::remove_file(&path);
 }
 
@@ -142,8 +202,12 @@ fn test_route_default_returns_html() {
 #[test]
 fn test_route_post_championships_creates_championship() {
     let (store, path) = make_test_store();
-    let resp = post(store.clone(), path.clone(), "/api/championships",
-        b"{\"name\":\"My Champ\"}");
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        b"{\"name\":\"My Champ\"}",
+    );
     assert!(status_line(&resp).contains("200"));
     let v = body_json(&resp);
     assert_eq!(v["name"], "My Champ");
@@ -155,10 +219,19 @@ fn test_route_post_championships_creates_championship() {
 #[test]
 fn test_route_post_championships_uses_default_points_when_absent() {
     let (store, path) = make_test_store();
-    let resp = post(store.clone(), path.clone(), "/api/championships", b"{\"name\":\"X\"}");
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        b"{\"name\":\"X\"}",
+    );
     let v = body_json(&resp);
-    let pts: Vec<i64> = v["points_system"].as_array().unwrap()
-        .iter().map(|x| x.as_i64().unwrap()).collect();
+    let pts: Vec<i64> = v["points_system"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x.as_i64().unwrap())
+        .collect();
     assert_eq!(pts, vec![25, 18, 15, 12, 10, 8, 6, 4, 2, 1]);
     let _ = std::fs::remove_file(&path);
 }
@@ -177,8 +250,12 @@ fn test_route_post_championships_invalid_body_returns_400() {
 fn test_route_patch_championship_updates_name() {
     let (store, path) = make_test_store();
     store.write().unwrap().championships.push(make_champ("42"));
-    let resp = patch(store.clone(), path.clone(),
-        "/api/championships/42", b"{\"name\":\"Renamed\"}");
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/42",
+        b"{\"name\":\"Renamed\"}",
+    );
     assert!(status_line(&resp).contains("200"));
     assert_eq!(store.read().unwrap().championships[0].name, "Renamed");
     let _ = std::fs::remove_file(&path);
@@ -187,7 +264,12 @@ fn test_route_patch_championship_updates_name() {
 #[test]
 fn test_route_patch_championship_not_found_returns_404() {
     let (store, path) = make_test_store();
-    let resp = patch(store, path.clone(), "/api/championships/999", b"{\"name\":\"X\"}");
+    let resp = patch(
+        store,
+        path.clone(),
+        "/api/championships/999",
+        b"{\"name\":\"X\"}",
+    );
     assert!(status_line(&resp).contains("404"));
     let _ = std::fs::remove_file(&path);
 }
@@ -203,12 +285,30 @@ fn test_route_patch_championship_only_one_active_at_a_time() {
         data.championships.push(c2);
     }
     // Set c2 to Active — c1 should become Progress
-    let resp = patch(store.clone(), path.clone(),
-        "/api/championships/2", b"{\"status\":\"Active\"}");
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/2",
+        b"{\"status\":\"Active\"}",
+    );
     assert!(status_line(&resp).contains("200"));
     let data = store.read().unwrap();
-    assert_eq!(data.championships.iter().find(|c| c.id == "1").unwrap().status, ChampionshipStatus::Progress);
-    assert_eq!(data.championships.iter().find(|c| c.id == "2").unwrap().status, ChampionshipStatus::Active);
+    assert_eq!(
+        data.championships
+            .iter()
+            .find(|c| c.id == "1")
+            .unwrap()
+            .status,
+        ChampionshipStatus::Progress
+    );
+    assert_eq!(
+        data.championships
+            .iter()
+            .find(|c| c.id == "2")
+            .unwrap()
+            .status,
+        ChampionshipStatus::Active
+    );
     let _ = std::fs::remove_file(&path);
 }
 
@@ -238,7 +338,12 @@ fn test_route_delete_championship_not_found_returns_404() {
 fn test_route_post_round_adds_empty_round() {
     let (store, path) = make_test_store();
     store.write().unwrap().championships.push(make_champ("c1"));
-    let resp = post(store.clone(), path.clone(), "/api/championships/c1/rounds", b"");
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1/rounds",
+        b"",
+    );
     assert!(status_line(&resp).contains("200"));
     assert_eq!(store.read().unwrap().championships[0].rounds.len(), 1);
     let _ = std::fs::remove_file(&path);
@@ -263,7 +368,11 @@ fn test_route_delete_round_removes_it() {
         champ.rounds = vec![Round::default(), Round::default()];
         data.championships.push(champ);
     }
-    let resp = delete(store.clone(), path.clone(), "/api/championships/c1/rounds/0");
+    let resp = delete(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1/rounds/0",
+    );
     assert!(status_line(&resp).contains("200"));
     assert_eq!(store.read().unwrap().championships[0].rounds.len(), 1);
     let _ = std::fs::remove_file(&path);
@@ -289,18 +398,29 @@ fn test_route_team_eligibility_unrated_without_custom_ai_file() {
         let mut data = store.write().unwrap();
         data.championships.push(make_champ("c1"));
     }
-    let resp = get(store, path.clone(), "/api/championships/c1/team-eligibility");
+    let resp = get(
+        store,
+        path.clone(),
+        "/api/championships/c1/team-eligibility",
+    );
     assert!(status_line(&resp).contains("200"));
     // No roster to rate against, so nothing is gated — but enforcement state is still reported.
     assert!(resp.contains("\"rated\":false"), "got {resp}");
-    assert!(resp.contains("\"enforced\":true"), "enforcement defaults on: {resp}");
+    assert!(
+        resp.contains("\"enforced\":true"),
+        "enforcement defaults on: {resp}"
+    );
     let _ = std::fs::remove_file(&path);
 }
 
 #[test]
 fn test_route_team_eligibility_unknown_championship_is_404() {
     let (store, path) = make_test_store();
-    let resp = get(store, path.clone(), "/api/championships/nope/team-eligibility");
+    let resp = get(
+        store,
+        path.clone(),
+        "/api/championships/nope/team-eligibility",
+    );
     assert!(status_line(&resp).contains("404"));
     let _ = std::fs::remove_file(&path);
 }
@@ -317,13 +437,21 @@ fn test_route_patch_explicit_null_clears_assignments() {
     }
     // A plain Option<Option<_>> collapses an explicit null into "key absent", which silently
     // made these impossible to clear — the UI's "(none)" choice did nothing.
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"player_team":null}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"player_team":null}"#,
+    );
     assert!(status_line(&resp).contains("200"), "got {resp}");
     assert_eq!(store.read().unwrap().championships[0].player_team, None);
 
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"custom_ai_file":null}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"custom_ai_file":null}"#,
+    );
     assert!(status_line(&resp).contains("200"), "got {resp}");
     assert_eq!(store.read().unwrap().championships[0].custom_ai_file, None);
     let _ = std::fs::remove_file(&path);
@@ -340,12 +468,22 @@ fn test_route_patch_omitted_key_leaves_assignment_untouched() {
         data.championships.push(champ);
     }
     // The other half of the contract: absent means "leave alone", not "clear".
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"name":"Renamed"}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"name":"Renamed"}"#,
+    );
     assert!(status_line(&resp).contains("200"), "got {resp}");
     let data = store.read().unwrap();
-    assert_eq!(data.championships[0].player_team.as_deref(), Some("Brabham"));
-    assert_eq!(data.championships[0].custom_ai_file.as_deref(), Some("F-Classic_Gen1.xml"));
+    assert_eq!(
+        data.championships[0].player_team.as_deref(),
+        Some("Brabham")
+    );
+    assert_eq!(
+        data.championships[0].custom_ai_file.as_deref(),
+        Some("F-Classic_Gen1.xml")
+    );
     let _ = std::fs::remove_file(&path);
 }
 
@@ -357,14 +495,22 @@ fn test_route_patch_player_team_locked_once_a_session_is_assigned() {
         let mut champ = make_champ("c1");
         champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
         champ.player_team = Some("Brabham".into());
-        champ.rounds.push(Round { session_ids: vec!["sess1".into()] });
+        champ.rounds.push(Round {
+            session_ids: vec!["sess1".into()],
+        });
         data.championships.push(champ);
     }
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"player_team":"Williams"}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"player_team":"Williams"}"#,
+    );
     assert!(status_line(&resp).contains("409"), "got {resp}");
     assert_eq!(
-        store.read().unwrap().championships[0].player_team.as_deref(),
+        store.read().unwrap().championships[0]
+            .player_team
+            .as_deref(),
         Some("Brabham"),
         "a rejected change must leave the team untouched"
     );
@@ -379,12 +525,18 @@ fn test_route_patch_locked_team_still_allows_other_edits() {
         let mut champ = make_champ("c1");
         champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
         champ.player_team = Some("Brabham".into());
-        champ.rounds.push(Round { session_ids: vec!["sess1".into()] });
+        champ.rounds.push(Round {
+            session_ids: vec!["sess1".into()],
+        });
         data.championships.push(champ);
     }
     // Renaming touches no team, so the lock must not stand in the way.
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"name":"1986 Season"}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"name":"1986 Season"}"#,
+    );
     assert!(status_line(&resp).contains("200"), "got {resp}");
     assert_eq!(store.read().unwrap().championships[0].name, "1986 Season");
     let _ = std::fs::remove_file(&path);
@@ -401,11 +553,17 @@ fn test_route_patch_team_changeable_before_any_session() {
         champ.rounds.push(Round::default());
         data.championships.push(champ);
     }
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"player_team":"Williams"}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"player_team":"Williams"}"#,
+    );
     assert!(status_line(&resp).contains("200"), "got {resp}");
     assert_eq!(
-        store.read().unwrap().championships[0].player_team.as_deref(),
+        store.read().unwrap().championships[0]
+            .player_team
+            .as_deref(),
         Some("Williams")
     );
     let _ = std::fs::remove_file(&path);
@@ -419,16 +577,28 @@ fn test_route_patch_locked_team_blocks_clearing_the_custom_ai_file() {
         let mut champ = make_champ("c1");
         champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
         champ.player_team = Some("Brabham".into());
-        champ.rounds.push(Round { session_ids: vec!["sess1".into()] });
+        champ.rounds.push(Round {
+            session_ids: vec!["sess1".into()],
+        });
         data.championships.push(champ);
     }
     // Unassigning the roster clears the team as a side effect, which is still a team change.
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"custom_ai_file":null}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"custom_ai_file":null}"#,
+    );
     assert!(status_line(&resp).contains("409"), "got {resp}");
     let data = store.read().unwrap();
-    assert_eq!(data.championships[0].custom_ai_file.as_deref(), Some("F-Classic_Gen1.xml"));
-    assert_eq!(data.championships[0].player_team.as_deref(), Some("Brabham"));
+    assert_eq!(
+        data.championships[0].custom_ai_file.as_deref(),
+        Some("F-Classic_Gen1.xml")
+    );
+    assert_eq!(
+        data.championships[0].player_team.as_deref(),
+        Some("Brabham")
+    );
     let _ = std::fs::remove_file(&path);
 }
 
@@ -443,11 +613,17 @@ fn test_route_patch_player_team_is_not_gated_without_a_roster() {
     }
     // With no custom_ai_dir configured the rating cannot be computed, and an unrateable team
     // must never be blocked.
-    let resp = patch(store.clone(), path.clone(), "/api/championships/c1",
-        br#"{"player_team":"Williams"}"#);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"player_team":"Williams"}"#,
+    );
     assert!(status_line(&resp).contains("200"), "got {resp}");
     assert_eq!(
-        store.read().unwrap().championships[0].player_team.as_deref(),
+        store.read().unwrap().championships[0]
+            .player_team
+            .as_deref(),
         Some("Williams")
     );
     let _ = std::fs::remove_file(&path);
@@ -465,7 +641,11 @@ fn test_route_session_eligibility_not_enforced_without_player_team() {
         champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
         data.championships.push(champ);
     }
-    let resp = get(store, path.clone(), "/api/championships/c1/session-eligibility");
+    let resp = get(
+        store,
+        path.clone(),
+        "/api/championships/c1/session-eligibility",
+    );
     assert!(status_line(&resp).contains("200"));
     assert!(resp.contains("\"enforced\":false"), "got {resp}");
     let _ = std::fs::remove_file(&path);
@@ -474,7 +654,11 @@ fn test_route_session_eligibility_not_enforced_without_player_team() {
 #[test]
 fn test_route_session_eligibility_unknown_championship_is_404() {
     let (store, path) = make_test_store();
-    let resp = get(store, path.clone(), "/api/championships/nope/session-eligibility");
+    let resp = get(
+        store,
+        path.clone(),
+        "/api/championships/nope/session-eligibility",
+    );
     assert!(status_line(&resp).contains("404"));
     let _ = std::fs::remove_file(&path);
 }
@@ -488,11 +672,17 @@ fn test_route_post_session_to_round_adds_it() {
         champ.rounds.push(Round::default());
         data.championships.push(champ);
     }
-    let resp = post(store.clone(), path.clone(),
-        "/api/championships/c1/rounds/0/sessions/sess1", b"");
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1/rounds/0/sessions/sess1",
+        b"",
+    );
     assert!(status_line(&resp).contains("200"));
     let data = store.read().unwrap();
-    assert!(data.championships[0].rounds[0].session_ids.contains(&"sess1".to_string()));
+    assert!(data.championships[0].rounds[0]
+        .session_ids
+        .contains(&"sess1".to_string()));
     let _ = std::fs::remove_file(&path);
 }
 
@@ -502,12 +692,23 @@ fn test_route_post_session_to_round_deduplicates() {
     {
         let mut data = store.write().unwrap();
         let mut champ = make_champ("c1");
-        champ.rounds.push(Round { session_ids: vec!["sess1".into()] });
+        champ.rounds.push(Round {
+            session_ids: vec!["sess1".into()],
+        });
         data.championships.push(champ);
     }
-    post(store.clone(), path.clone(),
-        "/api/championships/c1/rounds/0/sessions/sess1", b"");
-    assert_eq!(store.read().unwrap().championships[0].rounds[0].session_ids.len(), 1);
+    post(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1/rounds/0/sessions/sess1",
+        b"",
+    );
+    assert_eq!(
+        store.read().unwrap().championships[0].rounds[0]
+            .session_ids
+            .len(),
+        1
+    );
     let _ = std::fs::remove_file(&path);
 }
 
@@ -519,15 +720,24 @@ fn test_route_delete_session_from_round_removes_it() {
     {
         let mut data = store.write().unwrap();
         let mut champ = make_champ("c1");
-        champ.rounds.push(Round { session_ids: vec!["s1".into(), "s2".into()] });
+        champ.rounds.push(Round {
+            session_ids: vec!["s1".into(), "s2".into()],
+        });
         data.championships.push(champ);
     }
-    let resp = delete(store.clone(), path.clone(),
-        "/api/championships/c1/rounds/0/sessions/s1");
+    let resp = delete(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1/rounds/0/sessions/s1",
+    );
     assert!(status_line(&resp).contains("200"));
     let data = store.read().unwrap();
-    assert!(!data.championships[0].rounds[0].session_ids.contains(&"s1".to_string()));
-    assert!(data.championships[0].rounds[0].session_ids.contains(&"s2".to_string()));
+    assert!(!data.championships[0].rounds[0]
+        .session_ids
+        .contains(&"s1".to_string()));
+    assert!(data.championships[0].rounds[0]
+        .session_ids
+        .contains(&"s2".to_string()));
     let _ = std::fs::remove_file(&path);
 }
 
@@ -541,14 +751,21 @@ fn test_route_delete_unassigned_sessions_removes_orphans() {
         let mut data = store.write().unwrap();
         // Session "s1" is assigned; "s2" is not
         let mut champ = make_champ("c1");
-        champ.rounds.push(Round { session_ids: vec!["s1".into()] });
+        champ.rounds.push(Round {
+            session_ids: vec!["s1".into()],
+        });
         data.championships.push(champ);
         for id in &["s1", "s2"] {
             data.sessions.push(RecordedSession {
-                id: (*id).into(), recorded_at: 1000,
-                track: "Spa".into(), track_variation: "GP".into(),
-                car_name: String::new(), car_class: String::new(),
-                session_type: 5, results: vec![], lap_chart: vec![],
+                id: (*id).into(),
+                recorded_at: 1000,
+                track: "Spa".into(),
+                track_variation: "GP".into(),
+                car_name: String::new(),
+                car_class: String::new(),
+                session_type: 5,
+                results: vec![],
+                lap_chart: vec![],
             });
         }
     }
@@ -589,7 +806,7 @@ fn test_route_get_track_layout_returns_null_when_missing() {
 fn test_route_post_track_layout_rejects_too_few_points() {
     let (store, path) = make_test_store();
     // Array with < 300 entries
-    let few: serde_json::Value = serde_json::Value::Array(vec![serde_json::json!([0,0]); 10]);
+    let few: serde_json::Value = serde_json::Value::Array(vec![serde_json::json!([0, 0]); 10]);
     let body = serde_json::to_vec(&few).unwrap();
     let resp = post(store, path.clone(), "/api/track-layout/spa", &body);
     assert!(status_line(&resp).contains("400"));
@@ -681,7 +898,10 @@ fn test_parse_no_body_after_headers() {
 fn test_parse_path_segments_round_session_route() {
     let r = req(b"POST /api/championships/42/rounds/0/sessions/7 HTTP/1.1\r\n\r\n");
     let segs: Vec<&str> = r.path.trim_start_matches('/').split('/').collect();
-    assert_eq!(segs, ["api", "championships", "42", "rounds", "0", "sessions", "7"]);
+    assert_eq!(
+        segs,
+        ["api", "championships", "42", "rounds", "0", "sessions", "7"]
+    );
     assert_eq!(segs.len(), 7);
 }
 
@@ -714,7 +934,10 @@ fn test_sha1_empty() {
 
 #[test]
 fn test_sha1_abc() {
-    assert_eq!(hex(&sha1(b"abc")), "a9993e364706816aba3e25717850c26c9cd0d89d");
+    assert_eq!(
+        hex(&sha1(b"abc")),
+        "a9993e364706816aba3e25717850c26c9cd0d89d"
+    );
 }
 
 #[test]
@@ -730,7 +953,10 @@ fn test_sha1_longer_message() {
 fn test_sha1_multichunk() {
     // Input longer than 64 bytes (two SHA-1 blocks)
     let input = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    assert_eq!(hex(&sha1(input)), "84983e441c3bd26ebaae4aa1f95129e5e54670f1");
+    assert_eq!(
+        hex(&sha1(input)),
+        "84983e441c3bd26ebaae4aa1f95129e5e54670f1"
+    );
 }
 
 // ── base64_encode ─────────────────────────────────────────────────────────────
@@ -851,6 +1077,272 @@ fn test_ws_send_text_large_payload() {
     let frame = ws_capture(&payload);
     assert_eq!(frame[0], 0x81);
     assert_eq!(frame[1], 127);
-    assert_eq!(u64::from_be_bytes(frame[2..10].try_into().unwrap()) as usize, 70_000);
+    assert_eq!(
+        u64::from_be_bytes(frame[2..10].try_into().unwrap()) as usize,
+        70_000
+    );
     assert_eq!(&frame[10..], payload.as_slice());
+}
+
+// ── /api/saves routes ─────────────────────────────────────────────────────────
+
+/// A store plus an isolated saves directory holding `ams2_career.json` as the active save.
+fn make_saves_dir(
+    tag: &str,
+) -> (
+    ams2_championship::data_store::SharedStore,
+    std::path::PathBuf,
+) {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_saves_route_{tag}_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ams2_career.json");
+    let store = Arc::new(RwLock::new(CareerData::default()));
+    store.write().unwrap().championships.push(make_champ("c1"));
+    ams2_championship::data_store::persist(&store, &path);
+    (store, path)
+}
+
+#[test]
+fn test_route_get_saves_lists_active() {
+    let (store, path) = make_saves_dir("list");
+    let resp = get(store, path.clone(), "/api/saves");
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    assert_eq!(v["active"], "ams2_career");
+    let saves = v["saves"].as_array().unwrap();
+    assert_eq!(saves.len(), 1);
+    assert_eq!(saves[0]["championships"], 1);
+    assert_eq!(saves[0]["active"], true);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_post_saves_creates_empty_and_activates() {
+    let (store, path) = make_saves_dir("create");
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/saves",
+        br#"{"name":"GT3 Career"}"#,
+    );
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    assert_eq!(v["active"], "GT3 Career");
+    assert_eq!(v["saves"].as_array().unwrap().len(), 2);
+    // The in-memory store was swapped to the new, empty career.
+    assert!(store.read().unwrap().championships.is_empty());
+    assert!(path.parent().unwrap().join("GT3 Career.json").exists());
+    // The previous career is untouched on disk.
+    let old = ams2_championship::data_store::load_data(&path);
+    assert_eq!(old.championships.len(), 1);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_post_saves_rejects_duplicate_name() {
+    let (store, path) = make_saves_dir("dup_name");
+    let resp = post(
+        store,
+        path.clone(),
+        "/api/saves",
+        br#"{"name":"ams2_career"}"#,
+    );
+    assert!(status_line(&resp).contains("409"));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_post_saves_rejects_traversal_name() {
+    let (store, path) = make_saves_dir("traversal");
+    let resp = post(store, path.clone(), "/api/saves", br#"{"name":"../evil"}"#);
+    assert!(status_line(&resp).contains("400"));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_activate_swaps_store_contents() {
+    let (store, path) = make_saves_dir("activate");
+    let dir = path.parent().unwrap().to_path_buf();
+    // A second career on disk with two championships.
+    let other = dir.join("other.json");
+    let other_store = Arc::new(RwLock::new(CareerData::default()));
+    other_store
+        .write()
+        .unwrap()
+        .championships
+        .push(make_champ("x1"));
+    other_store
+        .write()
+        .unwrap()
+        .championships
+        .push(make_champ("x2"));
+    ams2_championship::data_store::persist(&other_store, &other);
+
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/saves/activate",
+        br#"{"name":"other"}"#,
+    );
+    assert!(status_line(&resp).contains("200"));
+    assert_eq!(body_json(&resp)["active"], "other");
+    assert_eq!(
+        store.read().unwrap().championships.len(),
+        2,
+        "store now holds the other career"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_activate_unknown_save_404s() {
+    let (store, path) = make_saves_dir("activate_404");
+    let resp = post(
+        store,
+        path.clone(),
+        "/api/saves/activate",
+        br#"{"name":"nope"}"#,
+    );
+    assert!(status_line(&resp).contains("404"));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_duplicate_copies_without_switching() {
+    let (store, path) = make_saves_dir("duplicate");
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/saves/duplicate",
+        br#"{"name":"ams2_career","new_name":"backup"}"#,
+    );
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    assert_eq!(v["active"], "ams2_career", "duplicating does not switch");
+    let copy = path.parent().unwrap().join("backup.json");
+    assert!(copy.exists());
+    assert_eq!(
+        ams2_championship::data_store::load_data(&copy)
+            .championships
+            .len(),
+        1
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_rename_active_save_follows_the_path() {
+    let (store, path) = make_saves_dir("rename");
+    let dir = path.parent().unwrap().to_path_buf();
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/saves/ams2_career",
+        br#"{"new_name":"Renamed"}"#,
+    );
+    assert!(status_line(&resp).contains("200"));
+    assert_eq!(
+        body_json(&resp)["active"],
+        "Renamed",
+        "active save follows the rename"
+    );
+    assert!(!path.exists());
+    assert!(dir.join("Renamed.json").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_rename_percent_encoded_name() {
+    let (store, path) = make_saves_dir("rename_enc");
+    let dir = path.parent().unwrap().to_path_buf();
+    std::fs::copy(&path, dir.join("GT3 Career.json")).unwrap();
+    let resp = patch(
+        store,
+        path.clone(),
+        "/api/saves/GT3%20Career",
+        br#"{"new_name":"GT4 Career"}"#,
+    );
+    assert!(status_line(&resp).contains("200"));
+    assert!(dir.join("GT4 Career.json").exists());
+    assert!(!dir.join("GT3 Career.json").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_delete_save() {
+    let (store, path) = make_saves_dir("delete");
+    let dir = path.parent().unwrap().to_path_buf();
+    std::fs::copy(&path, dir.join("scratch.json")).unwrap();
+    let resp = delete(store, path.clone(), "/api/saves/scratch");
+    assert!(status_line(&resp).contains("200"));
+    assert!(!dir.join("scratch.json").exists());
+    assert!(path.exists(), "active save untouched");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_delete_active_save_rejected() {
+    let (store, path) = make_saves_dir("delete_active");
+    let resp = delete(store, path.clone(), "/api/saves/ams2_career");
+    assert!(status_line(&resp).contains("400"));
+    assert!(path.exists(), "active save must survive");
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+// ── PATCH /api/config — saves folder ──────────────────────────────────────────
+
+fn config_body(saves_dir: &str) -> Vec<u8> {
+    format!(
+        r#"{{"port":8080,"host":"127.0.0.1","poll_ms":200,"record_practice":true,
+             "record_qualify":true,"record_race":true,"show_track_map":true,
+             "track_map_max_points":5000,"saves_dir":{saves_dir}}}"#
+    )
+    .into_bytes()
+}
+
+#[test]
+fn test_route_patch_config_saves_dir_requires_restart_and_clears_data_file() {
+    let (store, path) = make_saves_dir("cfg_saves_dir");
+    let new_dir = path.parent().unwrap().join("elsewhere");
+
+    let body = config_body(&serde_json::Value::String(new_dir.display().to_string()).to_string());
+    let resp = patch(store, path.clone(), "/api/config", &body);
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    assert_eq!(v["config"]["saves_dir"], new_dir.display().to_string());
+    assert!(
+        v["restart_required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("saves_dir")),
+        "moving the saves folder only takes effect on restart"
+    );
+    assert!(
+        v["config"]["data_file"].is_null(),
+        "the remembered save lived in the old folder, so it is dropped"
+    );
+    assert!(new_dir.is_dir(), "the folder is created eagerly");
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_patch_config_unchanged_saves_dir_keeps_data_file() {
+    let (store, path) = make_saves_dir("cfg_saves_same");
+    let resp = patch(store, path.clone(), "/api/config", &config_body("null"));
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    assert!(
+        !v["restart_required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("saves_dir")),
+        "null == unset, so nothing changed"
+    );
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }

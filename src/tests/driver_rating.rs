@@ -35,7 +35,13 @@ fn result(name: &str, pos: u32, laps: u32) -> SessionResult {
 }
 
 /// A single-player grid where Brabham #7 is the free seat, so the player is a Brabham.
-fn sp_session(id: &str, at: u64, session_type: u32, player_pos: u32, player_laps: u32) -> RecordedSession {
+fn sp_session(
+    id: &str,
+    at: u64,
+    session_type: u32,
+    player_pos: u32,
+    player_laps: u32,
+) -> RecordedSession {
     let mut results = vec![
         result("Nigel Mansell", 1, 15),
         result("Nelson Piquet", 2, 15),
@@ -72,7 +78,11 @@ fn mp_session(id: &str, at: u64, player_pos: u32, rival_pos: u32) -> RecordedSes
         car_name: M1.into(),
         car_class: "F-Classic_Gen1".into(),
         session_type: 5,
-        results: vec![me, result("Wiper", rival_pos, 15), result("Sandro Martini  (AI)", 3, 15)],
+        results: vec![
+            me,
+            result("Wiper", rival_pos, 15),
+            result("Sandro Martini  (AI)", 3, 15),
+        ],
         lap_chart: vec![],
     }
 }
@@ -108,7 +118,10 @@ fn test_positional_score_does_not_saturate_across_cars() {
     // normalising by headroom, which caps both at +1.
     let slow_car_win = positional_score(21.5, 1.0, 26.0);
     let fast_car_win = positional_score(7.5, 1.0, 26.0);
-    assert!(slow_car_win > fast_car_win, "{slow_car_win} vs {fast_car_win}");
+    assert!(
+        slow_car_win > fast_car_win,
+        "{slow_car_win} vs {fast_car_win}"
+    );
     assert!(slow_car_win <= 1.0 && fast_car_win > 0.0);
 }
 
@@ -116,10 +129,12 @@ fn test_positional_score_does_not_saturate_across_cars() {
 fn test_reputation_rewards_beating_the_car() {
     let seats = parse_seats_str(ROSTER);
     // Brabham expects P3.5; winning every race is a clear overperformance.
-    let winning: Vec<RecordedSession> =
-        (0..8).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
-    let losing: Vec<RecordedSession> =
-        (0..8).map(|i| sp_session(&i.to_string(), 100 + i, 5, 6, 15)).collect();
+    let winning: Vec<RecordedSession> = (0..8)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
+    let losing: Vec<RecordedSession> = (0..8)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 6, 15))
+        .collect();
     let hi = compute_reputation(&winning, &seats, &pace(), Some("Brabham"));
     let lo = compute_reputation(&losing, &seats, &pace(), Some("Brabham"));
     assert!(hi.value > lo.value, "{} vs {}", hi.value, lo.value);
@@ -131,34 +146,46 @@ fn test_reputation_rewards_beating_the_car() {
 fn test_reputation_shrinks_toward_neutral_on_a_small_sample() {
     let seats = parse_seats_str(ROSTER);
     let one = vec![sp_session("a", 100, 5, 1, 15)];
-    let many: Vec<RecordedSession> =
-        (0..20).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    let many: Vec<RecordedSession> = (0..20)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
     let a = compute_reputation(&one, &seats, &pace(), Some("Brabham"));
     let b = compute_reputation(&many, &seats, &pace(), Some("Brabham"));
-    assert!(a.value < b.value, "one race must not rate as highly as twenty");
+    assert!(
+        a.value < b.value,
+        "one race must not rate as highly as twenty"
+    );
 }
 
 #[test]
 fn test_retirements_land_in_reliability_not_pace() {
     let seats = parse_seats_str(ROSTER);
-    let mut sessions: Vec<RecordedSession> =
-        (0..6).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    let mut sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
     let clean = compute_reputation(&sessions, &seats, &pace(), Some("Brabham"));
     // Two retirements: starts rise, finishes do not, and pace is untouched.
     sessions.push(sp_session("r1", 200, 5, 6, 2));
     sessions.push(sp_session("r2", 201, 5, 6, 2));
     let with_dnf = compute_reputation(&sessions, &seats, &pace(), Some("Brabham"));
     assert_eq!(with_dnf.sp_races, 8);
-    assert!((with_dnf.pace - clean.pace).abs() < 0.001, "pace must ignore retirements");
+    assert!(
+        (with_dnf.pace - clean.pace).abs() < 0.001,
+        "pace must ignore retirements"
+    );
     assert!(with_dnf.finish_rate < clean.finish_rate);
-    assert!(with_dnf.value < clean.value, "reliability still costs reputation");
+    assert!(
+        with_dnf.value < clean.value,
+        "reliability still costs reputation"
+    );
 }
 
 #[test]
 fn test_multiplayer_scored_head_to_head_and_capped() {
     let seats = parse_seats_str(ROSTER);
-    let sp: Vec<RecordedSession> =
-        (0..8).map(|i| sp_session(&i.to_string(), 100 + i, 5, 3, 15)).collect();
+    let sp: Vec<RecordedSession> = (0..8)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 3, 15))
+        .collect();
     let baseline = compute_reputation(&sp, &seats, &pace(), Some("Brabham"));
 
     let mut with_mp = sp.clone();
@@ -170,7 +197,11 @@ fn test_multiplayer_scored_head_to_head_and_capped() {
     assert_eq!(won.mp_wins, 6);
     assert!(won.value > baseline.value);
     // However dominant, online racing may not move the rating by more than the cap.
-    assert!((won.value - baseline.value) <= 5.0 + 0.001, "delta {}", won.value - baseline.value);
+    assert!(
+        (won.value - baseline.value) <= 5.0 + 0.001,
+        "delta {}",
+        won.value - baseline.value
+    );
 }
 
 #[test]
@@ -192,8 +223,10 @@ const ROSTER_B: &str = r#"<custom_ai_drivers>
 </custom_ai_drivers>"#;
 
 fn contexts() -> Vec<RatingContext> {
-    let pace_b: HashMap<String, f32> =
-        [("Lotus-Ford", 0.0f32), ("Honda", 5.0)].into_iter().map(|(t, p)| (t.into(), p)).collect();
+    let pace_b: HashMap<String, f32> = [("Lotus-Ford", 0.0f32), ("Honda", 5.0)]
+        .into_iter()
+        .map(|(t, p)| (t.into(), p))
+        .collect();
     vec![
         RatingContext::new("F-Classic_Gen1", parse_seats_str(ROSTER), &pace()),
         RatingContext::new("F-Vintage_Gen1", parse_seats_str(ROSTER_B), &pace_b),
@@ -222,21 +255,32 @@ fn class_b_session(id: &str, at: u64, player_pos: u32) -> RecordedSession {
 #[test]
 fn test_assigned_sessions_keeps_only_what_a_championship_claims() {
     use crate::data_store::{Championship, ChampionshipStatus, Round};
-    let sessions: Vec<RecordedSession> =
-        (0..4).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    let sessions: Vec<RecordedSession> = (0..4)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
     let champ = Championship {
         id: "c1".into(),
         name: "Season".into(),
         status: ChampionshipStatus::Progress,
         points_system: vec![25, 18],
         manufacturer_scoring: false,
-        rounds: vec![Round { session_ids: vec!["0".into()] }, Round { session_ids: vec!["2".into()] }],
+        rounds: vec![
+            Round {
+                session_ids: vec!["0".into()],
+            },
+            Round {
+                session_ids: vec!["2".into()],
+            },
+        ],
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
     };
     let kept = assigned_sessions(&[champ], &sessions);
-    assert_eq!(kept.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), vec!["0", "2"]);
+    assert_eq!(
+        kept.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(),
+        vec!["0", "2"]
+    );
     // No championships at all means nothing is rateable — a fresh install starts from neutral.
     assert!(assigned_sessions(&[], &sessions).is_empty());
 }
@@ -245,8 +289,9 @@ fn test_assigned_sessions_keeps_only_what_a_championship_claims() {
 fn test_rating_ignores_unassigned_sessions() {
     use crate::data_store::{Championship, ChampionshipStatus, Round};
     let ctxs = contexts();
-    let winning: Vec<RecordedSession> =
-        (0..6).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    let winning: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
     // Six wins recorded, but only three claimed by a championship.
     let champ = Championship {
         id: "c1".into(),
@@ -254,7 +299,9 @@ fn test_rating_ignores_unassigned_sessions() {
         status: ChampionshipStatus::Progress,
         points_system: vec![25],
         manufacturer_scoring: false,
-        rounds: vec![Round { session_ids: vec!["0".into(), "1".into(), "2".into()] }],
+        rounds: vec![Round {
+            session_ids: vec!["0".into(), "1".into(), "2".into()],
+        }],
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
@@ -263,14 +310,18 @@ fn test_rating_ignores_unassigned_sessions() {
     let r = compute_reputation_global(Some("Nightrat"), &rated, &ctxs, None);
     assert_eq!(r.sp_races, 3, "unassigned races must not count");
     let all = compute_reputation_global(Some("Nightrat"), &winning, &ctxs, None);
-    assert!(all.value > r.value, "shrinkage means the larger claimed sample rates higher");
+    assert!(
+        all.value > r.value,
+        "shrinkage means the larger claimed sample rates higher"
+    );
 }
 
 #[test]
 fn test_global_rating_combines_classes() {
     let ctxs = contexts();
-    let mut sessions: Vec<RecordedSession> =
-        (0..6).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    let mut sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
     let one_class = compute_reputation_global(Some("Nightrat"), &sessions, &ctxs, None);
     assert_eq!(one_class.sp_races, 6);
 
@@ -280,14 +331,18 @@ fn test_global_rating_combines_classes() {
     }
     let both = compute_reputation_global(Some("Nightrat"), &sessions, &ctxs, None);
     assert_eq!(both.sp_races, 10, "races from every class feed one rating");
-    assert!(both.value > one_class.value, "more evidence of winning must not lower the rating");
+    assert!(
+        both.value > one_class.value,
+        "more evidence of winning must not lower the rating"
+    );
 }
 
 #[test]
 fn test_global_rating_skips_classes_with_no_roster() {
     let ctxs = contexts();
-    let mut sessions: Vec<RecordedSession> =
-        (0..6).map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15)).collect();
+    let mut sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
     let before = compute_reputation_global(Some("Nightrat"), &sessions, &ctxs, None);
     // F-Junior has no Custom AI file, so there is no expectation to score it against.
     let mut orphan = class_b_session("j", 300, 1);
@@ -318,7 +373,10 @@ fn test_recorded_players_global_excludes_every_roster_and_lobby_ai() {
 // the rating maths is *supposed* to move them — update them deliberately when it does.
 
 fn reference_career() -> crate::data_store::CareerData {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/tests/fixtures/career_reference.json");
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/tests/fixtures/career_reference.json"
+    );
     serde_json::from_str(&std::fs::read_to_string(path).expect("fixture missing")).unwrap()
 }
 
@@ -331,8 +389,11 @@ fn reference_contexts() -> Vec<RatingContext> {
         .into_iter()
         .map(|perf| {
             let path = dir.join(format!("{}.xml", perf.class));
-            let pace: HashMap<String, f32> =
-                perf.cars.iter().map(|c| (c.team.clone(), c.pace_delta_pct)).collect();
+            let pace: HashMap<String, f32> = perf
+                .cars
+                .iter()
+                .map(|c| (c.team.clone(), c.pace_delta_pct))
+                .collect();
             RatingContext::new(&perf.class, crate::custom_ai::parse_seats(&path), &pace)
         })
         .collect()
@@ -348,7 +409,11 @@ fn reference_rated() -> Vec<RecordedSession> {
 fn test_reference_career_is_fully_assigned() {
     let data = reference_career();
     // The snapshots below only mean something while every session is claimed by a championship.
-    assert_eq!(reference_rated().len(), data.sessions.len(), "fixture should be fully assigned");
+    assert_eq!(
+        reference_rated().len(),
+        data.sessions.len(),
+        "fixture should be fully assigned"
+    );
     assert_eq!(data.championships.len(), 5);
 }
 
@@ -368,9 +433,16 @@ fn test_reference_career_rating_snapshot() {
     assert_eq!(r.mp_races, 7, "online races");
     assert_eq!((r.mp_wins, r.mp_losses), (2, 5), "online record");
     // 7 of 24 starts ended in a retirement.
-    assert!((r.finish_rate - 17.0 / 24.0).abs() < 0.001, "finish_rate {}", r.finish_rate);
+    assert!(
+        (r.finish_rate - 17.0 / 24.0).abs() < 0.001,
+        "finish_rate {}",
+        r.finish_rate
+    );
     assert!(r.pace > 0.0 && r.quali > 0.0, "beat the car on average");
-    assert!(r.mp_bonus < 0.0, "a losing online record must cost, not pay");
+    assert!(
+        r.mp_bonus < 0.0,
+        "a losing online record must cost, not pay"
+    );
     // Snapshot value shifts whenever docs/custom_ai_files_with_perf_scalars/*.xml's scalars change
     // (power_scalar was rescaled so the fastest car in each class is 1.00, not up to 1.10).
     assert!((r.value - 51.66).abs() < 0.5, "rating {}", r.value);
@@ -388,8 +460,11 @@ fn test_reference_career_skips_classes_without_a_roster() {
     );
     assert!(!ctxs.iter().any(|c| c.class == "F-Junior"));
     let all = compute_reputation_global(Some("Nightrat"), &rated, &ctxs, None);
-    let without: Vec<_> =
-        rated.iter().filter(|s| s.car_class != "F-Junior").cloned().collect();
+    let without: Vec<_> = rated
+        .iter()
+        .filter(|s| s.car_class != "F-Junior")
+        .cloned()
+        .collect();
     let trimmed = compute_reputation_global(Some("Nightrat"), &without, &ctxs, None);
     assert_eq!(all.sp_races, trimmed.sp_races);
     assert!((all.value - trimmed.value).abs() < 0.001);
@@ -404,7 +479,10 @@ fn test_reference_career_second_human_is_online_only() {
     assert_eq!(r.sp_races, 0);
     assert_eq!((r.mp_wins, r.mp_losses), (5, 2));
     let me = compute_reputation_global(Some("Nightrat"), &rated, &reference_contexts(), None);
-    assert!((r.mp_bonus + me.mp_bonus).abs() < 0.001, "head-to-head must be zero-sum");
+    assert!(
+        (r.mp_bonus + me.mp_bonus).abs() < 0.001,
+        "head-to-head must be zero-sum"
+    );
     assert!((r.value - (50.0 + r.mp_bonus)).abs() < 0.001);
 }
 
@@ -420,7 +498,10 @@ fn test_eligibility_locks_top_teams_and_opens_the_back() {
     // Osella's own bar (Ghinzani at 0.66) is above a 40 rating, but the slowest team is always
     // open so a new driver has somewhere to start.
     assert_eq!(osella.tier, Tier::Available);
-    assert!(osella.required > 40.0, "the floor should override the bar, not lower it");
+    assert!(
+        osella.required > 40.0,
+        "the floor should override the bar, not lower it"
+    );
     // The bar is the weaker incumbent: Brabham asks for Warwick's 0.78, not Patrese's 0.81.
     let brabham = low.iter().find(|e| e.team == "Brabham").unwrap();
     assert!((brabham.incumbent_skill.unwrap() - 0.78).abs() < 0.001);

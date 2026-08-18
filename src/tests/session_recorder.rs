@@ -8,32 +8,49 @@ use std::sync::{Arc, RwLock};
 
 fn empty_telemetry() -> PlayerTelemetry {
     PlayerTelemetry {
-        tyre_temp_left:    [0.0; 4],
-        tyre_temp_center:  [0.0; 4],
-        tyre_temp_right:   [0.0; 4],
-        tyre_wear:         [0.0; 4],
-        tyre_pressure:     [0.0; 4],
-        brake_temp:        [0.0; 4],
+        tyre_temp_left: [0.0; 4],
+        tyre_temp_center: [0.0; 4],
+        tyre_temp_right: [0.0; 4],
+        tyre_wear: [0.0; 4],
+        tyre_pressure: [0.0; 4],
+        brake_temp: [0.0; 4],
         suspension_travel: [0.0; 4],
-        ride_height:       [0.0; 4],
-        throttle: 0.0, brake_input: 0.0, steering: 0.0,
-        speed: 0.0, rpm: 0.0, gear: 0,
+        ride_height: [0.0; 4],
+        throttle: 0.0,
+        brake_input: 0.0,
+        steering: 0.0,
+        speed: 0.0,
+        rpm: 0.0,
+        gear: 0,
         tyre_compound: [String::new(), String::new(), String::new(), String::new()],
-        fuel_level: 0.0, fuel_capacity: 0.0,
+        fuel_level: 0.0,
+        fuel_capacity: 0.0,
     }
 }
 
 fn make_participant(name: &str, pos: u32, laps: u32, fl: f32, car: &str) -> ParticipantData {
     ParticipantData {
-        name: name.into(), car_name: car.into(), car_class: String::new(),
-        is_active: true, is_player: false,
-        race_position: pos, laps_completed: laps, current_lap: laps + 1,
+        name: name.into(),
+        car_name: car.into(),
+        car_class: String::new(),
+        is_active: true,
+        is_player: false,
+        race_position: pos,
+        laps_completed: laps,
+        current_lap: laps + 1,
         current_lap_distance: 0.0,
-        cur_s1: -1.0, cur_s2: -1.0, cur_s3: -1.0,
-        best_s1: -1.0, best_s2: -1.0, best_s3: -1.0,
-        fastest_lap_time: fl, last_lap_time: 0.0,
-        world_pos_x: 0.0, world_pos_z: 0.0,
-        interval_gap_secs: 0.0, interval_gap_laps: 0,
+        cur_s1: -1.0,
+        cur_s2: -1.0,
+        cur_s3: -1.0,
+        best_s1: -1.0,
+        best_s2: -1.0,
+        best_s3: -1.0,
+        fastest_lap_time: fl,
+        last_lap_time: 0.0,
+        world_pos_x: 0.0,
+        world_pos_z: 0.0,
+        interval_gap_secs: 0.0,
+        interval_gap_laps: 0,
         in_pits: false,
     }
 }
@@ -41,13 +58,21 @@ fn make_participant(name: &str, pos: u32, laps: u32, fl: f32, car: &str) -> Part
 fn make_session(session_state: u32, participants: Vec<ParticipantData>) -> LiveSessionData {
     let n = participants.len() as i32;
     LiveSessionData {
-        connected: true, game_state: 2, session_state, race_state: 2,
+        connected: true,
+        game_state: 2,
+        session_state,
+        race_state: 2,
         num_participants: n,
-        track_location: "Spa".into(), track_variation: "GP".into(),
-        track_length: 7000.0, laps_in_event: 0,
-        car_name: "Ferrari".into(), car_class: "GT3".into(),
-        participants, player_telemetry: empty_telemetry(),
-        race_flag_colour: 0, race_flag_reason: 0,
+        track_location: "Spa".into(),
+        track_variation: "GP".into(),
+        track_length: 7000.0,
+        laps_in_event: 0,
+        car_name: "Ferrari".into(),
+        car_class: "GT3".into(),
+        participants,
+        player_telemetry: empty_telemetry(),
+        race_flag_colour: 0,
+        race_flag_reason: 0,
     }
 }
 
@@ -56,10 +81,13 @@ fn make_session(session_state: u32, participants: Vec<ParticipantData>) -> LiveS
 /// Drives the accumulator through a race where the leader reaches `laps`.
 fn run_laps(chart: &mut Vec<LapChartEntry>, leader: &mut u32, laps: u32) {
     for lap in 1..=laps {
-        let s = make_session(5, vec![
-            make_participant("A", 1, lap, 90.0, "Ferrari"),
-            make_participant("B", 2, lap.saturating_sub(1), 91.0, "Ferrari"),
-        ]);
+        let s = make_session(
+            5,
+            vec![
+                make_participant("A", 1, lap, 90.0, "Ferrari"),
+                make_participant("B", 2, lap.saturating_sub(1), 91.0, "Ferrari"),
+            ],
+        );
         accumulate_lap_chart(chart, leader, &s);
     }
 }
@@ -132,10 +160,13 @@ fn make_store() -> (SharedStore, PathBuf) {
 #[test]
 fn test_capture_stores_session_with_correct_fields() {
     let (store, path) = make_store();
-    let session = make_session(5, vec![
-        make_participant("Alice", 1, 10, 90.0, "Ferrari"),
-        make_participant("Bob",   2, 10, 91.0, "McLaren"),
-    ]);
+    let session = make_session(
+        5,
+        vec![
+            make_participant("Alice", 1, 10, 90.0, "Ferrari"),
+            make_participant("Bob", 2, 10, 91.0, "McLaren"),
+        ],
+    );
     capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     assert_eq!(data.sessions.len(), 1);
@@ -155,25 +186,31 @@ fn test_capture_stores_session_with_correct_fields() {
 fn test_capture_dnf_driver_with_fewer_laps() {
     let (store, path) = make_store();
     // Alice completed 10 (max); Bob only 8 → Bob is DNF
-    let session = make_session(5, vec![
-        make_participant("Alice", 1, 10, 90.0, ""),
-        make_participant("Bob",   2,  8, 91.0, ""),
-    ]);
+    let session = make_session(
+        5,
+        vec![
+            make_participant("Alice", 1, 10, 90.0, ""),
+            make_participant("Bob", 2, 8, 91.0, ""),
+        ],
+    );
     capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     let results = &data.sessions[0].results;
     assert!(!results[0].dnf, "Alice finished");
-    assert!(results[1].dnf,  "Bob is DNF");
+    assert!(results[1].dnf, "Bob is DNF");
     let _ = std::fs::remove_file(&path);
 }
 
 #[test]
 fn test_capture_all_same_laps_no_dnf() {
     let (store, path) = make_store();
-    let session = make_session(5, vec![
-        make_participant("Alice", 1, 5, 90.0, ""),
-        make_participant("Bob",   2, 5, 91.0, ""),
-    ]);
+    let session = make_session(
+        5,
+        vec![
+            make_participant("Alice", 1, 5, 90.0, ""),
+            make_participant("Bob", 2, 5, 91.0, ""),
+        ],
+    );
     capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     for r in &data.sessions[0].results {
@@ -216,7 +253,10 @@ fn test_capture_is_player_from_telemetry_flag() {
     let (store, path) = make_store();
     let mut alice = make_participant("Alice", 1, 10, 90.0, "Ferrari");
     alice.is_player = true;
-    let session = make_session(5, vec![alice, make_participant("Bob", 2, 10, 91.0, "McLaren")]);
+    let session = make_session(
+        5,
+        vec![alice, make_participant("Bob", 2, 10, 91.0, "McLaren")],
+    );
     capture(&store, &path, &session, vec![], None);
     let data = store.read().unwrap();
     assert!(data.sessions[0].results[0].is_player, "Alice");
@@ -230,10 +270,13 @@ fn test_capture_is_player_falls_back_to_player_name_override() {
     // AMS2's is_player flag for everyone — the tracked player_name from an earlier poll
     // should still mark the right result.
     let (store, path) = make_store();
-    let session = make_session(5, vec![
-        make_participant("Alice", 1, 10, 90.0, "Ferrari"),
-        make_participant("Bob",   2, 10, 91.0, "McLaren"),
-    ]);
+    let session = make_session(
+        5,
+        vec![
+            make_participant("Alice", 1, 10, 90.0, "Ferrari"),
+            make_participant("Bob", 2, 10, 91.0, "McLaren"),
+        ],
+    );
     capture(&store, &path, &session, vec![], Some("Bob"));
     let data = store.read().unwrap();
     assert!(!data.sessions[0].results[0].is_player, "Alice");

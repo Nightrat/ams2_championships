@@ -30,13 +30,19 @@ fn test_parse_driver_teams_basic_mapping() {
 
 #[test]
 fn test_extract_team_name_strips_number_and_driver() {
-    assert_eq!(extract_team_name("Brabham-Repco #1 J. Brabham"), "Brabham-Repco");
+    assert_eq!(
+        extract_team_name("Brabham-Repco #1 J. Brabham"),
+        "Brabham-Repco"
+    );
 }
 
 #[test]
 fn test_extract_team_name_strips_leading_year() {
     assert_eq!(extract_team_name("1986 AGS #31 - I. Capelli"), "AGS");
-    assert_eq!(extract_team_name("1988 Eurobrun #32 - O. Larrauri"), "Eurobrun");
+    assert_eq!(
+        extract_team_name("1988 Eurobrun #32 - O. Larrauri"),
+        "Eurobrun"
+    );
 }
 
 #[test]
@@ -48,9 +54,15 @@ fn test_extract_team_name_no_hash_returns_trimmed_input() {
 fn test_extract_team_name_driver_before_number_with_dash_separator() {
     // F-Retro_Gen1.xml's convention: "Team - Driver #Num", unlike the more common
     // "Team #Num Driver" / "Team #Num - Driver" used elsewhere.
-    assert_eq!(extract_team_name("Marlboro Team Texaco - E. Fittipaldi #5"), "Marlboro Team Texaco");
+    assert_eq!(
+        extract_team_name("Marlboro Team Texaco - E. Fittipaldi #5"),
+        "Marlboro Team Texaco"
+    );
     // Team name itself contains an unspaced hyphen — must not be mistaken for the separator.
-    assert_eq!(extract_team_name("Dalton-Amon Int. - C. Amon #22"), "Dalton-Amon Int.");
+    assert_eq!(
+        extract_team_name("Dalton-Amon Int. - C. Amon #22"),
+        "Dalton-Amon Int."
+    );
 }
 
 #[test]
@@ -69,8 +81,9 @@ fn test_parse_driver_teams_empty_xml_returns_empty_map() {
 #[test]
 fn test_parse_driver_teams_malformed_xml_does_not_panic() {
     let map = parse_driver_teams_str("<driver livery_name=\"Oops\"><name>Unclosed");
-    // No closing </driver>, still should not panic — livery captured with whatever block remains.
-    assert!(map.get("Unclosed").is_none() || map.get("Unclosed").is_some());
+    // Neither </name> nor </driver> is closed: the name can't be read, so the block is skipped
+    // rather than panicking on the truncated input.
+    assert!(map.is_empty());
 }
 
 #[test]
@@ -101,7 +114,11 @@ const M2: &str = "Formula Classic Gen1 Model2";
 
 fn grid<'a>(rows: &'a [(&'a str, &'a str, bool)]) -> Vec<GridEntry<'a>> {
     rows.iter()
-        .map(|(name, car_name, is_player)| GridEntry { name, car_name, is_player: *is_player })
+        .map(|(name, car_name, is_player)| GridEntry {
+            name,
+            car_name,
+            is_player: *is_player,
+        })
         .collect()
 }
 
@@ -121,7 +138,10 @@ const FULL_GRID: &[(&str, &str, bool)] = &[
 fn test_parse_seats_extracts_team_and_number() {
     let seats = parse_seats_str(ROSTER);
     assert_eq!(seats.len(), 10, "one entry per named driver");
-    let patrese = seats.iter().find(|s| s.driver == "Riccardo Patrese").unwrap();
+    let patrese = seats
+        .iter()
+        .find(|s| s.driver == "Riccardo Patrese")
+        .unwrap();
     assert_eq!(patrese.seat, "Brabham #7");
     assert_eq!(patrese.team, "Brabham");
 }
@@ -163,12 +183,21 @@ fn test_infer_resolves_dual_livery_driver_by_car_model() {
     // Danner on Model1 must be read as Osella #22, leaving Arrows #17 free rather than Osella.
     // If he were mis-seated at Arrows #17, Osella #22 would show as a free Model1 seat and the
     // result would be Candidates instead of Derived.
-    assert!(matches!(infer_player_seat(&seats, &grid(FULL_GRID)), PlayerSeat::Derived(_)));
+    assert!(matches!(
+        infer_player_seat(&seats, &grid(FULL_GRID)),
+        PlayerSeat::Derived(_)
+    ));
 
     // On Model2 the same driver is the Arrows entry instead, so Osella #22 becomes free.
     let rows: Vec<(&str, &str, bool)> = FULL_GRID
         .iter()
-        .map(|&(n, c, p)| if n == "Christian Danner" { (n, M2, p) } else { (n, c, p) })
+        .map(|&(n, c, p)| {
+            if n == "Christian Danner" {
+                (n, M2, p)
+            } else {
+                (n, c, p)
+            }
+        })
         .collect();
     match infer_player_seat(&seats, &grid(&rows)) {
         PlayerSeat::Candidates(v) => {
@@ -184,8 +213,11 @@ fn test_infer_filters_candidates_by_player_car_model() {
     let seats = parse_seats_str(ROSTER);
     // Drop Warwick: both Brabham seats open up, but Arrows #17 stays excluded because Boutsen
     // pins Arrows to Model2 while the player drove Model1.
-    let rows: Vec<(&str, &str, bool)> =
-        FULL_GRID.iter().copied().filter(|&(n, _, _)| n != "Derek Warwick").collect();
+    let rows: Vec<(&str, &str, bool)> = FULL_GRID
+        .iter()
+        .copied()
+        .filter(|&(n, _, _)| n != "Derek Warwick")
+        .collect();
     match infer_player_seat(&seats, &grid(&rows)) {
         PlayerSeat::Candidates(v) => {
             let mut names: Vec<&str> = v.iter().map(|s| s.seat.as_str()).collect();
@@ -202,8 +234,7 @@ fn test_infer_identifies_player_without_is_player_flag() {
     // Sessions recorded before the is_player flag existed have it false on every row; the
     // player is still identifiable as the only name absent from the roster, which keeps the
     // car-model filter working (without it, Arrows #17 would survive as a candidate).
-    let rows: Vec<(&str, &str, bool)> =
-        FULL_GRID.iter().map(|&(n, c, _)| (n, c, false)).collect();
+    let rows: Vec<(&str, &str, bool)> = FULL_GRID.iter().map(|&(n, c, _)| (n, c, false)).collect();
     match infer_player_seat(&seats, &grid(&rows)) {
         PlayerSeat::Derived(seat) => assert_eq!(seat.seat, "Brabham #7"),
         other => panic!("expected Derived, got {other:?}"),
@@ -227,21 +258,31 @@ fn test_infer_reports_roster_not_detected_for_stock_ai() {
 
 #[test]
 fn test_infer_reports_no_empty_seat_when_grid_is_full() {
-    let seats = parse_seats_str(r#"<custom_ai_drivers>
+    let seats = parse_seats_str(
+        r#"<custom_ai_drivers>
         <driver livery_name="1986 Williams #5 - N. Mansell"><name>Nigel Mansell</name></driver>
-    </custom_ai_drivers>"#);
-    let rows: &[(&str, &str, bool)] =
-        &[("Nightrat", M1, true), ("Nigel Mansell", M1, false)];
-    assert_eq!(infer_player_seat(&seats, &grid(rows)), PlayerSeat::NoEmptySeat);
+    </custom_ai_drivers>"#,
+    );
+    let rows: &[(&str, &str, bool)] = &[("Nightrat", M1, true), ("Nigel Mansell", M1, false)];
+    assert_eq!(
+        infer_player_seat(&seats, &grid(rows)),
+        PlayerSeat::NoEmptySeat
+    );
 }
 
 #[test]
 fn test_check_player_team_accepts_declared_team_and_seat() {
     let seats = parse_seats_str(ROSTER);
     let g = grid(FULL_GRID);
-    assert!(matches!(check_player_team(&seats, &g, "Brabham"), TeamCheck::Passed(_)));
+    assert!(matches!(
+        check_player_team(&seats, &g, "Brabham"),
+        TeamCheck::Passed(_)
+    ));
     // The car number may be included, and case is ignored.
-    assert!(matches!(check_player_team(&seats, &g, "brabham #7"), TeamCheck::Passed(_)));
+    assert!(matches!(
+        check_player_team(&seats, &g, "brabham #7"),
+        TeamCheck::Passed(_)
+    ));
 }
 
 #[test]
@@ -253,7 +294,10 @@ fn test_check_player_team_rejects_contradicted_team() {
         TeamCheck::Failed(reason) => assert!(reason.contains("Brabham #7"), "got {reason}"),
         other => panic!("expected Failed, got {other:?}"),
     }
-    assert!(matches!(check_player_team(&seats, &g, "McLaren"), TeamCheck::Failed(_)));
+    assert!(matches!(
+        check_player_team(&seats, &g, "McLaren"),
+        TeamCheck::Failed(_)
+    ));
 }
 
 #[test]
@@ -261,10 +305,15 @@ fn test_check_player_team_skips_when_unverifiable() {
     let seats = parse_seats_str(ROSTER);
     let g = grid(FULL_GRID);
     // No declared team, and no roster, are both "accept without checking".
-    assert!(matches!(check_player_team(&seats, &g, "   "), TeamCheck::Skipped(_)));
-    assert!(matches!(check_player_team(&[], &g, "Brabham"), TeamCheck::Skipped(_)));
-    let stock: &[(&str, &str, bool)] =
-        &[("Nightrat", M1, true), ("Aires Silva  (AI)", M1, false)];
+    assert!(matches!(
+        check_player_team(&seats, &g, "   "),
+        TeamCheck::Skipped(_)
+    ));
+    assert!(matches!(
+        check_player_team(&[], &g, "Brabham"),
+        TeamCheck::Skipped(_)
+    ));
+    let stock: &[(&str, &str, bool)] = &[("Nightrat", M1, true), ("Aires Silva  (AI)", M1, false)];
     assert!(matches!(
         check_player_team(&seats, &grid(stock), "Brabham"),
         TeamCheck::Skipped(_)
@@ -454,18 +503,31 @@ fn test_class_performance_filters_out_unregistered_files() {
 fn test_class_performance_orders_classes_chronologically() {
     let ai_dir = make_install_with_registry(
         "chrono",
-        &["F-Classic_Gen1", "F-Vintage_Gen1", "F-Retro_Gen1", "F-Unmapped-Class"],
+        &[
+            "F-Classic_Gen1",
+            "F-Vintage_Gen1",
+            "F-Retro_Gen1",
+            "F-Unmapped-Class",
+        ],
     );
     // Written in a deliberately non-chronological, non-alphabetical order on disk.
     std::fs::write(ai_dir.join("F-Classic_Gen1.xml"), SAMPLE_WITH_SCALARS).unwrap(); // 1986
     std::fs::write(ai_dir.join("F-Vintage_Gen1.xml"), SAMPLE_WITH_SCALARS).unwrap(); // 1967
-    std::fs::write(ai_dir.join("F-Retro_Gen1.xml"), SAMPLE_WITH_SCALARS).unwrap();   // 1974
+    std::fs::write(ai_dir.join("F-Retro_Gen1.xml"), SAMPLE_WITH_SCALARS).unwrap(); // 1974
     std::fs::write(ai_dir.join("F-Unmapped-Class.xml"), SAMPLE_WITH_SCALARS).unwrap(); // no year
 
     let classes = class_performance(&ai_dir);
     let names: Vec<&str> = classes.iter().map(|c| c.class.as_str()).collect();
     // Chronological: 1967, 1974, 1986, then the unmapped class last.
-    assert_eq!(names, vec!["F-Vintage_Gen1", "F-Retro_Gen1", "F-Classic_Gen1", "F-Unmapped-Class"]);
+    assert_eq!(
+        names,
+        vec![
+            "F-Vintage_Gen1",
+            "F-Retro_Gen1",
+            "F-Classic_Gen1",
+            "F-Unmapped-Class"
+        ]
+    );
     assert_eq!(classes[0].year, Some(1967));
     assert_eq!(classes[3].year, None);
 

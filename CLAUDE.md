@@ -48,7 +48,8 @@ All JS files are concatenated into a single `<script>` block each — no bundler
 5. `career.js` — career/championships/track-stats tab
 6. `manage.js` — championship management tab
 7. `config.js` — server config tab
-8. `main.js` — tab switching, sub-tab init
+8. `saves.js` — career save switcher (header dropdown + Config tab list)
+9. `main.js` — tab switching, sub-tab init
 
 ### include_str! caching gotcha
 
@@ -63,17 +64,25 @@ Test files live in `src/tests/` and are wired into their parent module with `#[p
 - `src/tests/config.rs` — unit tests for config load/create/defaults
 - `src/tests/server.rs` — integration tests for HTTP routes via real TCP loopback (`TcpListener::bind("127.0.0.1:0")`)
 
-### Data files (same directory as ams2_career.json)
+### Data files (saves folder — `championships/` next to the exe by default)
 
 | File | Purpose |
 |---|---|
-| `ams2_career.json` | All sessions and championships |
-| `track_layouts/` | Per-track radar point arrays (`{slug}.json`) |
+| `*.json` | One career save each — sessions and championships. `ams2_career.json` is the default |
+| `track_layouts/` | Per-track radar point arrays (`{slug}.json`), shared by all saves |
+
+### Multiple career saves (`src/saves.rs`)
+
+- Every `*.json` directly inside the saves folder is a save; the file stem is its name. `config.saves_dir` picks the folder (resolved by `saves::resolve_dir` at startup only), `config.data_file` holds the full path of the **active** save.
+- The active path is `SavePath = Arc<RwLock<PathBuf>>` (`data_store.rs`), cloned into both the HTTP handler and the recorder thread, so `POST /api/saves/activate` repoints both without a restart. Read it via `cur(&data_path)` in the server — never hold the guard across a file write.
+- Switching replaces the store's **contents** (`*store.write() = load_data(&new)`), never the `Arc` — the recorder thread holds a clone of the same one.
+- `sanitize_name` gates every user-supplied name (rejects separators, `..`, non-`[A-Za-z0-9 _-]`); path segments go through `http::url_decode` first.
+- `PATCH /api/config` deliberately has **no** `data_file` field — it carries the old value through, like the spotter fields. Changing `saves_dir` is restart-required and clears `data_file`, so `saves::resolve_active` re-picks from the new folder (configured file if it still exists → `ams2_career.json` → first save → fresh default).
 
 ### HTTP server notes
 
 - All routes are matched in sequence inside a single `handle()` function — add new routes before the catch-all HTML fallback at the bottom
-- `data_path` is `Arc<PathBuf>`
+- `data_path` is `SavePath` (`Arc<RwLock<PathBuf>>`) — the active save, swappable at runtime
 - WebSocket (`/ws`) streams `LiveSessionData` JSON at configurable poll interval
 - CI runs on `windows-latest` only (shared memory code is Windows-specific)
 

@@ -41,37 +41,37 @@ pub struct ParticipantData {
 #[derive(Serialize, Clone)]
 pub struct PlayerTelemetry {
     /// Left-edge tyre temperature, °C.
-    pub tyre_temp_left:    [f32; 4],
+    pub tyre_temp_left: [f32; 4],
     /// Centre-tread tyre temperature, °C.
-    pub tyre_temp_center:  [f32; 4],
+    pub tyre_temp_center: [f32; 4],
     /// Right-edge tyre temperature, °C.
-    pub tyre_temp_right:   [f32; 4],
+    pub tyre_temp_right: [f32; 4],
     /// Tyre wear 0–1 (0 = new, 1 = fully worn).
-    pub tyre_wear:         [f32; 4],
+    pub tyre_wear: [f32; 4],
     /// Tyre air pressure, PSI.
-    pub tyre_pressure:     [f32; 4],
+    pub tyre_pressure: [f32; 4],
     /// Brake disc temperature, °C.
-    pub brake_temp:        [f32; 4],
+    pub brake_temp: [f32; 4],
     /// Suspension travel, metres.
     pub suspension_travel: [f32; 4],
     /// Ride height per corner, cm.
-    pub ride_height:       [f32; 4],
+    pub ride_height: [f32; 4],
     /// Filtered throttle 0–1.
-    pub throttle:   f32,
+    pub throttle: f32,
     /// Filtered brake 0–1.
     pub brake_input: f32,
     /// Filtered steering −1…+1.
-    pub steering:   f32,
+    pub steering: f32,
     /// Speed m/s.
-    pub speed:      f32,
+    pub speed: f32,
     /// Engine RPM.
-    pub rpm:        f32,
+    pub rpm: f32,
     /// Current gear (negative = reverse, 0 = neutral).
-    pub gear:       i32,
+    pub gear: i32,
     /// Tyre compound name per wheel (FL, FR, RL, RR).
     pub tyre_compound: [String; 4],
     /// Current fuel level in litres (mFuelLevel).
-    pub fuel_level:    f32,
+    pub fuel_level: f32,
     /// Fuel tank capacity in litres (mFuelCapacity).
     pub fuel_capacity: f32,
 }
@@ -119,18 +119,23 @@ fn disconnected() -> LiveSessionData {
         race_flag_colour: 0,
         race_flag_reason: 0,
         player_telemetry: PlayerTelemetry {
-            tyre_temp_left:    [0.0; 4],
-            tyre_temp_center:  [0.0; 4],
-            tyre_temp_right:   [0.0; 4],
-            tyre_wear:         [0.0; 4],
-            tyre_pressure:     [0.0; 4],
-            brake_temp:        [0.0; 4],
+            tyre_temp_left: [0.0; 4],
+            tyre_temp_center: [0.0; 4],
+            tyre_temp_right: [0.0; 4],
+            tyre_wear: [0.0; 4],
+            tyre_pressure: [0.0; 4],
+            brake_temp: [0.0; 4],
             suspension_travel: [0.0; 4],
-            ride_height:       [0.0; 4],
-            throttle: 0.0, brake_input: 0.0, steering: 0.0,
-            speed: 0.0, rpm: 0.0, gear: 0,
+            ride_height: [0.0; 4],
+            throttle: 0.0,
+            brake_input: 0.0,
+            steering: 0.0,
+            speed: 0.0,
+            rpm: 0.0,
+            gear: 0,
             tyre_compound: [String::new(), String::new(), String::new(), String::new()],
-            fuel_level: 0.0, fuel_capacity: 0.0,
+            fuel_level: 0.0,
+            fuel_capacity: 0.0,
         },
     }
 }
@@ -181,11 +186,11 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_VIEWED_PARTICIPANT: usize = 20;
     const OFF_NUM_PARTICIPANTS: usize = 24;
     const OFF_PARTICIPANTS: usize = 28;
-    const OFF_CAR_NAME:        usize = 6444;  // char mCarName[64]
-    const OFF_CAR_CLASS:       usize = 6508;  // char mCarClassName[64]
-    const OFF_LAPS_IN_EVENT:   usize = 6572;  // unsigned int mLapsInEvent
-    const OFF_TRACK_LOCATION:  usize = 6576;  // char mTrackLocation[64]
-    const OFF_TRACK_VARIATION: usize = 6640;  // char mTrackVariation[64]
+    const OFF_CAR_NAME: usize = 6444; // char mCarName[64]
+    const OFF_CAR_CLASS: usize = 6508; // char mCarClassName[64]
+    const OFF_LAPS_IN_EVENT: usize = 6572; // unsigned int mLapsInEvent
+    const OFF_TRACK_LOCATION: usize = 6576; // char mTrackLocation[64]
+    const OFF_TRACK_VARIATION: usize = 6640; // char mTrackVariation[64]
     const OFF_TRACK_LENGTH: usize = 6704;
     // Sector time arrays (all float[64], indexed by participant slot)
     // float mCurrentSector1Times[64]  //  7408  (256)
@@ -196,25 +201,25 @@ pub fn read_live_session() -> LiveSessionData {
     // float mFastestSector3Times[64]  //  8688  (256)
     // float mFastestLapTimes[64]      //  8944  (256)
     // float mLastLapTimes[64]         //  9200  (256)
-    const OFF_CAR_NAMES:       usize = 11056; // char mCarNames[64][64]
+    const OFF_CAR_NAMES: usize = 11056; // char mCarNames[64][64]
     const OFF_CAR_CLASS_NAMES: usize = 15152; // char mCarClassNames[64][64]
-    // ── Player car telemetry ──────────────────────────────────────────────────
-    const OFF_SPEED:              usize = 6848;  // float mSpeed (m/s)
-    const OFF_RPM:                usize = 6852;  // float mRpm
-    const OFF_BRAKE_INPUT:        usize = 6860;  // float mBrake (filtered)
-    const OFF_THROTTLE:           usize = 6864;  // float mThrottle (filtered)
-    const OFF_STEERING:           usize = 6872;  // float mSteering (filtered)
-    const OFF_GEAR:               usize = 6876;  // int mGear
-    const OFF_TYRE_WEAR:          usize = 7136;  // float mTyreWear[4]
-    const OFF_BRAKE_TEMP:         usize = 7184;  // float mBrakeTempCelsius[4]
-    const OFF_SUSPENSION_TRAVEL:  usize = 7340;  // float mSuspensionTravel[4] (metres)
-    const OFF_TYRE_PRESSURE:      usize = 7372;  // float mAirPressure[4] (PSI)
-    // AMS2-specific additions (not in original PC2 header):
-    const OFF_TYRE_COMPOUND:      usize = 19388; // char mTyreCompound[4][40]
-    const OFF_TYRE_TEMP_LEFT:     usize = 20584; // float mTyreTempLeft[4] (°C)
-    const OFF_TYRE_TEMP_CENTER:   usize = 20600; // float mTyreTempCenter[4] (°C)
-    const OFF_TYRE_TEMP_RIGHT:    usize = 20616; // float mTyreTempRight[4] (°C)
-    const OFF_RIDE_HEIGHT:        usize = 20636; // float mRideHeight[4] (cm)
+                                              // ── Player car telemetry ──────────────────────────────────────────────────
+    const OFF_SPEED: usize = 6848; // float mSpeed (m/s)
+    const OFF_RPM: usize = 6852; // float mRpm
+    const OFF_BRAKE_INPUT: usize = 6860; // float mBrake (filtered)
+    const OFF_THROTTLE: usize = 6864; // float mThrottle (filtered)
+    const OFF_STEERING: usize = 6872; // float mSteering (filtered)
+    const OFF_GEAR: usize = 6876; // int mGear
+    const OFF_TYRE_WEAR: usize = 7136; // float mTyreWear[4]
+    const OFF_BRAKE_TEMP: usize = 7184; // float mBrakeTempCelsius[4]
+    const OFF_SUSPENSION_TRAVEL: usize = 7340; // float mSuspensionTravel[4] (metres)
+    const OFF_TYRE_PRESSURE: usize = 7372; // float mAirPressure[4] (PSI)
+                                           // AMS2-specific additions (not in original PC2 header):
+    const OFF_TYRE_COMPOUND: usize = 19388; // char mTyreCompound[4][40]
+    const OFF_TYRE_TEMP_LEFT: usize = 20584; // float mTyreTempLeft[4] (°C)
+    const OFF_TYRE_TEMP_CENTER: usize = 20600; // float mTyreTempCenter[4] (°C)
+    const OFF_TYRE_TEMP_RIGHT: usize = 20616; // float mTyreTempRight[4] (°C)
+    const OFF_RIDE_HEIGHT: usize = 20636; // float mRideHeight[4] (cm)
     const OFF_CUR_S1: usize = 7408;
     const OFF_CUR_S2: usize = 7664;
     const OFF_CUR_S3: usize = 7920;
@@ -224,8 +229,8 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_FASTEST_LAP_TIMES: usize = 8944;
     const OFF_LAST_LAP_TIMES: usize = 9200;
     // After mLastLapTimes[64] (9200 + 256 = 9456):
-    const OFF_FUEL_LEVEL:          usize = 9460; // float mFuelLevel (litres)
-    const OFF_FUEL_CAPACITY:       usize = 9464; // float mFuelCapacity (litres)
+    const OFF_FUEL_LEVEL: usize = 9460; // float mFuelLevel (litres)
+    const OFF_FUEL_CAPACITY: usize = 9464; // float mFuelCapacity (litres)
     const OFF_HIGHEST_FLAG_COLOUR: usize = 9468; // unsigned int mHighestFlagColour
     const OFF_HIGHEST_FLAG_REASON: usize = 9472; // unsigned int mHighestFlagReason
 
@@ -255,7 +260,12 @@ pub fn read_live_session() -> LiveSessionData {
     const P_CURRENT_SECTOR: usize = 96; // int, -1 = pits/garage
 
     unsafe fn rf32x4(b: *const u8, off: usize) -> [f32; 4] {
-        [rf32(b, off), rf32(b, off + 4), rf32(b, off + 8), rf32(b, off + 12)]
+        [
+            rf32(b, off),
+            rf32(b, off + 4),
+            rf32(b, off + 8),
+            rf32(b, off + 12),
+        ]
     }
     unsafe fn ru8(b: *const u8, off: usize) -> u8 {
         *b.add(off)
@@ -289,27 +299,27 @@ pub fn read_live_session() -> LiveSessionData {
         let ptr = mapped.Value as *const u8;
 
         let player_telemetry = PlayerTelemetry {
-            tyre_temp_left:    rf32x4(ptr, OFF_TYRE_TEMP_LEFT),
-            tyre_temp_center:  rf32x4(ptr, OFF_TYRE_TEMP_CENTER),
-            tyre_temp_right:   rf32x4(ptr, OFF_TYRE_TEMP_RIGHT),
-            tyre_wear:         rf32x4(ptr, OFF_TYRE_WEAR),
-            tyre_pressure:     rf32x4(ptr, OFF_TYRE_PRESSURE),
-            brake_temp:        rf32x4(ptr, OFF_BRAKE_TEMP),
+            tyre_temp_left: rf32x4(ptr, OFF_TYRE_TEMP_LEFT),
+            tyre_temp_center: rf32x4(ptr, OFF_TYRE_TEMP_CENTER),
+            tyre_temp_right: rf32x4(ptr, OFF_TYRE_TEMP_RIGHT),
+            tyre_wear: rf32x4(ptr, OFF_TYRE_WEAR),
+            tyre_pressure: rf32x4(ptr, OFF_TYRE_PRESSURE),
+            brake_temp: rf32x4(ptr, OFF_BRAKE_TEMP),
             suspension_travel: rf32x4(ptr, OFF_SUSPENSION_TRAVEL),
-            ride_height:       rf32x4(ptr, OFF_RIDE_HEIGHT),
-            throttle:    rf32(ptr, OFF_THROTTLE),
+            ride_height: rf32x4(ptr, OFF_RIDE_HEIGHT),
+            throttle: rf32(ptr, OFF_THROTTLE),
             brake_input: rf32(ptr, OFF_BRAKE_INPUT),
-            steering:    rf32(ptr, OFF_STEERING),
-            speed:       rf32(ptr, OFF_SPEED),
-            rpm:         rf32(ptr, OFF_RPM),
-            gear:        ri32(ptr, OFF_GEAR),
+            steering: rf32(ptr, OFF_STEERING),
+            speed: rf32(ptr, OFF_SPEED),
+            rpm: rf32(ptr, OFF_RPM),
+            gear: ri32(ptr, OFF_GEAR),
             tyre_compound: [
-                rstr(ptr, OFF_TYRE_COMPOUND,        40),
-                rstr(ptr, OFF_TYRE_COMPOUND + 40,   40),
-                rstr(ptr, OFF_TYRE_COMPOUND + 80,   40),
-                rstr(ptr, OFF_TYRE_COMPOUND + 120,  40),
+                rstr(ptr, OFF_TYRE_COMPOUND, 40),
+                rstr(ptr, OFF_TYRE_COMPOUND + 40, 40),
+                rstr(ptr, OFF_TYRE_COMPOUND + 80, 40),
+                rstr(ptr, OFF_TYRE_COMPOUND + 120, 40),
             ],
-            fuel_level:    rf32(ptr, OFF_FUEL_LEVEL),
+            fuel_level: rf32(ptr, OFF_FUEL_LEVEL),
             fuel_capacity: rf32(ptr, OFF_FUEL_CAPACITY),
         };
         let game_state = ru32(ptr, OFF_GAME_STATE);
@@ -317,12 +327,12 @@ pub fn read_live_session() -> LiveSessionData {
         let race_state = ru32(ptr, OFF_RACE_STATE);
         let viewed_idx = ri32(ptr, OFF_VIEWED_PARTICIPANT);
         let num_participants = ri32(ptr, OFF_NUM_PARTICIPANTS).clamp(0, 64);
-        let car_name       = rstr(ptr, OFF_CAR_NAME, 64);
-        let car_class      = rstr(ptr, OFF_CAR_CLASS, 64);
-        let laps_in_event   = ru32(ptr, OFF_LAPS_IN_EVENT);
-        let track_location  = rstr(ptr, OFF_TRACK_LOCATION, 64);
+        let car_name = rstr(ptr, OFF_CAR_NAME, 64);
+        let car_class = rstr(ptr, OFF_CAR_CLASS, 64);
+        let laps_in_event = ru32(ptr, OFF_LAPS_IN_EVENT);
+        let track_location = rstr(ptr, OFF_TRACK_LOCATION, 64);
         let track_variation = rstr(ptr, OFF_TRACK_VARIATION, 64);
-        let track_length    = rf32(ptr, OFF_TRACK_LENGTH);
+        let track_length = rf32(ptr, OFF_TRACK_LENGTH);
 
         let mut participants = Vec::with_capacity(num_participants as usize);
         for i in 0..num_participants as usize {
@@ -331,8 +341,8 @@ pub fn read_live_session() -> LiveSessionData {
             if !is_active {
                 continue;
             }
-            let name      = rstr(ptr, base + P_NAME, 64);
-            let car_name  = rstr(ptr, OFF_CAR_NAMES + i * 64, 64);
+            let name = rstr(ptr, base + P_NAME, 64);
+            let car_name = rstr(ptr, OFF_CAR_NAMES + i * 64, 64);
             let car_class = rstr(ptr, OFF_CAR_CLASS_NAMES + i * 64, 64);
 
             // All timing arrays are at top-level, indexed by participant slot i
@@ -363,30 +373,38 @@ pub fn read_live_session() -> LiveSessionData {
             });
         }
         // Sort by race position; unset (0) positions go to the end
-        participants.sort_by(|a, b| {
-            match (a.race_position, b.race_position) {
-                (0, 0) => std::cmp::Ordering::Equal,
-                (0, _) => std::cmp::Ordering::Greater,
-                (_, 0) => std::cmp::Ordering::Less,
-                (x, y) => x.cmp(&y),
-            }
+        participants.sort_by(|a, b| match (a.race_position, b.race_position) {
+            (0, 0) => std::cmp::Ordering::Equal,
+            (0, _) => std::cmp::Ordering::Greater,
+            (_, 0) => std::cmp::Ordering::Less,
+            (x, y) => x.cmp(&y),
         });
 
         // ── Race interval (gap to car directly ahead) ─────────────────────────
         // Only meaningful during a race session (session_state == 5).
         if session_state == 5 && track_length > 0.0 {
             // Total distance covered: laps + fractional lap from current_lap_distance.
-            let distances: Vec<f32> = participants.iter().map(|p| {
-                let frac = (p.current_lap_distance / track_length).clamp(0.0, 1.0);
-                p.laps_completed as f32 + frac
-            }).collect();
+            let distances: Vec<f32> = participants
+                .iter()
+                .map(|p| {
+                    let frac = (p.current_lap_distance / track_length).clamp(0.0, 1.0);
+                    p.laps_completed as f32 + frac
+                })
+                .collect();
 
             // Leader's reference lap time for converting fraction → seconds.
-            let ref_lap = participants.first().map(|p| {
-                if p.fastest_lap_time > 0.0 { p.fastest_lap_time }
-                else if p.last_lap_time > 0.0 { p.last_lap_time }
-                else { 0.0 }
-            }).unwrap_or(0.0);
+            let ref_lap = participants
+                .first()
+                .map(|p| {
+                    if p.fastest_lap_time > 0.0 {
+                        p.fastest_lap_time
+                    } else if p.last_lap_time > 0.0 {
+                        p.last_lap_time
+                    } else {
+                        0.0
+                    }
+                })
+                .unwrap_or(0.0);
 
             for i in 0..participants.len() {
                 if i == 0 {
@@ -396,7 +414,11 @@ pub fn read_live_session() -> LiveSessionData {
                     let gap_laps = gap_dist.floor() as u32;
                     let gap_frac = gap_dist - gap_laps as f32;
                     participants[i].interval_gap_laps = gap_laps;
-                    participants[i].interval_gap_secs = if ref_lap > 0.0 { gap_frac * ref_lap } else { 0.0 };
+                    participants[i].interval_gap_secs = if ref_lap > 0.0 {
+                        gap_frac * ref_lap
+                    } else {
+                        0.0
+                    };
                 }
             }
         }

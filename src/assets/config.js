@@ -14,7 +14,7 @@ function loadConfig() {
       _loadedConfig = cfg;
       document.getElementById('cfg-port').value       = cfg.port;
       document.getElementById('cfg-host').value       = cfg.host;
-      document.getElementById('cfg-data-file').value  = cfg.data_file || '';
+      document.getElementById('cfg-saves-dir').value = cfg.saves_dir || '';
       document.getElementById('cfg-custom-ai-dir').value = cfg.custom_ai_dir || '';
       document.getElementById('cfg-poll-ms').value    = cfg.poll_ms;
       document.getElementById('cfg-record-practice').checked = cfg.record_practice;
@@ -43,21 +43,23 @@ function setConfigMsg(msg, isError) {
   el.className = 'config-save-msg' + (isError ? ' config-save-msg-error' : (msg ? ' config-save-msg-ok' : ''));
 }
 
-function saveConfig(newCfg, moveDataFile) {
-  var body = Object.assign({}, newCfg, { move_data_file: !!moveDataFile });
+function saveConfig(newCfg) {
   fetch('/api/config', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }).then(function (r) { return r.json(); })
-    .then(function (res) {
+    body: JSON.stringify(newCfg),
+  }).then(function (r) {
+    return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+  })
+    .then(function (r) {
+      if (!r.ok) { setConfigMsg(r.body.error || 'Failed to save config.', true); return; }
+      var res = r.body;
       _loadedConfig = res.config;
       applyTrackMapConfig(res.config);
       var msgs = [];
       if (res.restart_required && res.restart_required.length) {
         msgs.push('Restart required for: ' + res.restart_required.join(', ') + '.');
       }
-      if (res.moved) msgs.push('Data file moved.');
       setConfigMsg(msgs.length ? msgs.join(' ') : 'Saved.', false);
     })
     .catch(function () { setConfigMsg('Failed to save config.', true); });
@@ -65,14 +67,10 @@ function saveConfig(newCfg, moveDataFile) {
 
 document.getElementById('config-form').addEventListener('submit', function (e) {
   e.preventDefault();
-  var newDataFile = document.getElementById('cfg-data-file').value.trim() || null;
-  var oldDataFile = _loadedConfig ? (_loadedConfig.data_file || null) : null;
-  var dataFileChanged = newDataFile !== oldDataFile;
-
   var newCfg = {
     port:           parseInt(document.getElementById('cfg-port').value, 10),
     host:           document.getElementById('cfg-host').value.trim(),
-    data_file:      newDataFile,
+    saves_dir:      document.getElementById('cfg-saves-dir').value.trim() || null,
     custom_ai_dir:  document.getElementById('cfg-custom-ai-dir').value.trim() || null,
     poll_ms:        parseInt(document.getElementById('cfg-poll-ms').value, 10),
     record_practice:      document.getElementById('cfg-record-practice').checked,
@@ -82,18 +80,7 @@ document.getElementById('config-form').addEventListener('submit', function (e) {
     show_track_map:       document.getElementById('cfg-show-track-map').checked,
     track_map_max_points: parseInt(document.getElementById('cfg-track-map-max-points').value, 10),
   };
-
-  if (dataFileChanged && oldDataFile) {
-    var dest = newDataFile || '(default location)';
-    var move = confirm(
-      'The data file path has changed.\n\n' +
-      'Move the current data file to:\n' + dest + '\n\n' +
-      'OK = move the file\nCancel = keep file in place (you may need to copy it manually)'
-    );
-    saveConfig(newCfg, move);
-  } else {
-    saveConfig(newCfg, false);
-  }
+  saveConfig(newCfg);
 });
 
 document.querySelectorAll('.tab-btn').forEach(function (btn) {

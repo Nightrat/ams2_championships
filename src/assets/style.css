@@ -1015,3 +1015,45 @@ table { border-collapse: collapse; width: 100%; }
 .config-save-msg-ok    { color: #7dcea0; }
 .config-save-msg-error { color: #e74c3c; }
 
+
+/* Career save switcher (header) */
+header { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 1rem; }
+header h1 { flex: 1 1 100%; }
+/* h1's bottom margin no longer collapses with the tab bar's top margin in a flex header. */
+.tab-bar { margin-top: 0.25rem; }
+.save-switcher {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-bottom: 0.35rem;
+}
+.save-switcher-label {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: #777;
+}
+.save-select {
+  background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 4px;
+  color: #e0e0e0; padding: 0.3rem 0.5rem; font-size: 0.82rem;
+  font-family: inherit; cursor: pointer; max-width: 220px;
+}
+.save-select:focus { border-color: #e74c3c; outline: none; }
+
+/* Career save files (config tab) */
+.saves-list { list-style: none; margin: 0 0 1rem 0; padding: 0; }
+.saves-item {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: 0.5rem 0.75rem; border: 1px solid #2a2a4a; border-radius: 4px;
+  background: #14141f; margin-bottom: 0.35rem;
+}
+.saves-item-active { border-color: #c0392b; background: #1a1420; }
+.saves-name { font-weight: 600; color: #e0e0e0; font-size: 0.9rem; }
+.saves-badge {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  background: #2a1a1a; color: #e74c3c; border: 1px solid #8b1a1a;
+  border-radius: 3px; padding: 0 4px; letter-spacing: 0.03em;
+}
+.saves-counts { font-size: 0.78rem; color: #777; }
+.saves-actions { margin-left: auto; display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.config-panel-wide { max-width: 900px; padding-bottom: 0.25rem; }
+.saves-actions .manage-btn { padding: 0.25rem 0.55rem; font-size: 0.78rem; }

@@ -20,6 +20,10 @@ fn generate_html() -> String {
     <button class="tab-btn" data-tab="config">&#9965; Config</button>
     <button class="tab-btn" data-tab="carperf">&#128202; Car Performance</button>
   </div>
+  <div class="save-switcher">
+    <label class="save-switcher-label" for="save-select">Career</label>
+    <select id="save-select" class="save-select"></select>
+  </div>
 </header>
 <main>
   <div id="tab-career" class="tab-panel tab-panel-hidden">
@@ -144,6 +148,19 @@ fn generate_html() -> String {
     </div>
   </div>
   <div id="tab-config" class="tab-panel tab-panel-hidden">
+    <div class="config-panel config-panel-wide">
+      <h2 class="config-heading">Career Save Files</h2>
+      <p class="config-note">Each save is a separate career — its own championships, sessions and stats.
+         Saves are the <code>*.json</code> files in <code id="saves-dir-label">…</code>; recorded sessions
+         always go into the active one. Track radar maps are shared by all saves.
+         Change the folder under <em>Server Configuration</em> below.</p>
+      <ul id="saves-list" class="saves-list"></ul>
+      <div class="config-actions">
+        <input class="config-input" id="save-new-name" type="text" placeholder="New career name" maxlength="64" />
+        <button id="save-new-btn" class="manage-btn manage-btn-primary" type="button">&#10010; New career</button>
+        <span id="saves-msg" class="config-save-msg"></span>
+      </div>
+    </div>
     <div class="config-panel">
       <h2 class="config-heading">Server Configuration</h2>
       <p class="config-note">Changes are saved to <code>config.json</code> next to the executable.
@@ -160,9 +177,9 @@ fn generate_html() -> String {
           <span class="config-hint">Bind address. Use <code>0.0.0.0</code> to allow LAN access (default 127.0.0.1)</span>
         </div>
         <div class="config-group">
-          <label class="config-label" for="cfg-data-file">Data file <span class="config-restart-badge">restart</span></label>
-          <input class="config-input config-input-wide" id="cfg-data-file" name="data_file" type="text" placeholder="(default: championships/ams2_career.json next to executable)" />
-          <span class="config-hint">Full path to the career JSON file. Leave empty for the default location.</span>
+          <label class="config-label" for="cfg-saves-dir">Save files folder <span class="config-restart-badge">restart</span></label>
+          <input class="config-input config-input-wide" id="cfg-saves-dir" name="saves_dir" type="text" placeholder="(default: championships folder next to the executable)" />
+          <span class="config-hint">Folder holding your career save files and their track layouts. Leave empty for the default. The folder is created if it does not exist; after restarting, the server opens a career from it.</span>
         </div>
         <div class="config-group">
           <label class="config-label" for="cfg-custom-ai-dir">Custom AI Drivers folder</label>
@@ -220,20 +237,22 @@ fn generate_html() -> String {
 <script>{js_career}</script>
 <script>{js_manage}</script>
 <script>{js_config}</script>
+<script>{js_saves}</script>
 <script>{js_carperf}</script>
 <script>{js_main}</script>
 </body>
 </html>"##,
-        css          = CSS,
-        js_utils     = JS_UTILS,
+        css = CSS,
+        js_utils = JS_UTILS,
         js_telemetry = JS_TELEMETRY,
         js_track_map = JS_TRACK_MAP,
-        js_live      = JS_LIVE,
-        js_career    = JS_CAREER,
-        js_manage    = JS_MANAGE,
-        js_config    = JS_CONFIG,
-        js_carperf   = JS_CARPERF,
-        js_main      = JS_MAIN,
+        js_live = JS_LIVE,
+        js_career = JS_CAREER,
+        js_manage = JS_MANAGE,
+        js_config = JS_CONFIG,
+        js_saves = JS_SAVES,
+        js_carperf = JS_CARPERF,
+        js_main = JS_MAIN,
     )
 }
 
@@ -249,12 +268,13 @@ const CSS: &str = include_str!("assets/style.css");
 
 // ── Scripts ──────────────────────────────────────────────────────────────────
 
-const JS_UTILS:     &str = include_str!("assets/utils.js");
+const JS_UTILS: &str = include_str!("assets/utils.js");
 const JS_TELEMETRY: &str = include_str!("assets/telemetry.js");
 const JS_TRACK_MAP: &str = include_str!("assets/track_map.js");
-const JS_LIVE:      &str = include_str!("assets/live.js");
-const JS_CAREER:    &str = include_str!("assets/career.js");
-const JS_MANAGE:    &str = include_str!("assets/manage.js");
-const JS_CONFIG:    &str = include_str!("assets/config.js");
-const JS_CARPERF:   &str = include_str!("assets/car_performance.js");
-const JS_MAIN:      &str = include_str!("assets/main.js");
+const JS_LIVE: &str = include_str!("assets/live.js");
+const JS_CAREER: &str = include_str!("assets/career.js");
+const JS_MANAGE: &str = include_str!("assets/manage.js");
+const JS_CONFIG: &str = include_str!("assets/config.js");
+const JS_SAVES: &str = include_str!("assets/saves.js");
+const JS_CARPERF: &str = include_str!("assets/car_performance.js");
+const JS_MAIN: &str = include_str!("assets/main.js");

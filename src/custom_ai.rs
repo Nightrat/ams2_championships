@@ -18,7 +18,9 @@ pub fn list_files(dir: &Path) -> Vec<String> {
                 .map(|e| e.eq_ignore_ascii_case("xml"))
                 .unwrap_or(false);
             if is_xml {
-                path.file_name().and_then(|n| n.to_str()).map(|s| s.to_string())
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string())
             } else {
                 None
             }
@@ -143,7 +145,8 @@ pub fn parse_driver_teams_str(xml: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for (livery, block) in primary_driver_blocks(xml) {
         if let Some(name) = element_text(&block, "name") {
-            map.entry(name.to_string()).or_insert_with(|| extract_team_name(&livery));
+            map.entry(name.to_string())
+                .or_insert_with(|| extract_team_name(&livery));
         }
     }
     map
@@ -229,7 +232,10 @@ pub struct ClassPerformance {
 /// filter), not as "no classes are valid".
 pub fn known_class_names(custom_ai_dir: &Path) -> Option<HashSet<String>> {
     let install_root = custom_ai_dir.parent()?.parent()?;
-    let hud_colours = install_root.join("GUI").join("HUD_1_6").join("HUD_ColoursDefs.xml");
+    let hud_colours = install_root
+        .join("GUI")
+        .join("HUD_1_6")
+        .join("HUD_ColoursDefs.xml");
     let content = fs::read_to_string(hud_colours).ok()?;
     let mut names = HashSet::new();
     let mut rest = content.as_str();
@@ -252,7 +258,10 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
     let mut classes: Vec<ClassPerformance> = list_files(dir)
         .into_iter()
         .filter(|file| {
-            let class = Path::new(file).file_stem().and_then(|s| s.to_str()).unwrap_or(file);
+            let class = Path::new(file)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(file);
             known.as_ref().is_none_or(|names| names.contains(class))
         })
         .map(|file| {
@@ -262,10 +271,7 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
                 .unwrap_or(&file)
                 .to_string();
             let cars = parse_car_performance(&dir.join(&file));
-            let best = cars
-                .iter()
-                .map(pace_score)
-                .fold(f32::INFINITY, f32::min);
+            let best = cars.iter().map(pace_score).fold(f32::INFINITY, f32::min);
             let mut rows: Vec<CarPerformanceRow> = cars
                 .iter()
                 .map(|c| {
@@ -285,7 +291,11 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
             let year = crate::season_years::season_year(&class);
-            ClassPerformance { class, year, cars: rows }
+            ClassPerformance {
+                class,
+                year,
+                cars: rows,
+            }
         })
         .collect();
     classes.sort_by(|a, b| {
@@ -311,7 +321,9 @@ pub fn parse_team_skills_str(xml: &str) -> HashMap<String, f32> {
             continue;
         };
         let team = extract_team_name(&livery);
-        out.entry(team).and_modify(|v| *v = v.min(skill)).or_insert(skill);
+        out.entry(team)
+            .and_modify(|v| *v = v.min(skill))
+            .or_insert(skill);
     }
     out
 }
@@ -360,8 +372,15 @@ pub struct GridEntry<'a> {
 /// The car number in a `livery_name`: the digits following the first `" #"`.
 fn extract_car_number(livery: &str) -> Option<String> {
     let idx = livery.find(" #")? + 2;
-    let num: String = livery[idx..].chars().take_while(|c| c.is_ascii_digit()).collect();
-    if num.is_empty() { None } else { Some(num) }
+    let num: String = livery[idx..]
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    if num.is_empty() {
+        None
+    } else {
+        Some(num)
+    }
 }
 
 /// Match key for a driver name: first initial + surname, lowercased, non-alphanumerics dropped.
@@ -383,7 +402,12 @@ pub fn name_key(name: &str) -> String {
         .unwrap_or_default();
     let surname: String = words
         .last()
-        .map(|w| w.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect())
+        .map(|w| {
+            w.to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect()
+        })
         .unwrap_or_default();
     format!("{initial}|{surname}")
 }
@@ -448,15 +472,17 @@ pub fn infer_player_seat(entries: &[SeatEntry], grid: &[GridEntry]) -> PlayerSea
         by_key.entry(name_key(&e.driver)).or_default().push(e);
     }
 
-    let (player, ai): (Vec<&GridEntry>, Vec<&GridEntry>) =
-        grid.iter().partition(|g| g.is_player);
+    let (player, ai): (Vec<&GridEntry>, Vec<&GridEntry>) = grid.iter().partition(|g| g.is_player);
 
     let matched: Vec<(&GridEntry, &Vec<&SeatEntry>)> = ai
         .iter()
         .filter_map(|g| by_key.get(&name_key(g.name)).map(|e| (*g, e)))
         .collect();
     if matched.len() * 2 < ai.len() {
-        return PlayerSeat::RosterNotDetected { matched: matched.len(), grid: grid.len() };
+        return PlayerSeat::RosterNotDetected {
+            matched: matched.len(),
+            grid: grid.len(),
+        };
     }
 
     // team -> car model, learned from AI whose name maps to a single team. Drivers listed under
@@ -509,7 +535,10 @@ pub fn infer_player_seat(entries: &[SeatEntry], grid: &[GridEntry]) -> PlayerSea
             (Some(car), Some(model)) => *model == car,
             _ => true,
         })
-        .map(|e| Seat { seat: e.seat.clone(), team: e.team.clone() })
+        .map(|e| Seat {
+            seat: e.seat.clone(),
+            team: e.team.clone(),
+        })
         .collect();
 
     match empty.len() {
@@ -538,7 +567,11 @@ fn declares(seat: &Seat, declared: &str) -> bool {
 }
 
 fn seat_list(seats: &[Seat]) -> String {
-    seats.iter().map(|s| s.seat.as_str()).collect::<Vec<_>>().join(", ")
+    seats
+        .iter()
+        .map(|s| s.seat.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Checks a recorded grid against the team the player declared for a championship.

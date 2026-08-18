@@ -17,10 +17,21 @@ pub fn parse_request(buf: &[u8]) -> Request {
     let mut parts = first_line.split_ascii_whitespace();
     let method = parts.next().unwrap_or("GET").to_owned();
     let path = parts.next().unwrap_or("/").to_owned();
-    let header_end = buf.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4).unwrap_or(buf.len());
-    let headers = std::str::from_utf8(&buf[..header_end]).unwrap_or("").to_owned();
+    let header_end = buf
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .map(|p| p + 4)
+        .unwrap_or(buf.len());
+    let headers = std::str::from_utf8(&buf[..header_end])
+        .unwrap_or("")
+        .to_owned();
     let body = buf.get(header_end..).unwrap_or(&[]).to_vec();
-    Request { method, path, body, headers }
+    Request {
+        method,
+        path,
+        body,
+        headers,
+    }
 }
 
 pub fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]) {
@@ -52,20 +63,29 @@ pub fn read_full_request(stream: &mut TcpStream) -> Request {
     // Read until we have the full headers (\r\n\r\n).
     loop {
         let n = stream.read(&mut tmp).unwrap_or(0);
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         raw.extend_from_slice(&tmp[..n]);
-        if raw.windows(4).any(|w| w == b"\r\n\r\n") { break; }
+        if raw.windows(4).any(|w| w == b"\r\n\r\n") {
+            break;
+        }
     }
 
     // Parse method and path from the first line.
-    let line_end = raw.iter().position(|&b| b == b'\r' || b == b'\n').unwrap_or(raw.len());
+    let line_end = raw
+        .iter()
+        .position(|&b| b == b'\r' || b == b'\n')
+        .unwrap_or(raw.len());
     let first_line = std::str::from_utf8(&raw[..line_end]).unwrap_or("");
     let mut parts = first_line.split_ascii_whitespace();
     let method = parts.next().unwrap_or("GET").to_owned();
-    let path   = parts.next().unwrap_or("/").to_owned();
+    let path = parts.next().unwrap_or("/").to_owned();
 
     // Find where the body starts.
-    let header_end = raw.windows(4).position(|w| w == b"\r\n\r\n")
+    let header_end = raw
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
         .map(|p| p + 4)
         .unwrap_or(raw.len());
 
@@ -82,18 +102,52 @@ pub fn read_full_request(stream: &mut TcpStream) -> Request {
     let mut body = raw[header_end..].to_vec();
     while body.len() < content_length {
         let n = stream.read(&mut tmp).unwrap_or(0);
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         body.extend_from_slice(&tmp[..n]);
     }
     body.truncate(content_length);
 
-    Request { method, path, body, headers: headers_str.to_owned() }
+    Request {
+        method,
+        path,
+        body,
+        headers: headers_str.to_owned(),
+    }
+}
+
+/// Percent-decodes one URL path segment (e.g. "GT3%20Career" → "GT3 Career").
+/// Invalid escapes are left as-is.
+pub fn url_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("");
+            if let Ok(b) = u8::from_str_radix(hex, 16) {
+                out.push(b);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| s.to_string())
 }
 
 /// Turns a track name into a safe filename stem (e.g. "Spa – GP" → "spa_gp").
 pub fn track_slug(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
         .collect::<String>()
         .split('_')
         .filter(|s| !s.is_empty())

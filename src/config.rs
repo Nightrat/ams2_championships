@@ -1,12 +1,24 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-fn default_port()          -> u16    { 8080 }
-fn default_host()          -> String { "127.0.0.1".into() }
-fn default_poll_ms()       -> u64    { 200 }
-fn default_true()          -> bool   { true }
-fn default_show_track_map()    -> bool { true }
-fn default_track_map_max_points() -> u32 { 5000 }
+fn default_port() -> u16 {
+    8080
+}
+fn default_host() -> String {
+    "127.0.0.1".into()
+}
+fn default_poll_ms() -> u64 {
+    200
+}
+fn default_true() -> bool {
+    true
+}
+fn default_show_track_map() -> bool {
+    true
+}
+fn default_track_map_max_points() -> u32 {
+    5000
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -16,8 +28,13 @@ pub struct Config {
     /// Bind address. Use "0.0.0.0" to allow LAN access.
     #[serde(default = "default_host")]
     pub host: String,
-    /// Path to the career JSON data file. Defaults to championships/ams2_career.json
-    /// next to the executable.
+    /// Folder holding the career save files (`*.json`) and their track layouts.
+    /// Defaults to `championships` next to the executable.
+    #[serde(default)]
+    pub saves_dir: Option<String>,
+    /// Path to the *active* career save file. Set by the career switcher, not by hand.
+    /// When unset (or pointing at a file that no longer exists) the server picks a save
+    /// from `saves_dir` on startup.
     #[serde(default)]
     pub data_file: Option<String>,
     /// Shared memory poll interval in milliseconds (live view refresh rate).
@@ -62,6 +79,7 @@ impl Default for Config {
         Config {
             port: default_port(),
             host: default_host(),
+            saves_dir: None,
             data_file: None,
             poll_ms: default_poll_ms(),
             record_practice: default_true(),

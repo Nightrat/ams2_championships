@@ -43,7 +43,8 @@ On first run `config.json` is created next to the executable with all default va
 |---|---|---|
 | `port` | `8080` | HTTP and WebSocket port |
 | `host` | `"127.0.0.1"` | Bind address — use `"0.0.0.0"` to allow LAN access |
-| `data_file` | `null` | Full path to the career JSON file; `null` uses `championships\ams2_career.json` next to the executable |
+| `saves_dir` | `null` | Folder holding the career save files and their track layouts; `null` uses `championships\` next to the executable — see [Data & Backup](Data-and-Backup.md#choosing-the-save-files-folder) |
+| `data_file` | `null` | Full path to the **active** career save. Set by the Career dropdown in the header, not by hand; when unset or stale the server picks a save from `saves_dir` — see [Data & Backup](Data-and-Backup.md#multiple-careers) |
 | `poll_ms` | `200` | Shared memory read interval in milliseconds (live view refresh rate) |
 | `record_practice` | `true` | Automatically save practice sessions |
 | `record_qualify` | `true` | Automatically save qualifying sessions |
@@ -54,7 +55,7 @@ On first run `config.json` is created next to the executable with all default va
 | `spotter_voice` | `null` | TTS voice name to use (`null` = system default) |
 | `spotter_name` | `null` | Driver name to track in multiplayer (`null` = viewed player) |
 
-Settings marked with *restart required* in the Config tab (port, host, data_file, and the record_* flags) take effect after restarting the server.
+Settings marked with *restart required* in the Config tab (port, host, saves_dir, and the record_* flags) take effect after restarting the server. Switching careers does not need a restart.
 
 ## First race
 

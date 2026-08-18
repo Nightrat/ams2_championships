@@ -75,9 +75,19 @@ fn test_load_or_create_rewrites_file_with_all_fields() {
     load_or_create(&path);
     let written = fs::read_to_string(&path).unwrap();
     let v: serde_json::Value = serde_json::from_str(&written).unwrap();
-    for key in &["host", "poll_ms", "record_practice", "record_qualify", "record_race",
-                 "show_track_map", "track_map_max_points"] {
-        assert!(v.get(key).is_some(), "expected key '{key}' in rewritten config");
+    for key in &[
+        "host",
+        "poll_ms",
+        "record_practice",
+        "record_qualify",
+        "record_race",
+        "show_track_map",
+        "track_map_max_points",
+    ] {
+        assert!(
+            v.get(key).is_some(),
+            "expected key '{key}' in rewritten config"
+        );
     }
     let _ = fs::remove_file(&path);
 }

@@ -2,33 +2,33 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::ams2_shared_memory::{read_live_session, LiveSessionData};
-use crate::data_store::{persist, LapChartEntry, RecordedSession, SessionResult, SharedStore};
+use crate::data_store::{
+    persist, LapChartEntry, RecordedSession, SavePath, SessionResult, SharedStore,
+};
 
 #[allow(dead_code)]
 mod ams2 {
     /// session_state values
     pub const SESSION_PRACTICE: u32 = 1;
-    pub const SESSION_QUALIFY:  u32 = 3;
-    pub const SESSION_RACE:     u32 = 5;
+    pub const SESSION_QUALIFY: u32 = 3;
+    pub const SESSION_RACE: u32 = 5;
 
     /// race_state values
     pub const RACE_STATE_NOT_STARTED: u32 = 1;
-    pub const RACE_STATE_RACING:      u32 = 2;
-    pub const RACE_STATE_FINISHED:    u32 = 3;
-    pub const RACE_STATE_RETIRED:     u32 = 5;
-    pub const RACE_STATE_DNF:         u32 = 6;
+    pub const RACE_STATE_RACING: u32 = 2;
+    pub const RACE_STATE_FINISHED: u32 = 3;
+    pub const RACE_STATE_RETIRED: u32 = 5;
+    pub const RACE_STATE_DNF: u32 = 6;
 
     /// game_state values
-    pub const GAME_STATE_EXITED:  u32 = 0;
-    pub const GAME_STATE_MENUS:   u32 = 1;
-    pub const GAME_STATE_TIMEDOUT:u32 = 3;
+    pub const GAME_STATE_EXITED: u32 = 0;
+    pub const GAME_STATE_MENUS: u32 = 1;
+    pub const GAME_STATE_TIMEDOUT: u32 = 3;
     pub const GAME_STATE_IN_GAME: u32 = 2;
-    pub const GAME_STATE_REPLAY:  u32 = 4;
+    pub const GAME_STATE_REPLAY: u32 = 4;
 }
 
 use ams2::{SESSION_PRACTICE, SESSION_QUALIFY, SESSION_RACE};
-
-
 
 #[cfg(test)]
 #[path = "tests/session_recorder.rs"]
@@ -39,7 +39,13 @@ mod tests;
 /// player's own car during the post-race results/podium screen, so the *last* cached snapshot
 /// before capture — the one actually persisted — can have every participant's `is_player`
 /// read back as false even though it was correctly true earlier in the same session.
-pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSessionData, lap_chart: Vec<LapChartEntry>, player_name: Option<&str>) {
+pub(crate) fn capture(
+    store: &SharedStore,
+    path: &PathBuf,
+    session: &LiveSessionData,
+    lap_chart: Vec<LapChartEntry>,
+    player_name: Option<&str>,
+) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -82,14 +88,16 @@ pub(crate) fn capture(store: &SharedStore, path: &PathBuf, session: &LiveSession
 
     let type_name = match session.session_state {
         SESSION_PRACTICE => "Practice",
-        SESSION_QUALIFY  => "Qualify",
-        SESSION_RACE     => "Race",
-        _                => "Session",
+        SESSION_QUALIFY => "Qualify",
+        SESSION_RACE => "Race",
+        _ => "Session",
     };
 
     println!(
         "[recorder] {} at {} recorded — {} participants",
-        type_name, recorded.track, recorded.results.len()
+        type_name,
+        recorded.track,
+        recorded.results.len()
     );
 
     {
@@ -109,7 +117,10 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
     if session.num_participants == 0 {
         return Err("No active participants".into());
     }
-    if !matches!(session.session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE) {
+    if !matches!(
+        session.session_state,
+        SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE
+    ) {
         return Err("No active session".into());
     }
     capture(store, path, &session, vec![], None);
@@ -132,7 +143,12 @@ pub(crate) fn accumulate_lap_chart(
     if session.num_participants == 0 {
         return;
     }
-    let max_laps = session.participants.iter().map(|p| p.laps_completed).max().unwrap_or(0);
+    let max_laps = session
+        .participants
+        .iter()
+        .map(|p| p.laps_completed)
+        .max()
+        .unwrap_or(0);
     if max_laps < *leader_laps {
         lap_chart.clear();
         *leader_laps = 0;
@@ -154,7 +170,12 @@ pub(crate) fn should_capture(cached: &LiveSessionData) -> bool {
         return false;
     }
     if cached.session_state == SESSION_RACE {
-        let max_laps = cached.participants.iter().map(|p| p.laps_completed).max().unwrap_or(0);
+        let max_laps = cached
+            .participants
+            .iter()
+            .map(|p| p.laps_completed)
+            .max()
+            .unwrap_or(0);
         return max_laps > 0;
     }
     true
@@ -174,8 +195,17 @@ pub(crate) fn should_capture(cached: &LiveSessionData) -> bool {
 ///   Race   — when the race is finished the user can only leave session which leads to a disconnect (in SP he can also restart the session, meaning he throws away the current cached result).
 ///   P / Q  — session_state changes (P→Q, Q→Race lobby)
 ///   Any    — disconnect while session was active
-pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qualify: bool, record_race: bool) {
+pub fn start(
+    store: SharedStore,
+    path: SavePath,
+    record_practice: bool,
+    record_qualify: bool,
+    record_race: bool,
+) {
     std::thread::spawn(move || {
+        // Read fresh from the shared path at each capture — the active save can be switched
+        // at runtime via POST /api/saves/activate while this thread is running.
+        let current_path = || path.read().map(|p| p.clone()).unwrap_or_default();
         let mut prev_session_state: u32 = 0;
         // Rolling snapshot — updated whenever in a capturable session with participants,
         // regardless of game_state (P/Q use game=4, not game=2).
@@ -195,16 +225,22 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             let should_record = |state: u32| -> bool {
                 match state {
                     SESSION_PRACTICE => record_practice,
-                    SESSION_QUALIFY  => record_qualify,
-                    SESSION_RACE     => record_race,
-                    _                => false,
+                    SESSION_QUALIFY => record_qualify,
+                    SESSION_RACE => record_race,
+                    _ => false,
                 }
             };
 
             if !session.connected {
                 if let Some(ref cached) = session_cache {
                     if should_capture(cached) && should_record(cached.session_state) {
-                        capture(&store, &path, cached, std::mem::take(&mut lap_chart), player_name.as_deref());
+                        capture(
+                            &store,
+                            &current_path(),
+                            cached,
+                            std::mem::take(&mut lap_chart),
+                            player_name.as_deref(),
+                        );
                     }
                 }
                 prev_session_state = 0;
@@ -223,7 +259,13 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
             if prev_session_state != session_state {
                 if let Some(ref cached) = session_cache {
                     if should_capture(cached) && should_record(cached.session_state) {
-                        capture(&store, &path, cached, std::mem::take(&mut lap_chart), player_name.as_deref());
+                        capture(
+                            &store,
+                            &current_path(),
+                            cached,
+                            std::mem::take(&mut lap_chart),
+                            player_name.as_deref(),
+                        );
                     }
                 }
                 session_cache = None;
@@ -240,14 +282,19 @@ pub fn start(store: SharedStore, path: PathBuf, record_practice: bool, record_qu
 
             // ── Always refresh the rolling cache ─────────────────────────────
             // P/Q run at game_state=4 so we must not gate the cache on game_state.
-            if matches!(session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE)
-                && session.num_participants > 0
+            if matches!(
+                session_state,
+                SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE
+            ) && session.num_participants > 0
             {
                 if let Some(p) = session.participants.iter().find(|p| p.is_player) {
                     player_name = Some(p.name.clone());
                 }
                 session_cache = Some(session.clone());
-            } else if !matches!(session_state, SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE) {
+            } else if !matches!(
+                session_state,
+                SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE
+            ) {
                 session_cache = None;
             }
         }
