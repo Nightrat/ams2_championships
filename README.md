@@ -20,11 +20,12 @@ A motorsport career tracker for Automobilista 2. It records race results directl
 ## Features
 
 - **Session recorder** — automatically captures race and qualifying results at session end from the AMS2 shared memory API; no external tool required
-- **Championship management** — create championships, assign recorded sessions to rounds, set points systems (F1 modern/classic or custom), toggle constructor scoring, and track status (Active / Progress / Final)
+- **Championship management** — create championships, assign recorded sessions to rounds, set points systems (F1 modern/classic or custom), toggle constructor scoring, and track status (Active / Progress / Final — exactly one championship is Active, marking the season you are currently racing)
 - **Championship standings** — master-detail view with per-championship driver and constructor standings, collapsible round-by-round results (qualifying and race)
 - **Career statistics** — aggregated stats across all championships: race starts, podium splits (1st/2nd/3rd), top-10 finishes, average finishing position, DNFs, qualifying results (pole/2nd/3rd/top-10), and championship standings finishes (1st/2nd/3rd)
 - **Track statistics** — per-track summary across all recorded sessions: race and qualifying counts, best lap time with record holder name and car, last visited date
-- **Live session overlay** — real-time timing table pushed over WebSocket at 5 Hz from AMS2 shared memory: position, laps, race interval, gap to fastest lap, sector times, best/last lap, top speed, and tyre compound for the player
+- **Live session overlay** — real-time timing table pushed over WebSocket at 5 Hz from AMS2 shared memory: position, laps, race interval, gap to fastest lap, sector times, best/last lap, car/team, and tyre compound for the player
+- **Historic team names** — AMS2 exposes no livery field, so the live grid resolves each driver to their real team from the **active** championship's Custom AI Drivers file, and your own row from that championship's **My Team** setting; anything unmatched falls back to the AMS2 car model
 - **Track radar** — canvas overlay on the live timing view that builds a map of the track from car positions and renders all participants as dots; map is saved to disk per track and loaded on the next visit
 - **Telemetry panel** — player tyre temperatures (inner/mid/outer per corner), tyre wear/pressure, brake temperatures, suspension travel, and automatic setup recommendations based on a rolling 20-sample average
 - **PDF export** — download a print-ready PDF of all championships with all round details expanded
@@ -96,7 +97,7 @@ When a new config key is added in a future version the existing file is updated 
 | S1 / S2 / S3 | Sector times — current lap sector when available, personal best otherwise. **Purple** = overall fastest sector; **green** = driver's personal best |
 | Best Lap | Driver's fastest lap of the session |
 | Last Lap | Driver's most recently completed lap time |
-| Top km/h | Highest recorded speed (capped at 450 km/h to filter teleport spikes) |
+| Car / Team | Historic team name from the active championship's Custom AI Drivers file, falling back to the car model AMS2 reports |
 | Tyre | Player's current tyre compound (e.g. Soft / Medium / Hard) |
 
 ### Career sub-tabs
@@ -137,7 +138,9 @@ When a new config key is added in a future version the existing file is updated 
 Career data is stored as JSON in `championships/ams2_career.json` next to the server executable (or at the path set in `config.json`). The file is created automatically on first run and updated after every recorded session. It contains two top-level arrays:
 
 - **`sessions`** — each recorded session: track, timestamp, session type, and per-driver results (position, laps, fastest lap, last lap, DNF flag, car name)
-- **`championships`** — each user-created championship: name, status (`Active` / `Progress` / `Final`), points system, constructor scoring flag, and the ordered list of rounds (each round contains one or more session IDs)
+- **`championships`** — each user-created championship: name, status (`Active` / `Progress` / `Final`), points system, constructor scoring flag, assigned Custom AI Drivers file and player team, and the ordered list of rounds (each round contains one or more session IDs)
+
+At most one championship carries the `Active` status: it marks the season currently being raced, and `PATCH /api/championships/:id` demotes any previous holder to `Progress`. The live timing grid reads its team names from that championship, so the flag is load-bearing rather than cosmetic.
 
 Track layout data is stored as JSON files in `championships/track_layouts/` — one file per track, named by a slug of the track name. These are built automatically from car positions during live sessions and loaded on subsequent visits.
 
@@ -149,7 +152,7 @@ Track layout data is stored as JSON files in `championships/track_layouts/` — 
 | `GET` | `/api/championships` | List all championships |
 | `GET` | `/api/career` | Pre-computed career view: standings, constructor standings, rounds, driver stats, and track stats |
 | `POST` | `/api/championships` | Create a championship |
-| `PATCH` | `/api/championships/:id` | Update name, status, or points system |
+| `PATCH` | `/api/championships/:id` | Update name, status, points system, Custom AI file, or player team. Setting status to `Active` demotes any other Active championship to `Progress` |
 | `DELETE` | `/api/championships/:id` | Delete a championship |
 | `POST` | `/api/championships/:id/rounds` | Add a round to a championship |
 | `POST` | `/api/championships/:id/rounds/:r/sessions/:sid` | Assign a session to a round |
@@ -159,6 +162,7 @@ Track layout data is stored as JSON files in `championships/track_layouts/` — 
 | `PATCH` | `/api/config` | Write server configuration (optionally moves the data file) |
 | `GET` | `/api/track-layout/:track` | Load saved track radar points for a track |
 | `POST` | `/api/track-layout/:track` | Save track radar points for a track |
+| `GET` | `/api/live-teams` | Driver → team names for the live grid, from the active championship's Custom AI Drivers file, plus that championship's player team |
 | `GET` | `/live` | Current AMS2 session state snapshot (JSON) |
 | `WS` | `/ws` | WebSocket endpoint — pushes live session JSON at the configured poll interval |
 

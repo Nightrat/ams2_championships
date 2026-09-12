@@ -31,10 +31,26 @@ Use this if you have auto-recording turned off for a session type (e.g. practice
 | **S1 / S2 / S3** | Sector times. Shows the current lap's sector when available, otherwise the driver's personal best. **Purple** = overall fastest sector; **green** = driver's personal best |
 | **Best Lap** | Driver's fastest lap of the session |
 | **Last Lap** | Most recently completed lap time |
-| **Top km/h** | Highest recorded speed this session (capped at 450 km/h to filter teleport spikes) |
+| **Car / Team** | Historic team name where one is known, otherwise the car model AMS2 reports — see [Team names](#team-names) |
 | **Tyre** | Player's current tyre compound (e.g. Soft / Medium / Hard) — other drivers show — |
 
 Click any column header to sort by that column.
+
+## Team names
+
+AMS2's shared memory has no team or livery field — every car reports only its model name (e.g. *Formula Retro Gen3*). To show real team names instead, the **Car / Team** column is resolved against the **active championship**:
+
+1. The championship whose status is **Active** in the Manage tab is the one you are racing. There is only ever one.
+2. Its assigned **Custom AI Drivers** file maps each AI driver's name to their livery, so *Niki Lauda* shows as *Brabham-Alfa Romeo*.
+3. Your own row uses the championship's **My Team** setting, because your profile name is not in the roster file.
+
+Anything the roster does not name — and your row when **My Team** is unset — falls back to the AMS2 car model.
+
+> **Two seasons sharing one roster file?** Historic packs often reuse a single `.xml` across several seasons, so the file alone cannot say which season you are in. Only the **Active** flag can. If the live grid shows the wrong team, check that the season you are racing is the one marked Active.
+
+The names refresh when the session moves to a new track, and immediately whenever you change anything in the Manage tab — so switching which championship is Active updates the live grid without a page reload.
+
+If no championship is Active, or the Active one has no Custom AI file assigned, the whole column falls back to car models.
 
 ## Track map
 

@@ -29,7 +29,19 @@ With a championship selected:
 
 - **Rename** — hover over the championship name in the left panel; a pencil icon (✎) appears. Click it to edit the name inline. Press **Enter** to save or **Escape** to cancel.
 - **Change points system** — select a new preset or enter custom values in the detail panel on the right
-- **Change status** — set to **Active**, **Progress**, or **Final** using the dropdown next to the name in the left panel. Only Final championships count toward championship standings finishes in the Driver Stats.
+- **Change status** — set to **Active**, **Progress**, or **Final** using the dropdown next to the name in the left panel (see [Status](#status) below).
+
+## Status
+
+| Status | Meaning |
+|---|---|
+| **Active** | The season you are racing right now. **Only one championship can be Active** — marking another one Active demotes the previous holder to Progress automatically. |
+| **Progress** | Started, but not the one currently being raced. |
+| **Final** | Finished. Only Final championships count toward championship standings finishes in the Driver Stats. |
+
+**Active** is not just a label — it is how the app knows which season a live session belongs to. The [Live Session](Live-Session.md#team-names) tab reads its team names from the Active championship's Custom AI Drivers file and **My Team** setting. If you run several seasons of the same series off one roster file, the Active flag is the only thing that tells them apart, so set it before you go on track.
+
+The Manage tab also opens on the Active championship when you load the page.
 
 ## Removing sessions and rounds
 
