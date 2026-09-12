@@ -1758,3 +1758,183 @@ fn test_route_driver_performance_leaves_phantom_unknown_without_manifests() {
     assert!(drivers[1]["phantom"].is_null(), "{drivers}");
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn test_route_patch_config_omitting_rating_tuning_leaves_it_alone() {
+    // `config_body` above sends no rating fields at all, exactly like a stale form would. Each
+    // must fall back to its default rather than to zero — a starting_rating of 0 would drop
+    // every driver to the back of the grid without anyone asking for it.
+    let (store, path) = make_saves_dir("cfg_rating_absent");
+    let resp = patch(store, path.clone(), "/api/config", &config_body("null"));
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    let v = body_json(&resp);
+    assert_eq!(v["config"]["starting_rating"], 50.0);
+    assert_eq!(v["config"]["rating_strictness"], 0.0);
+    assert_eq!(v["config"]["rating_half_life"], 10.0);
+    assert_eq!(v["config"]["eligibility_gates"], "both");
+    assert_eq!(v["config"]["count_retirements"], true);
+    assert_eq!(v["config"]["retirement_min_laps_down"], 3);
+    assert_eq!(v["config"]["retirement_distance_pct"], 90.0);
+    assert_eq!(v["config"]["hide_locked_teams"], false);
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_patch_config_clamps_rating_tuning() {
+    let (store, path) = make_saves_dir("cfg_rating_clamp");
+    let body = br#"{"port":8080,"host":"127.0.0.1","poll_ms":200,"record_practice":true,
+        "record_qualify":true,"record_race":true,"show_track_map":true,
+        "track_map_max_points":5000,"saves_dir":null,
+        "starting_rating":250.0,"rating_strictness":-400.0,"rating_half_life":-3.0,
+        "eligibility_gates":"grid","count_retirements":false,"hide_locked_teams":true,
+        "retirement_min_laps_down":900,"retirement_distance_pct":400.0}"#;
+    let resp = patch(store, path.clone(), "/api/config", body);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    let v = body_json(&resp);
+    // Clamped on the way in, so what is persisted is already within range and the form that
+    // reads it back cannot show a value the rating would refuse to use.
+    assert_eq!(v["config"]["starting_rating"], 100.0);
+    assert_eq!(v["config"]["rating_strictness"], -50.0);
+    assert_eq!(v["config"]["rating_half_life"], 0.0);
+    assert_eq!(v["config"]["eligibility_gates"], "grid");
+    assert_eq!(v["config"]["count_retirements"], false);
+    assert_eq!(v["config"]["retirement_min_laps_down"], 50, "capped at a whole race");
+    assert_eq!(v["config"]["retirement_distance_pct"], 100.0, "a share cannot exceed the whole");
+    assert_eq!(v["config"]["hide_locked_teams"], true);
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+// ── resolve_live_teams (the /api/live-teams lookup) ───────────────────────────
+//
+// Two rosters for the same fictional season, as the historic Custom AI packs ship them: a core
+// field, and a "full" variant adding the optional entries some tracks used. Both name the same
+// regulars, so both match any grid from that season — which is why the live lookup must not try
+// to pick between them by counting drivers, and follows the active championship instead.
+
+const CORE_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<custom_ai_drivers>
+    <driver livery_name="Lotus #1 A. Alpha"><name>Alan Alpha</name></driver>
+    <driver livery_name="Lotus #2 B. Bravo"><name>Ben Bravo</name></driver>
+    <driver livery_name="Brabham #7 C. Charlie"><name>Carl Charlie</name></driver>
+</custom_ai_drivers>
+"#;
+
+const FULL_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<custom_ai_drivers>
+    <driver livery_name="Lotus #1 A. Alpha"><name>Alan Alpha</name></driver>
+    <driver livery_name="Lotus #2 B. Bravo"><name>Ben Bravo</name></driver>
+    <driver livery_name="Brabham #7 C. Charlie"><name>Carl Charlie</name></driver>
+    <driver livery_name="March #16 D. Delta"><name>Dan Delta</name></driver>
+</custom_ai_drivers>
+"#;
+
+/// A temp Custom AI Drivers folder holding both rosters.
+fn make_live_teams_dir() -> std::path::PathBuf {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_live_teams_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("core.xml"), CORE_XML).unwrap();
+    std::fs::write(dir.join("full.xml"), FULL_XML).unwrap();
+    dir
+}
+
+/// The season being raced (Active) plus a second, larger roster left in Progress.
+fn two_seasons() -> Vec<Championship> {
+    let mut racing = make_champ("c1");
+    racing.custom_ai_file = Some("core.xml".into());
+    racing.player_team = Some("Brabham".into());
+    racing.status = ChampionshipStatus::Active;
+    let mut other = make_champ("c2");
+    other.custom_ai_file = Some("full.xml".into());
+    other.player_team = None;
+    other.status = ChampionshipStatus::Progress;
+    vec![racing, other]
+}
+
+#[test]
+fn test_live_teams_come_from_the_active_championship() {
+    let dir = make_live_teams_dir();
+    let out = resolve_live_teams(&dir, &two_seasons());
+
+    assert_eq!(out.player_team.as_deref(), Some("Brabham"));
+    assert_eq!(
+        out.teams.get("Carl Charlie").map(String::as_str),
+        Some("Brabham")
+    );
+    // The regression this lookup exists for: "full" names one more driver, so a roster picked by
+    // name count would have won with it and carried its empty player team onto the player's row.
+    assert!(
+        !out.teams.contains_key("Dan Delta"),
+        "the roster must be the active championship's, not the larger variant's"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_live_teams_follow_the_active_flag_when_it_moves() {
+    // Switching which season is active in the Manage tab is the whole control surface here.
+    let dir = make_live_teams_dir();
+    let mut champs = two_seasons();
+    champs[0].status = ChampionshipStatus::Progress;
+    champs[1].status = ChampionshipStatus::Active;
+    champs[1].player_team = Some("March".into());
+
+    let out = resolve_live_teams(&dir, &champs);
+    assert_eq!(out.player_team.as_deref(), Some("March"));
+    assert_eq!(
+        out.teams.get("Dan Delta").map(String::as_str),
+        Some("March")
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_live_teams_empty_when_no_championship_is_active() {
+    // Nothing is guessed from the other championships — the grid shows AMS2's car names until
+    // one is marked active.
+    let dir = make_live_teams_dir();
+    let mut champs = two_seasons();
+    champs[0].status = ChampionshipStatus::Progress;
+
+    let out = resolve_live_teams(&dir, &champs);
+    assert!(out.teams.is_empty());
+    assert_eq!(out.player_team, None);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_live_teams_empty_when_the_active_championship_has_no_roster() {
+    let dir = make_live_teams_dir();
+    let mut champs = two_seasons();
+    champs[0].custom_ai_file = None;
+
+    let out = resolve_live_teams(&dir, &champs);
+    assert!(out.teams.is_empty());
+    assert_eq!(
+        out.player_team, None,
+        "a player team is only settable alongside a roster, so it cannot outlive one"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_live_teams_treats_a_blank_player_team_as_unset() {
+    let dir = make_live_teams_dir();
+    let mut champs = two_seasons();
+    champs[0].player_team = Some("   ".into());
+
+    let out = resolve_live_teams(&dir, &champs);
+    assert!(!out.teams.is_empty(), "the roster still resolves");
+    assert_eq!(out.player_team, None);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

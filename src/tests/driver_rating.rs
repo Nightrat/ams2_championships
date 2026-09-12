@@ -695,3 +695,338 @@ fn test_a_retired_teammate_is_not_counted_as_beaten() {
     assert_eq!((r.mate_wins, r.mate_losses), (0, 0));
     assert_eq!(r.teammate_bonus, 0.0);
 }
+
+// ── Configurable tuning (`RatingParams`) ─────────────────────────────────────
+//
+// These rest on one guarantee: `RatingParams::default()` reproduces the behaviour these numbers
+// were hard-coded to. Every test above calls the wrappers that use it, and
+// `test_reference_career_rating_snapshot` pins real figures against a recorded career.
+
+fn params(f: impl FnOnce(&mut RatingParams)) -> RatingParams {
+    let mut p = RatingParams::default();
+    f(&mut p);
+    p
+}
+
+#[test]
+fn test_starting_rating_anchors_a_driver_with_no_results() {
+    let seats = parse_seats_str(ROSTER);
+    let p = params(|p| p.starting_rating = 20.0);
+    let r = compute_reputation_with(&[], &seats, &pace(), Some("Brabham"), &p);
+    assert!(
+        (r.value - 20.0).abs() < 0.001,
+        "an unproven driver sits exactly where the config puts them, got {}",
+        r.value
+    );
+    // The default is the midpoint the per-session scores are expressed around, as before.
+    let d = compute_reputation(&[], &seats, &pace(), Some("Brabham"));
+    assert!((d.value - 50.0).abs() < 0.001);
+}
+
+#[test]
+fn test_starting_rating_washes_out_as_races_accumulate() {
+    let seats = parse_seats_str(ROSTER);
+    let low = params(|p| p.starting_rating = 20.0);
+    // Brabham expects about P3 and the player wins every time, so the evidence is strongly
+    // positive and must eventually outweigh where they started.
+    let one: Vec<RecordedSession> = vec![sp_session("a", 100, 5, 1, 15)];
+    let many: Vec<RecordedSession> = (0..40)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
+
+    let gap_thin = compute_reputation(&one, &seats, &pace(), Some("Brabham")).value
+        - compute_reputation_with(&one, &seats, &pace(), Some("Brabham"), &low).value;
+    let gap_thick = compute_reputation(&many, &seats, &pace(), Some("Brabham")).value
+        - compute_reputation_with(&many, &seats, &pace(), Some("Brabham"), &low).value;
+
+    assert!(gap_thin > 20.0, "one race leaves the prior dominant");
+    assert!(
+        gap_thick < 4.0,
+        "forty races should have all but erased it, gap was {gap_thick}"
+    );
+}
+
+#[test]
+fn test_strictness_shifts_every_requirement_by_the_same_amount() {
+    let seats = parse_seats_str(ROSTER);
+    let exp = expected_positions(&pace(), &seats);
+    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+
+    let base = team_requirements(&exp, &skills);
+    let easier = team_requirements_with(&params(|p| p.strictness = -15.0), &exp, &skills);
+    for ((team, was), (team2, now)) in base.iter().zip(easier.iter()) {
+        assert_eq!(team, team2, "ordering must not change");
+        // Clamped at zero, so a team already asking for nothing cannot go negative.
+        assert!(
+            (now - (was - 15.0).max(0.0)).abs() < 0.001,
+            "{team}: {was} -> {now}"
+        );
+    }
+}
+
+#[test]
+fn test_strictness_opens_seats_the_default_locks() {
+    let seats = parse_seats_str(ROSTER);
+    let exp = expected_positions(&pace(), &seats);
+    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+
+    // Brabham's bar is Warwick's 0.78, so 73, out of reach at 60.
+    assert_eq!(
+        team_eligibility(60.0, &exp, &skills)
+            .iter()
+            .find(|e| e.team == "Brabham")
+            .unwrap()
+            .tier,
+        Tier::Locked
+    );
+    let lenient = team_eligibility_with(&params(|p| p.strictness = -20.0), 60.0, &exp, &skills);
+    assert_eq!(
+        lenient.iter().find(|e| e.team == "Brabham").unwrap().tier,
+        Tier::Available
+    );
+    // The top seat asks 93 by incumbent skill, so 20 points off is not enough to hand it over.
+    assert_eq!(
+        lenient.iter().find(|e| e.team == "Williams").unwrap().tier,
+        Tier::Locked
+    );
+}
+
+#[test]
+fn test_grid_gate_alone_ignores_incumbent_skill() {
+    let seats = parse_seats_str(ROSTER);
+    let exp = expected_positions(&pace(), &seats);
+    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+
+    let grid: HashMap<String, f32> =
+        team_requirements_with(&params(|p| p.gates = Gates::Grid), &exp, &skills)
+            .into_iter()
+            .collect();
+    // Slowest of three teams: nothing asked of the driver, where Ghinzani's 0.66 asked 61.
+    assert!(grid["Osella"] < 0.001, "got {}", grid["Osella"]);
+    assert!((grid["Brabham"] - 100.0 / 3.0).abs() < 0.5);
+}
+
+#[test]
+fn test_incumbent_gate_alone_ignores_car_pace() {
+    let seats = parse_seats_str(ROSTER);
+    let exp = expected_positions(&pace(), &seats);
+    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+
+    let inc: HashMap<String, f32> =
+        team_requirements_with(&params(|p| p.gates = Gates::Incumbent), &exp, &skills)
+            .into_iter()
+            .collect();
+    // Ghinzani's 0.66 less the margin: the slowest car on the grid still asks for 61.
+    assert!((inc["Osella"] - 61.0).abs() < 0.5, "got {}", inc["Osella"]);
+    assert!((inc["Williams"] - 93.0).abs() < 0.5);
+}
+
+#[test]
+fn test_incumbent_gate_leaves_a_skill_less_roster_wide_open() {
+    const NO_SKILLS: &str = r#"<custom_ai_drivers>
+    <driver livery_name="1986 Williams #5 - N. Mansell"><name>Nigel Mansell</name></driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani"><name>Piercarlo Ghinzani</name></driver>
+</custom_ai_drivers>"#;
+    let seats = parse_seats_str(NO_SKILLS);
+    let exp = expected_positions(&pace(), &seats);
+    let skills = crate::custom_ai::parse_team_skills_str(NO_SKILLS);
+    assert!(skills.is_empty(), "fixture must declare no race_skill");
+
+    // Documented consequence: with no bar left to clear, every seat is free. The Config hint
+    // says so, which is why this is a test rather than a bug.
+    let e = team_eligibility_with(&params(|p| p.gates = Gates::Incumbent), 0.0, &exp, &skills);
+    assert!(e.iter().all(|t| t.tier == Tier::Available));
+}
+
+#[test]
+fn test_zero_half_life_weighs_the_whole_career_equally() {
+    let seats = parse_seats_str(ROSTER);
+    // Six strong races long ago, six weak ones recently. Brabham expects about P3.
+    let mut sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&format!("old{i}"), 100 + i, 5, 1, 15))
+        .collect();
+    sessions.extend((0..6).map(|i| sp_session(&format!("new{i}"), 200 + i, 5, 6, 15)));
+
+    let decayed = compute_reputation(&sessions, &seats, &pace(), Some("Brabham"));
+    let flat = compute_reputation_with(
+        &sessions,
+        &seats,
+        &pace(),
+        Some("Brabham"),
+        &params(|p| p.recency_half_life = 0.0),
+    );
+    assert!(
+        flat.value > decayed.value,
+        "recent bad form must count for less without decay: {} vs {}",
+        flat.value,
+        decayed.value
+    );
+    // A zero half-life must not divide its way to NaN.
+    assert!(flat.value.is_finite());
+}
+
+#[test]
+fn test_retirements_can_be_excluded_entirely() {
+    let seats = parse_seats_str(ROSTER);
+    let mut sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
+    let ignore_dnf = params(|p| p.count_retirements = false);
+    let clean = compute_reputation_with(&sessions, &seats, &pace(), Some("Brabham"), &ignore_dnf);
+
+    sessions.push(sp_session("r1", 200, 5, 6, 2));
+    sessions.push(sp_session("r2", 201, 5, 6, 2));
+    let with_dnf = compute_reputation_with(&sessions, &seats, &pace(), Some("Brabham"), &ignore_dnf);
+
+    assert_eq!(with_dnf.sp_races, 6, "a skipped retirement is not a start");
+    assert!((with_dnf.finish_rate - clean.finish_rate).abs() < 0.001);
+    assert!(
+        (with_dnf.value - clean.value).abs() < 0.001,
+        "retirements must cost nothing when switched off"
+    );
+    // And the default still charges for them, so the switch is doing the work.
+    let counted = compute_reputation(&sessions, &seats, &pace(), Some("Brabham"));
+    assert_eq!(counted.sp_races, 8);
+    assert!(counted.value < with_dnf.value);
+}
+
+#[test]
+fn test_retirement_threshold_is_configurable() {
+    // Two laps down over 15 is a lapped finisher by default, and both tests must still agree:
+    // 13 of 15 laps is under 90%, so lowering the threshold to 2 is what flips it.
+    let r = result("x", 12, 13);
+    assert!(!retired(&r, 15));
+    assert!(retired_with(&r, 15, &params(|p| p.retirement_min_laps_down = 2)));
+
+    // Raising it past the gap makes an obvious retirement read as a finish, which is the point
+    // for long races: six laps down over 50 is a bad afternoon, not a DNF.
+    let long = result("x", 20, 44);
+    assert!(retired(&long, 50));
+    assert!(!retired_with(
+        &long,
+        50,
+        &params(|p| p.retirement_min_laps_down = 7)
+    ));
+}
+
+#[test]
+fn test_zero_threshold_leaves_the_distance_test_to_decide() {
+    // With no lap floor the 90% rule stands alone — and still protects a classified finisher.
+    let no_floor = params(|p| p.retirement_min_laps_down = 0);
+    assert!(retired_with(&result("x", 20, 13), 15, &no_floor), "13/15 is under 90%");
+    assert!(
+        !retired_with(&result("x", 12, 14), 15, &no_floor),
+        "14/15 is over 90%, so never a retirement whatever the floor"
+    );
+    assert!(
+        !retired_with(&result("x", 20, 0), 0, &no_floor),
+        "no leader, no verdict"
+    );
+}
+
+#[test]
+fn test_raising_the_threshold_reclassifies_a_dnf_as_a_finish() {
+    let seats = parse_seats_str(ROSTER);
+    let mut sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
+    // Four laps down of fifteen: a retirement by default, a lapped finisher at a floor of five.
+    sessions.push(sp_session("late", 200, 5, 6, 11));
+
+    let strict = compute_reputation(&sessions, &seats, &pace(), Some("Brabham"));
+    let lenient = compute_reputation_with(
+        &sessions,
+        &seats,
+        &pace(),
+        Some("Brabham"),
+        &params(|p| p.retirement_min_laps_down = 5),
+    );
+
+    assert_eq!((strict.sp_races, lenient.sp_races), (7, 7), "a start either way");
+    assert!(
+        (strict.finish_rate - 6.0 / 7.0).abs() < 0.001,
+        "the default calls it a retirement"
+    );
+    assert!(
+        (lenient.finish_rate - 1.0).abs() < 0.001,
+        "raising the floor makes it a classified finish"
+    );
+    // And as a finish it now contributes race pace, where a retirement contributed none.
+    assert!(lenient.pace < strict.pace, "a P6 finish drags the pace average down");
+}
+
+#[test]
+fn test_retirement_distance_is_configurable() {
+    // 45 of 50 laps is exactly 90%, so the default calls it a finish — the test is strict.
+    let borderline = result("x", 15, 45);
+    assert!(!retired(&borderline, 50));
+    // Demanding 95% of the distance instead turns the same result into a retirement.
+    assert!(retired_with(
+        &borderline,
+        50,
+        &params(|p| p.retirement_distance = 0.95)
+    ));
+
+    // And loosening it the other way rescues a car that is well down but still running.
+    let well_down = result("x", 20, 40);
+    assert!(retired(&well_down, 50), "80% is a retirement by default");
+    assert!(!retired_with(
+        &well_down,
+        50,
+        &params(|p| p.retirement_distance = 0.75)
+    ));
+}
+
+#[test]
+fn test_both_retirement_thresholds_must_still_agree() {
+    // Two laps down of fifteen: inside the default lap floor, outside 90% of the distance.
+    let r = result("x", 12, 13);
+    assert!(!retired(&r, 15), "the lap floor alone keeps this a finish");
+    // Loosening only the distance changes nothing — the lap test still says no.
+    assert!(!retired_with(
+        &r,
+        15,
+        &params(|p| p.retirement_distance = 0.99)
+    ));
+    // Both have to move.
+    assert!(retired_with(
+        &r,
+        15,
+        &params(|p| {
+            p.retirement_distance = 0.99;
+            p.retirement_min_laps_down = 2;
+        })
+    ));
+}
+
+#[test]
+fn test_zero_distance_means_nothing_is_ever_a_retirement() {
+    let off = params(|p| p.retirement_distance = 0.0);
+    // Not even a car that completed no laps at all: `0 < 0.0 * 50` is false.
+    assert!(!retired_with(&result("x", 20, 0), 50, &off));
+    assert!(!retired_with(&result("x", 20, 1), 50, &off));
+}
+
+#[test]
+fn test_distance_threshold_feeds_through_to_the_rating() {
+    let seats = parse_seats_str(ROSTER);
+    let mut sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
+    // Four laps down of fifteen — 73% — a retirement under both defaults.
+    sessions.push(sp_session("late", 200, 5, 6, 11));
+
+    let strict = compute_reputation(&sessions, &seats, &pace(), Some("Brabham"));
+    let lenient = compute_reputation_with(
+        &sessions,
+        &seats,
+        &pace(),
+        Some("Brabham"),
+        &params(|p| p.retirement_distance = 0.7),
+    );
+    assert!((strict.finish_rate - 6.0 / 7.0).abs() < 0.001);
+    assert!(
+        (lenient.finish_rate - 1.0).abs() < 0.001,
+        "73% clears a 70% bar, so it is a classified finish"
+    );
+}

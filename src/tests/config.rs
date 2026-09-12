@@ -124,3 +124,63 @@ fn test_load_or_create_data_file_some() {
     assert_eq!(cfg.data_file, Some("/some/path/career.json".into()));
     let _ = fs::remove_file(&path);
 }
+
+#[test]
+fn test_rating_tuning_defaults_for_existing_configs() {
+    // A config written before the rating was tunable must rate exactly as it did then.
+    let path = tmp_path();
+    fs::write(&path, r#"{"port":8080}"#).unwrap();
+    let cfg = load_or_create(&path);
+    assert_eq!(cfg.rating_params(), RatingParams::default());
+    assert_eq!(cfg.retirement_min_laps_down, 3);
+    assert_eq!(cfg.retirement_distance_pct, 90.0);
+    assert!(!cfg.hide_locked_teams, "the ladder is shown by default");
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_rating_params_clamps_hand_edited_values() {
+    // config.json is edited by hand often enough that the bounds cannot be trusted on the way
+    // in. A half-life below zero would invert the decay; a strictness of 400 would lock the
+    // grid with no way back through the UI.
+    let path = tmp_path();
+    fs::write(
+        &path,
+        r#"{"starting_rating":250.0,"rating_strictness":-400.0,"rating_half_life":-3.0}"#,
+    )
+    .unwrap();
+    let p = load_or_create(&path).rating_params();
+    assert_eq!(p.starting_rating, 100.0);
+    assert_eq!(p.strictness, -50.0);
+    assert_eq!(p.recency_half_life, 0.0);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_eligibility_gates_round_trip_through_the_file() {
+    let path = tmp_path();
+    fs::write(&path, r#"{"eligibility_gates":"incumbent"}"#).unwrap();
+    assert_eq!(load_or_create(&path).eligibility_gates, Gates::Incumbent);
+    // load_or_create rewrites the file with every field filled in; the enum must survive that.
+    assert_eq!(load_or_create(&path).eligibility_gates, Gates::Incumbent);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_retirement_distance_converts_percent_to_a_fraction() {
+    // The config speaks in percent because that is how the hint reads; the rating math wants a
+    // fraction. Out-of-range values are clamped before the conversion, never after.
+    let path = tmp_path();
+    fs::write(&path, r#"{"retirement_distance_pct":75.0}"#).unwrap();
+    let p = load_or_create(&path).rating_params();
+    assert!((p.retirement_distance - 0.75).abs() < 0.0001);
+
+    fs::write(&path, r#"{"retirement_distance_pct":400.0}"#).unwrap();
+    let p = load_or_create(&path).rating_params();
+    assert!(
+        (p.retirement_distance - 1.0).abs() < 0.0001,
+        "a share of the distance cannot exceed the whole, got {}",
+        p.retirement_distance
+    );
+    let _ = fs::remove_file(&path);
+}

@@ -62,10 +62,13 @@ pub struct Round {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "PascalCase")]
 pub enum ChampionshipStatus {
-    /// Not yet started.
+    /// The one being raced right now. **At most one championship is `Active`**: setting it via
+    /// `PATCH /api/championships/{id}` demotes whichever other one held it to [`Self::Progress`].
+    /// That makes it the answer to "which championship is this session part of", which is what
+    /// the Manage tab opens on and what the live timing grid reads its team names from.
     #[default]
     Active,
-    /// Rounds are in progress.
+    /// Started, but not the one currently being raced.
     Progress,
     /// All rounds completed — winner determined.
     Final,

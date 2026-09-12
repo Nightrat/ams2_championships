@@ -1038,6 +1038,15 @@ table { border-collapse: collapse; width: 100%; }
 .config-note { font-size: 0.82rem; color: #999; margin: 0 0 1.5rem; }
 .config-group { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1.1rem; }
 .config-group-check { flex-direction: row; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
+.config-details { margin: 0 0 1.1rem; border-top: 1px solid #333; padding-top: 0.9rem; }
+.config-details-summary {
+  font-size: 0.85rem; color: #ccc; font-weight: 600; cursor: pointer;
+  margin-bottom: 0.9rem; list-style: revert;
+}
+/* The groups inside carry display:flex, which beats the UA stylesheet's display:none on a
+   closed <details> — without this the panel never collapses. */
+.config-details:not([open]) > :not(summary) { display: none; }
+.config-details:not([open]) > .config-details-summary { margin-bottom: 0; }
 .config-label { font-size: 0.85rem; color: #ccc; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
 .config-label-check { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: #ccc; font-weight: 600; }
 .config-label-check input[type="checkbox"] { accent-color: #e74c3c; width: 1rem; height: 1rem; cursor: pointer; }

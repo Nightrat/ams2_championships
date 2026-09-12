@@ -212,6 +212,57 @@ fn generate_html() -> String {
         </div>
         <div class="config-group config-group-check">
           <label class="config-label config-label-check">
+            <input id="cfg-hide-locked-teams" name="hide_locked_teams" type="checkbox" />
+            Hide locked teams
+          </label>
+          <span class="config-hint">Leave off to list every team in the My Team picker with what it asks for, locked ones greyed out. On, teams you cannot claim are not shown at all.</span>
+        </div>
+        <details class="config-details">
+          <summary class="config-details-summary">Driver rating tuning</summary>
+          <div class="config-group">
+            <label class="config-label" for="cfg-starting-rating">Starting rating</label>
+            <input class="config-input" id="cfg-starting-rating" name="starting_rating" type="number" min="0" max="100" step="1" />
+            <span class="config-hint">Where a driver with no results sits, 0&ndash;100 (default 50). Lower it to start unproven at the back of the grid. Fades out as races accumulate &mdash; by about twenty races your results have taken over entirely.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-rating-strictness">Requirement offset</label>
+            <input class="config-input" id="cfg-rating-strictness" name="rating_strictness" type="number" min="-50" max="50" step="1" />
+            <span class="config-hint">Rating points added to every team's requirement (default 0). Negative opens the whole grid up; positive makes every seat harder. Unlike the starting rating this never fades.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-eligibility-gates">Requirement built from</label>
+            <select class="config-input" id="cfg-eligibility-gates" name="eligibility_gates">
+              <option value="both">Car pace and incumbent skill (stricter wins)</option>
+              <option value="grid">Car pace only</option>
+              <option value="incumbent">Incumbent skill only</option>
+            </select>
+            <span class="config-hint">Car pace ranks teams by their performance scalars; incumbent skill asks you to beat the weaker driver already in the seat. Incumbent only leaves every seat free on a roster that declares no race_skill.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-rating-half-life">Form half-life (results)</label>
+            <input class="config-input" id="cfg-rating-half-life" name="rating_half_life" type="number" min="0" max="200" step="1" />
+            <span class="config-hint">Results this far back count half (default 10, counted per session type). Raise it to weigh a long career evenly, lower it to track current form &mdash; and to let the rating recover faster after an AI difficulty change. 0 disables the decay.</span>
+          </div>
+          <div class="config-group config-group-check">
+            <label class="config-label config-label-check">
+              <input id="cfg-count-retirements" name="count_retirements" type="checkbox" />
+              Count retirements
+            </label>
+            <span class="config-hint">On, a DNF costs a point of finish rate. Off, retirements are skipped entirely &mdash; use it if AI contact is deciding your rating.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-retirement-min-laps-down">Retirement threshold (laps down)</label>
+            <input class="config-input" id="cfg-retirement-min-laps-down" name="retirement_min_laps_down" type="number" min="0" max="50" step="1" />
+            <span class="config-hint">Laps behind the leader before a car counts as retired rather than just lapped (default 3). Raise it for long races where being a few laps down is a bad afternoon, not a DNF; 0 leaves the distance test below to decide alone.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-retirement-distance-pct">Retirement threshold (% of distance)</label>
+            <input class="config-input" id="cfg-retirement-distance-pct" name="retirement_distance_pct" type="number" min="0" max="100" step="1" />
+            <span class="config-hint">A car must finish short of this share of the leader's distance to count as retired (default 90%). Both thresholds have to agree, so loosening either one alone only makes retirements rarer. 100% calls anything off the lead lap a retirement; 0% means nothing ever is.</span>
+          </div>
+        </details>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
             <input id="cfg-show-track-map" name="show_track_map" type="checkbox" />
             Show track radar in live view
           </label>

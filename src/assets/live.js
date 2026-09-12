@@ -69,7 +69,7 @@ function applyLiveSort() {
 }());
 
 var liveTeams   = { teams: {}, player_team: null }; // driver → historic team name, from the Custom AI file
-var liveTrack   = null; // track name at last poll, used to refresh the team names
+var liveTeamsKey = null; // track at the last lookup, used to refresh the team names
 
 function loadLiveTeams() {
   fetch('/api/live-teams')
@@ -124,10 +124,11 @@ function processLiveData(d) {
       updateSpotterFocus(d.participants);
 
       // ── Team names ────────────────────────────────────────────────────────
-      // Resolved server-side against the best-matching Custom AI Driver file; refreshed
-      // when the session moves to another track, since that may be another championship.
-      if (liveTrack !== d.track_location) {
-        liveTrack = d.track_location;
+      // Resolved server-side from the active championship's Custom AI Driver file; refreshed when
+      // the session moves to another track, since that is when the active championship is likely
+      // to have been switched too.
+      if (liveTeamsKey !== d.track_location) {
+        liveTeamsKey = d.track_location;
         loadLiveTeams();
       }
 

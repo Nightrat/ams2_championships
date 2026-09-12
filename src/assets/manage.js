@@ -14,6 +14,11 @@ function loadManage() {
     manageState.selectedId = active ? active.id : (manageState.champs[0] ? manageState.champs[0].id : null);
     renderChampList();
     if (manageState.selectedId) renderChampDetail(manageState.selectedId);
+    // The live grid's team names come from the active championship's Custom AI file, so every
+    // edit made here can change them — switching which championship is Active most of all. This
+    // is the one funnel every championship mutation already passes through, so refreshing from
+    // here means the Live tab can never be left showing the previous season's teams.
+    loadLiveTeams();
   }).catch(function () {
     var right = document.getElementById('manage-right');
     if (right) right.innerHTML = '<div class="manage-placeholder">Management requires the server binary \u2014 open this page via <code>ams2_championship_server</code>.</div>';
@@ -282,11 +287,13 @@ function loadPlayerTeamOptions(champId) {
         }
         return;
       }
-      // Offer only what the rating has earned; locked teams stay out of the list and are
-      // refused by the server too, unless enforcement is switched off in Config.
+      // Only what the rating has earned may be picked; the server refuses the rest anyway,
+      // unless enforcement is switched off in Config. Locked teams are still listed — disabled,
+      // with the rating they ask for — because the ladder is what tells you where to aim. The
+      // Config switch hides them for anyone who would rather not see it.
       var teams = el.teams || [];
       var offerable = teams.filter(function (t) { return t.tier !== 'locked'; });
-      var listed = el.enforced ? offerable : teams;
+      var listed = (el.enforced && el.hide_locked) ? offerable : teams;
       var opts = '<option value="">(none)</option>';
       // An already-claimed seat stays selectable even if the rating has since dropped below it,
       // so opening the panel can never silently drop the team that is already saved.
@@ -294,9 +301,11 @@ function loadPlayerTeamOptions(champId) {
         opts += '<option value="' + esc(current) + '">' + esc(current) + ' (current)</option>';
       }
       opts += listed.map(function (t) {
+        var locked = el.enforced && t.tier === 'locked';
         var label = t.team + ' — needs ' + Math.round(t.required) +
-          (t.tier === 'offer_possible' ? ', within reach' : '');
-        return '<option value="' + esc(t.team) + '">' + esc(label) + '</option>';
+          (locked ? ', locked' : t.tier === 'offer_possible' ? ', within reach' : '');
+        return '<option value="' + esc(t.team) + '"' + (locked ? ' disabled' : '') + '>' +
+          esc(label) + '</option>';
       }).join('');
       select.innerHTML = opts;
       select.value = current;

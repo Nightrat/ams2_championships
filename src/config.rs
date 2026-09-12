@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use crate::driver_rating::{Gates, RatingParams};
+
 fn default_port() -> u16 {
     8080
 }
@@ -18,6 +20,18 @@ fn default_show_track_map() -> bool {
 }
 fn default_track_map_max_points() -> u32 {
     5000
+}
+fn default_starting_rating() -> f32 {
+    RatingParams::default().starting_rating
+}
+fn default_rating_half_life() -> f32 {
+    RatingParams::default().recency_half_life
+}
+fn default_retirement_laps() -> u32 {
+    RatingParams::default().retirement_min_laps_down
+}
+fn default_retirement_distance_pct() -> f32 {
+    RatingParams::default().retirement_distance * 100.0
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,6 +86,57 @@ pub struct Config {
     /// seat. Turning this off keeps the ratings visible but stops them blocking anything.
     #[serde(default = "default_true")]
     pub enforce_team_eligibility: bool,
+    /// List locked teams in the championship's team picker, disabled and showing what they ask
+    /// for, instead of hiding them. Seeing the ladder is better motivation than an empty list,
+    /// so this defaults off; it changes nothing about what may be claimed.
+    #[serde(default)]
+    pub hide_locked_teams: bool,
+
+    // ── Driver rating tuning ─────────────────────────────────────────────────
+    // Defaults reproduce the behaviour these numbers were hard-coded to. See
+    // `driver_rating::RatingParams`, which is what they are read into.
+    /// Rating a driver with no recorded results starts at, 0–100.
+    #[serde(default = "default_starting_rating")]
+    pub starting_rating: f32,
+    /// Rating points added to every team's requirement; negative opens the grid up.
+    #[serde(default)]
+    pub rating_strictness: f32,
+    /// Which bars a team's requirement is built from.
+    #[serde(default)]
+    pub eligibility_gates: Gates,
+    /// Results this far back count half. Zero weighs a whole career equally.
+    #[serde(default = "default_rating_half_life")]
+    pub rating_half_life: f32,
+    /// Whether a retirement costs a point of finish rate.
+    #[serde(default = "default_true")]
+    pub count_retirements: bool,
+    /// Laps behind the leader before a car counts as retired rather than lapped.
+    #[serde(default = "default_retirement_laps")]
+    pub retirement_min_laps_down: u32,
+    /// Percentage of the leader's distance a car must fall short of to count as retired.
+    #[serde(default = "default_retirement_distance_pct")]
+    pub retirement_distance_pct: f32,
+}
+
+impl Config {
+    /// The rating tuning, clamped to sane ranges.
+    ///
+    /// Hand-edited config files are the norm here, so the bounds are enforced on the way out
+    /// rather than trusted on the way in: a negative half-life or a strictness of 400 would
+    /// otherwise produce a rating no UI could explain.
+    pub fn rating_params(&self) -> RatingParams {
+        RatingParams {
+            starting_rating: self.starting_rating.clamp(0.0, 100.0),
+            strictness: self.rating_strictness.clamp(-50.0, 50.0),
+            gates: self.eligibility_gates,
+            recency_half_life: self.rating_half_life.max(0.0),
+            count_retirements: self.count_retirements,
+            retirement_min_laps_down: self.retirement_min_laps_down,
+            // The config speaks in percent because that is how the hint reads; the rating math
+            // wants the fraction. One conversion, in one place.
+            retirement_distance: self.retirement_distance_pct.clamp(0.0, 100.0) / 100.0,
+        }
+    }
 }
 
 impl Default for Config {
@@ -92,6 +157,14 @@ impl Default for Config {
             spotter_name: None,
             custom_ai_dir: None,
             enforce_team_eligibility: default_true(),
+            hide_locked_teams: false,
+            starting_rating: default_starting_rating(),
+            rating_strictness: RatingParams::default().strictness,
+            eligibility_gates: Gates::default(),
+            rating_half_life: default_rating_half_life(),
+            count_retirements: RatingParams::default().count_retirements,
+            retirement_min_laps_down: default_retirement_laps(),
+            retirement_distance_pct: default_retirement_distance_pct(),
         }
     }
 }

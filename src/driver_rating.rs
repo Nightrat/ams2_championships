@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::custom_ai::{name_key, GridEntry, PlayerSeat, SeatEntry};
 use crate::data_store::{Championship, RecordedSession, SessionResult};
@@ -28,7 +28,13 @@ const AI_SUFFIX: &str = "(AI)";
 /// Races older than this many entries count half as much, so the rating tracks current form.
 /// It also makes the rating self-correct after an AI-difficulty change: scores shift, and the
 /// old ones fade out within roughly two half-lives.
+///
+/// Default for [`RatingParams::recency_half_life`].
 const RECENCY_HALF_LIFE: f32 = 10.0;
+
+/// Rating with no evidence behind it. Default for [`RatingParams::starting_rating`], and the
+/// midpoint every per-session score is expressed around.
+const NEUTRAL_RATING: f32 = 50.0;
 
 /// Pulls a small sample toward neutral so a couple of lucky results cannot unlock a top seat.
 const SHRINKAGE: f32 = 5.0;
@@ -60,6 +66,70 @@ const OFFER_MARGIN: f32 = 10.0;
 
 /// Allowance against the incumbent's `race_skill`, in the same 0–1 units.
 const INCUMBENT_MARGIN: f32 = 0.05;
+
+/// Which of the two bars a team's requirement is built from.
+///
+/// Both apply by default and the stricter wins. The single-gate modes exist because a roster's
+/// `race_skill` values are the author's opinion, not a measurement: a file that leaves them at a
+/// flat default makes the incumbent bar noise, and one that populates them carefully may be a
+/// better guide than car pace. Note [`Gates::Incumbent`] on a roster that declares no skills at
+/// all leaves every seat free — there is no bar left to clear.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Gates {
+    /// Car pace and incumbent skill, stricter wins.
+    #[default]
+    Both,
+    /// Car pace alone: the faster the car, the more it asks.
+    Grid,
+    /// Incumbent skill alone: beat the driver already in the seat.
+    Incumbent,
+}
+
+/// The tunable half of the rating. [`Default`] reproduces the behaviour these numbers were
+/// hard-coded to before they were configurable, so an untouched config changes nothing.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RatingParams {
+    /// Where a driver with no results sits, 0–100. The shrinkage below pulls a thin record
+    /// toward this rather than toward the midpoint, so a low value means starting unproven and
+    /// climbing. It washes out as races accumulate — by twenty races it is worth about a fifth.
+    pub starting_rating: f32,
+    /// Added to every team's requirement, in rating points. Negative opens the grid up.
+    ///
+    /// Additive rather than multiplicative so the whole ladder shifts uniformly: "every team
+    /// wants ten points less" stays true at both ends, where a multiplier would leave the
+    /// bottom untouched and squash the top.
+    pub strictness: f32,
+    /// Which bars a requirement is built from.
+    pub gates: Gates,
+    /// Entries this far back in each bucket count half. Zero disables the decay entirely, so a
+    /// whole career weighs the same rather than the rating tracking current form.
+    pub recency_half_life: f32,
+    /// Whether a retirement costs a point of finish rate. When false a DNF is skipped outright
+    /// — no start, no sample — rather than counted and forgiven.
+    pub count_retirements: bool,
+    /// Laps behind the leader before a car may be called a retirement rather than lapped. The
+    /// distance test below applies as well and both must agree, so raising this only ever makes
+    /// retirements rarer. See [`RETIREMENT_MIN_LAPS_DOWN`].
+    pub retirement_min_laps_down: u32,
+    /// Fraction of the leader's distance a car must fall short of to be called a retirement,
+    /// 0..1. See [`RETIREMENT_DISTANCE`]; the config carries it as a percentage.
+    pub retirement_distance: f32,
+}
+
+impl Default for RatingParams {
+    fn default() -> Self {
+        RatingParams {
+            starting_rating: NEUTRAL_RATING,
+            strictness: 0.0,
+            gates: Gates::Both,
+            recency_half_life: RECENCY_HALF_LIFE,
+            count_retirements: true,
+            retirement_min_laps_down: RETIREMENT_MIN_LAPS_DOWN,
+            retirement_distance: RETIREMENT_DISTANCE,
+        }
+    }
+}
 
 /// The sessions a rating is allowed to see: those committed to a round of some championship.
 ///
@@ -94,7 +164,19 @@ pub fn is_multiplayer(session: &RecordedSession) -> bool {
 /// laps, so a car that pits for repairs, loses two laps and still takes the flag is read as
 /// having retired. Requiring an absolute gap as well keeps the proportional rule for long races
 /// — where 10% is many laps — and stops it firing on a sprint.
+///
+/// Default for [`RatingParams::retirement_min_laps_down`]. The right value depends on race
+/// length: three laps is generous over a 10-lap sprint and strict over a two-hour enduro.
 const RETIREMENT_MIN_LAPS_DOWN: u32 = 3;
+
+/// Share of the leader's distance a car must fall short of before it may be called a retirement.
+///
+/// The proportional half of the test, and the one that scales with race length: a car inside
+/// this is a classified finisher however many laps that happens to be.
+///
+/// Default for [`RatingParams::retirement_distance`], where it is a fraction — the config
+/// exposes it as a percentage.
+const RETIREMENT_DISTANCE: f32 = 0.9;
 
 /// True when this driver retired rather than being classified.
 ///
@@ -105,13 +187,26 @@ const RETIREMENT_MIN_LAPS_DOWN: u32 = 3;
 /// a point of finish rate, so calling a finish a retirement penalises the same race twice.
 ///
 /// Both tests must agree. A car has retired when it is at least
-/// [`RETIREMENT_MIN_LAPS_DOWN`] laps down *and* short of 90% of the leader's distance.
+/// [`RETIREMENT_MIN_LAPS_DOWN`] laps down *and* short of [`RETIREMENT_DISTANCE`] of the leader's
+/// distance.
 pub fn retired(r: &SessionResult, leader_laps: u32) -> bool {
+    retired_with(r, leader_laps, &RatingParams::default())
+}
+
+/// [`retired`] under a user's own thresholds: [`RatingParams::retirement_min_laps_down`] and
+/// [`RatingParams::retirement_distance`].
+///
+/// Both still have to agree, so each one loosened alone only makes retirements rarer. A lap
+/// threshold of zero leaves the distance test to decide by itself — what someone running long
+/// races wants, since there being three laps down is a bad afternoon rather than a DNF. A
+/// distance of zero is the other extreme and stops anything being called a retirement at all.
+pub fn retired_with(r: &SessionResult, leader_laps: u32, params: &RatingParams) -> bool {
     if leader_laps == 0 {
         return false;
     }
     let laps_down = leader_laps.saturating_sub(r.laps_completed);
-    laps_down >= RETIREMENT_MIN_LAPS_DOWN && (r.laps_completed as f32) < 0.9 * leader_laps as f32
+    laps_down >= params.retirement_min_laps_down
+        && (r.laps_completed as f32) < params.retirement_distance * leader_laps as f32
 }
 
 fn leader_laps(session: &RecordedSession) -> u32 {
@@ -307,11 +402,18 @@ pub struct Reputation {
 }
 
 /// Recency-weighted mean of `(score, weight)` pairs given newest-first.
-fn weighted_mean(entries: &[(f32, f32)]) -> f32 {
+///
+/// A `half_life` of zero (or less) means no decay at all — every entry weighs the same — rather
+/// than an infinite exponent, which would be `NaN`.
+fn weighted_mean(entries: &[(f32, f32)], half_life: f32) -> f32 {
     let mut num = 0.0;
     let mut den = 0.0;
     for (i, (score, w)) in entries.iter().enumerate() {
-        let recency = 0.5f32.powf(i as f32 / RECENCY_HALF_LIFE);
+        let recency = if half_life > 0.0 {
+            0.5f32.powf(i as f32 / half_life)
+        } else {
+            1.0
+        };
         num += score * w * recency;
         den += w * recency;
     }
@@ -351,7 +453,8 @@ impl RatingContext {
     }
 }
 
-/// Computes the player's reputation from every recorded session in one class.
+/// Computes the player's reputation from every recorded session in one class, with the default
+/// tuning.
 pub fn compute_reputation(
     sessions: &[RecordedSession],
     seats: &[SeatEntry],
@@ -359,7 +462,26 @@ pub fn compute_reputation(
     declared_team: Option<&str>,
 ) -> Reputation {
     let name = infer_player_name(sessions, seats);
-    compute_reputation_inner(name.as_deref(), sessions, seats, pace, declared_team)
+    compute_reputation_inner(
+        name.as_deref(),
+        sessions,
+        seats,
+        pace,
+        declared_team,
+        &RatingParams::default(),
+    )
+}
+
+/// [`compute_reputation`] under a user's own tuning. See [`RatingParams`].
+pub fn compute_reputation_with(
+    sessions: &[RecordedSession],
+    seats: &[SeatEntry],
+    pace: &HashMap<String, f32>,
+    declared_team: Option<&str>,
+    params: &RatingParams,
+) -> Reputation {
+    let name = infer_player_name(sessions, seats);
+    compute_reputation_inner(name.as_deref(), sessions, seats, pace, declared_team, params)
 }
 
 /// Like [`compute_reputation`] but for a named driver, so every recorded human can be rated
@@ -371,7 +493,14 @@ pub fn compute_reputation_for(
     pace: &HashMap<String, f32>,
     declared_team: Option<&str>,
 ) -> Reputation {
-    compute_reputation_inner(Some(driver), sessions, seats, pace, declared_team)
+    compute_reputation_inner(
+        Some(driver),
+        sessions,
+        seats,
+        pace,
+        declared_team,
+        &RatingParams::default(),
+    )
 }
 
 /// A driver's career rating across every class they have raced.
@@ -386,6 +515,23 @@ pub fn compute_reputation_global(
     contexts: &[RatingContext],
     declared_team: Option<&str>,
 ) -> Reputation {
+    compute_reputation_global_with(
+        driver,
+        sessions,
+        contexts,
+        declared_team,
+        &RatingParams::default(),
+    )
+}
+
+/// [`compute_reputation_global`] under a user's own tuning. See [`RatingParams`].
+pub fn compute_reputation_global_with(
+    driver: Option<&str>,
+    sessions: &[RecordedSession],
+    contexts: &[RatingContext],
+    declared_team: Option<&str>,
+    params: &RatingParams,
+) -> Reputation {
     let name = driver.map(|d| d.to_string()).or_else(|| {
         contexts.iter().find_map(|c| {
             let own: Vec<RecordedSession> =
@@ -393,7 +539,7 @@ pub fn compute_reputation_global(
             infer_player_name(&own, &c.seats)
         })
     });
-    accumulate(name.as_deref(), sessions, contexts, declared_team)
+    accumulate(name.as_deref(), sessions, contexts, declared_team, params)
 }
 
 /// Human drivers across every class — everyone who is neither a roster entry in any of them nor
@@ -431,6 +577,7 @@ fn compute_reputation_inner(
     seats: &[SeatEntry],
     pace: &HashMap<String, f32>,
     declared_team: Option<&str>,
+    params: &RatingParams,
 ) -> Reputation {
     // A single-class rating is the global one over a roster that covers everything it is given.
     let expected = expected_positions(pace, seats);
@@ -439,7 +586,7 @@ fn compute_reputation_inner(
         seats: seats.to_vec(),
         expected,
     };
-    accumulate_covering_all(player_name, sessions, &ctx, declared_team)
+    accumulate_covering_all(player_name, sessions, &ctx, declared_team, params)
 }
 
 fn accumulate_covering_all(
@@ -447,8 +594,9 @@ fn accumulate_covering_all(
     sessions: &[RecordedSession],
     ctx: &RatingContext,
     declared_team: Option<&str>,
+    params: &RatingParams,
 ) -> Reputation {
-    accumulate_with(player_name, sessions, declared_team, |_| Some(ctx))
+    accumulate_with(player_name, sessions, declared_team, params, |_| Some(ctx))
 }
 
 fn accumulate(
@@ -456,8 +604,9 @@ fn accumulate(
     sessions: &[RecordedSession],
     contexts: &[RatingContext],
     declared_team: Option<&str>,
+    params: &RatingParams,
 ) -> Reputation {
-    accumulate_with(player_name, sessions, declared_team, |s| {
+    accumulate_with(player_name, sessions, declared_team, params, |s| {
         contexts.iter().find(|c| c.covers(s))
     })
 }
@@ -466,6 +615,7 @@ fn accumulate_with<'a>(
     player_name: Option<&str>,
     sessions: &[RecordedSession],
     declared_team: Option<&str>,
+    params: &RatingParams,
     context_for: impl Fn(&RecordedSession) -> Option<&'a RatingContext>,
 ) -> Reputation {
     let mut ordered: Vec<&RecordedSession> = sessions.iter().collect();
@@ -528,16 +678,22 @@ fn accumulate_with<'a>(
 
         match s.session_type {
             5 => {
+                // Retirements say nothing about pace; they feed the reliability term instead —
+                // unless the user has switched that off, in which case the race is skipped
+                // outright rather than counted as a start that was never finished.
+                let dnf = retired_with(me, leader_laps(s), params);
+                if dnf && !params.count_retirements {
+                    continue;
+                }
                 starts += 1;
-                // Retirements say nothing about pace; they feed the reliability term instead.
-                if retired(me, leader_laps(s)) {
+                if dnf {
                     continue;
                 }
                 finishes += 1;
                 races.push((positional_score(exp, me.race_position as f32, field), 1.0));
                 // A team-mate who retired was not beaten on pace, so that pairing is skipped
                 // rather than banked — reliability already has its own term.
-                if let Some(mate) = mate.filter(|m| !retired(m, leader_laps(s))) {
+                if let Some(mate) = mate.filter(|m| !retired_with(m, leader_laps(s), params)) {
                     let ahead = me.race_position < mate.race_position;
                     mates.push((if ahead { 1.0 } else { -1.0 }, 1.0));
                     if ahead {
@@ -564,8 +720,9 @@ fn accumulate_with<'a>(
         }
     }
 
-    let pace_score = weighted_mean(&races);
-    let quali_score = weighted_mean(&qualis);
+    let half_life = params.recency_half_life;
+    let pace_score = weighted_mean(&races, half_life);
+    let quali_score = weighted_mean(&qualis, half_life);
     let finish_rate = if starts > 0 {
         finishes as f32 / starts as f32
     } else {
@@ -580,17 +737,25 @@ fn accumulate_with<'a>(
         0.55 * pace_score + 0.30 * quali_score + 0.15 * (2.0 * finish_rate - 1.0)
     };
 
+    // The evidence is blended against the starting rating rather than the score simply being
+    // shrunk toward the midpoint, so an unproven driver sits where the user asked. The two are
+    // the same thing when that is 50: 50(1+raw)w + 50(1−w) = 50(1 + raw·w).
+    //
+    // Race starts alone are the evidence count, deliberately: a career of qualifying sessions
+    // with no race, or one where every race ended in a retirement, stays on the starting rating
+    // however those sessions went. Races are what a seat is earned in, and a rating that moved
+    // on Saturday pace alone would not mean what the team requirements assume it means.
     let n = races.len() as f32;
-    let shrunk = raw * n / (n + SHRINKAGE);
-    let base = 50.0 * (1.0 + shrunk);
+    let weight = n / (n + SHRINKAGE);
+    let base = NEUTRAL_RATING * (1.0 + raw) * weight + params.starting_rating * (1.0 - weight);
     let mp_bonus = if mps.is_empty() {
         0.0
     } else {
-        (MP_BONUS_CAP * weighted_mean(&mps)).clamp(-MP_BONUS_CAP, MP_BONUS_CAP)
+        (MP_BONUS_CAP * weighted_mean(&mps, half_life)).clamp(-MP_BONUS_CAP, MP_BONUS_CAP)
     };
 
     // Head-to-head against the other side of the garage, damped by how many comparisons exist.
-    let mate_h2h = weighted_mean(&mates);
+    let mate_h2h = weighted_mean(&mates, half_life);
     let m = mates.len() as f32;
     let teammate_bonus = if mates.is_empty() {
         0.0
@@ -648,6 +813,17 @@ pub struct TeamEligibility {
 /// would beat the driver already in the seat. That is why a midfield car staffed by two greats
 /// can ask for more than a quicker one with a weak line-up.
 pub fn required_rating(rank: usize, total: f32, incumbent_skill: Option<f32>) -> f32 {
+    required_rating_with(&RatingParams::default(), rank, total, incumbent_skill)
+}
+
+/// [`required_rating`] under a user's own tuning: which gates apply, and the offset applied to
+/// whichever of them wins.
+pub fn required_rating_with(
+    params: &RatingParams,
+    rank: usize,
+    total: f32,
+    incumbent_skill: Option<f32>,
+) -> f32 {
     let grid = if total > 0.0 {
         100.0 * (1.0 - (rank as f32 + 1.0) / total)
     } else {
@@ -656,12 +832,26 @@ pub fn required_rating(rank: usize, total: f32, incumbent_skill: Option<f32>) ->
     let incumbent = incumbent_skill
         .map(|s| 100.0 * (s - INCUMBENT_MARGIN))
         .unwrap_or(0.0);
-    grid.max(incumbent).clamp(0.0, 100.0)
+    let bar = match params.gates {
+        Gates::Both => grid.max(incumbent),
+        Gates::Grid => grid,
+        Gates::Incumbent => incumbent,
+    };
+    (bar + params.strictness).clamp(0.0, 100.0)
 }
 
 /// Teams ordered by car pace, each with the reputation it demands. Mirrors the ordering used by
 /// [`team_eligibility`] so callers can show the requirement without computing a rating first.
 pub fn team_requirements(
+    expected: &HashMap<String, f32>,
+    skills: &HashMap<String, f32>,
+) -> Vec<(String, f32)> {
+    team_requirements_with(&RatingParams::default(), expected, skills)
+}
+
+/// [`team_requirements`] under a user's own tuning. See [`RatingParams`].
+pub fn team_requirements_with(
+    params: &RatingParams,
     expected: &HashMap<String, f32>,
     skills: &HashMap<String, f32>,
 ) -> Vec<(String, f32)> {
@@ -674,7 +864,7 @@ pub fn team_requirements(
         .map(|(i, (team, _))| {
             (
                 team.clone(),
-                required_rating(i, total, skills.get(team).copied()),
+                required_rating_with(params, i, total, skills.get(team).copied()),
             )
         })
         .collect()
@@ -712,6 +902,16 @@ pub fn team_eligibility(
     expected: &HashMap<String, f32>,
     skills: &HashMap<String, f32>,
 ) -> Vec<TeamEligibility> {
+    team_eligibility_with(&RatingParams::default(), reputation, expected, skills)
+}
+
+/// [`team_eligibility`] under a user's own tuning. See [`RatingParams`].
+pub fn team_eligibility_with(
+    params: &RatingParams,
+    reputation: f32,
+    expected: &HashMap<String, f32>,
+    skills: &HashMap<String, f32>,
+) -> Vec<TeamEligibility> {
     let mut teams: Vec<(&String, &f32)> = expected.iter().collect();
     teams.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal));
     let total = teams.len() as f32;
@@ -720,7 +920,7 @@ pub fn team_eligibility(
         .into_iter()
         .enumerate()
         .map(|(i, (team, exp))| {
-            let required = required_rating(i, total, skills.get(team).copied());
+            let required = required_rating_with(params, i, total, skills.get(team).copied());
             let incumbent_skill = skills.get(team).copied();
             let tier = if reputation >= required {
                 Tier::Available
