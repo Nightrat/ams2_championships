@@ -9,8 +9,49 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rewrite cross-file links for a single document
+        run: |
+          mkdir -p build && cp docs/*.md build/
+          cd build
+          for f in *.md; do
+            slug="$(echo "${f%.md}" | tr '[:upper:]' '[:lower:]')"
+            sed -i "0,/^# /s|^# \(.*\)$|# \1 {#doc-$slug}|" "$f"
+          done
+          # Foo.md#anchor -> #anchor ; Foo.md -> #doc-foo
+          sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md#([^)]*)\)/](#\2)/g' *.md
+          sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md\)/](#doc-\L\1)/g' *.md
+
+      - name: Build PDF manual
+        run: |
+          docker run --rm -v "$PWD:/data" -w /data pandoc/latex:3.11 \
+            build/Home.md \
+            build/Getting-Started.md \
+            build/Live-Session.md \
+            build/Career.md \
+            build/Managing-Championships.md \
+            build/Data-and-Backup.md \
+            -o "ams2_career_manual_${{ github.ref_name }}.pdf" \
+            --toc --toc-depth=2 \
+            --metadata title="AMS2 Championships — User Manual" \
+            --metadata subtitle="${{ github.ref_name }}" \
+            -V geometry:margin=1in \
+            -V colorlinks=true -V linkcolor=RoyalBlue -V urlcolor=RoyalBlue
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manual-pdf
+          path: ams2_career_manual_*.pdf
+          if-no-files-found: error
+
   build:
     runs-on: windows-latest
+    needs: docs
     permissions:
       contents: write
 
@@ -26,6 +67,10 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path docs -DestinationPath ams2_career_docs_${{ github.ref_name }}.zip
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: manual-pdf
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -33,3 +78,4 @@ jobs:
             target/release/ams2_championship.exe
             target/release/ams2_championship_server.exe
             ams2_career_docs_${{ github.ref_name }}.zip
+            ams2_career_manual_${{ github.ref_name }}.pdf
