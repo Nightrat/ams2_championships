@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Rewrite cross-file links for a single document
         run: |
@@ -43,7 +43,7 @@ jobs:
             -V geometry:margin=1in \
             -V colorlinks=true -V linkcolor=RoyalBlue -V urlcolor=RoyalBlue
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: manual-pdf
           path: ams2_career_manual_*.pdf
@@ -56,7 +56,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -67,12 +67,12 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path docs -DestinationPath ams2_career_docs_${{ github.ref_name }}.zip
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: manual-pdf
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             target/release/ams2_championship.exe
