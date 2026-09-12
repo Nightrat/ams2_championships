@@ -6,6 +6,15 @@ var TM_MAX  = 5000; // maximum unique cells to accumulate (overridden by config)
 
 function tmCellKey(x, z) { return Math.floor(x / TM_CELL) + ',' + Math.floor(z / TM_CELL); }
 
+// Full track identity: one location has several layouts (e.g. Silverstone runs
+// "Grand Prix", "Grand Prix 1975", "International"), each a different shape, so
+// the layout file must be keyed by location + variation, not location alone.
+function tmTrackKey(d) {
+  var loc = d.track_location || '';
+  var v   = d.track_variation || '';
+  return v && v !== loc ? loc + ' ' + v : loc;
+}
+
 function tmAddPoints(participants) {
   participants.forEach(function (p) {
     if (Object.keys(trackMap.cells).length >= TM_MAX) return;
@@ -100,14 +109,15 @@ function tmUpdate(d) {
     return;
   }
 
-  // Reset when track changes
-  if (trackMap.track !== d.track_location) {
-    trackMap.track       = d.track_location;
+  // Reset when track or layout changes
+  var trackKey = tmTrackKey(d);
+  if (trackMap.track !== trackKey) {
+    trackMap.track       = trackKey;
     trackMap.points      = null;
     trackMap.cells       = {};
     trackMap.accumulated = [];
     trackMap.savedCount  = 0;
-    tmLoad(d.track_location);
+    tmLoad(trackKey);
   }
 
   if (d.participants && d.participants.length > 0) {
@@ -118,7 +128,7 @@ function tmUpdate(d) {
   if (totalCells >= TM_MIN && totalCells >= trackMap.savedCount + 100) {
     var combined = (trackMap.points || []).concat(trackMap.accumulated);
     trackMap.savedCount = totalCells;
-    tmSave(d.track_location, combined);
+    tmSave(trackKey, combined);
   }
 
   var allPoints = (trackMap.points || []).concat(trackMap.accumulated);

@@ -38,6 +38,23 @@ const SHRINKAGE: f32 = 5.0;
 /// so its influence is capped rather than blended in freely.
 const MP_BONUS_CAP: f32 = 5.0;
 
+/// Largest reputation swing the team-mate comparison may contribute, either way.
+///
+/// Beating the driver in the other half of the same garage is the cleanest skill signal there
+/// is — identical car, identical track, identical conditions — so it earns real points rather
+/// than a rounding error. It stays a bounded bonus rather than a fourth weighted term because
+/// it is only available when a team-mate is actually on the grid, and the rating must not mean
+/// something different for a one-car team.
+const TEAMMATE_BONUS_CAP: f32 = 8.0;
+
+/// Damps a thin head-to-head record, so one lucky qualifying lap is not worth the full cap.
+/// Reaches about ⅔ of the cap at six comparisons.
+const TEAMMATE_SHRINKAGE: f32 = 3.0;
+
+/// How much a qualifying head-to-head counts against a race one. Mirrors the 0.30/0.55 split
+/// the main rating already uses between the two.
+const TEAMMATE_QUALI_WEIGHT: f32 = 0.55;
+
 /// How far below a team's bar the player may sit and still be told a seat is within reach.
 const OFFER_MARGIN: f32 = 10.0;
 
@@ -71,14 +88,30 @@ pub fn is_multiplayer(session: &RecordedSession) -> bool {
     session.results.iter().any(|r| r.name.contains(AI_SUFFIX))
 }
 
+/// Laps a car must be behind before the proportional test below can call it a retirement.
+///
+/// On a short race the 10% test alone is far too sharp: over 15 laps it puts the line at 1.5
+/// laps, so a car that pits for repairs, loses two laps and still takes the flag is read as
+/// having retired. Requiring an absolute gap as well keeps the proportional rule for long races
+/// — where 10% is many laps — and stops it firing on a sprint.
+const RETIREMENT_MIN_LAPS_DOWN: u32 = 3;
+
 /// True when this driver retired rather than being classified.
 ///
 /// Only meaningful for races. The stored `dnf` flag means "completed fewer laps than the
 /// leader", which also catches being *lapped* — punishing a slow car twice — and in qualifying
-/// fires for anyone who simply ran a shorter run plan. This threshold separates a retirement
-/// from a lapped finisher.
+/// fires for anyone who simply ran a shorter run plan. This separates a retirement from a lapped
+/// finisher, which matters twice over: a retirement contributes no race pace at all *and* costs
+/// a point of finish rate, so calling a finish a retirement penalises the same race twice.
+///
+/// Both tests must agree. A car has retired when it is at least
+/// [`RETIREMENT_MIN_LAPS_DOWN`] laps down *and* short of 90% of the leader's distance.
 pub fn retired(r: &SessionResult, leader_laps: u32) -> bool {
-    leader_laps > 0 && (r.laps_completed as f32) < 0.9 * leader_laps as f32
+    if leader_laps == 0 {
+        return false;
+    }
+    let laps_down = leader_laps.saturating_sub(r.laps_completed);
+    laps_down >= RETIREMENT_MIN_LAPS_DOWN && (r.laps_completed as f32) < 0.9 * leader_laps as f32
 }
 
 fn leader_laps(session: &RecordedSession) -> u32 {
@@ -190,6 +223,29 @@ pub fn infer_player_name(sessions: &[RecordedSession], seats: &[SeatEntry]) -> O
         .map(|(name, _)| name.to_string())
 }
 
+/// The player's team-mate in one session: a roster driver sharing the player's team, in the
+/// other seat.
+///
+/// Returns the best-placed such driver, so a team listing alternates still yields the one who
+/// actually raced. `None` for a one-car team, or when the team-mate did not appear.
+fn teammate_row<'a>(
+    session: &'a RecordedSession,
+    seats: &[SeatEntry],
+    team: &str,
+    me: &SessionResult,
+) -> Option<&'a SessionResult> {
+    let mates: HashSet<String> = seats
+        .iter()
+        .filter(|e| e.team == team && name_key(&e.driver) != name_key(&me.name))
+        .map(|e| name_key(&e.driver))
+        .collect();
+    session
+        .results
+        .iter()
+        .filter(|r| !r.is_player && mates.contains(&name_key(&r.name)))
+        .min_by_key(|r| r.race_position)
+}
+
 /// Which team the player was driving for in a session, preferring the declared team whenever the
 /// seat inference cannot narrow it to one.
 fn session_team(
@@ -236,6 +292,13 @@ pub struct Reputation {
     pub finish_rate: f32,
     /// Reputation points contributed by online racing, within ±[`MP_BONUS_CAP`].
     pub mp_bonus: f32,
+    /// Head-to-head record against the team-mate, −1 (always beaten) to +1 (always ahead).
+    pub teammate: f32,
+    /// Reputation points that record contributed, within ±[`TEAMMATE_BONUS_CAP`].
+    pub teammate_bonus: f32,
+    /// Sessions the team-mate was beaten in, and lost to. Qualifying and race both count.
+    pub mate_wins: u32,
+    pub mate_losses: u32,
     pub sp_races: u32,
     pub mp_races: u32,
     /// Online record against other humans.
@@ -411,8 +474,10 @@ fn accumulate_with<'a>(
     let mut races: Vec<(f32, f32)> = Vec::new();
     let mut qualis: Vec<(f32, f32)> = Vec::new();
     let mut mps: Vec<(f32, f32)> = Vec::new();
+    let mut mates: Vec<(f32, f32)> = Vec::new();
     let (mut starts, mut finishes) = (0u32, 0u32);
     let (mut mp_wins, mut mp_losses) = (0u32, 0u32);
+    let (mut mate_wins, mut mate_losses) = (0u32, 0u32);
 
     for s in ordered {
         // A session in a class with no Custom AI file has no roster and no car pace, so there
@@ -457,6 +522,10 @@ fn accumulate_with<'a>(
             continue;
         };
 
+        // Same car, same track, same conditions: whoever finishes ahead was the faster driver
+        // that day, with none of the car-pace estimation the positional scores depend on.
+        let mate = teammate_row(s, &ctx.seats, &team, me);
+
         match s.session_type {
             5 => {
                 starts += 1;
@@ -466,9 +535,31 @@ fn accumulate_with<'a>(
                 }
                 finishes += 1;
                 races.push((positional_score(exp, me.race_position as f32, field), 1.0));
+                // A team-mate who retired was not beaten on pace, so that pairing is skipped
+                // rather than banked — reliability already has its own term.
+                if let Some(mate) = mate.filter(|m| !retired(m, leader_laps(s))) {
+                    let ahead = me.race_position < mate.race_position;
+                    mates.push((if ahead { 1.0 } else { -1.0 }, 1.0));
+                    if ahead {
+                        mate_wins += 1;
+                    } else {
+                        mate_losses += 1;
+                    }
+                }
             }
             // Qualifying is scored on position alone — lap counts there reflect run plans.
-            3 => qualis.push((positional_score(exp, me.race_position as f32, field), 1.0)),
+            3 => {
+                qualis.push((positional_score(exp, me.race_position as f32, field), 1.0));
+                if let Some(mate) = mate {
+                    let ahead = me.race_position < mate.race_position;
+                    mates.push((if ahead { 1.0 } else { -1.0 }, TEAMMATE_QUALI_WEIGHT));
+                    if ahead {
+                        mate_wins += 1;
+                    } else {
+                        mate_losses += 1;
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -498,12 +589,26 @@ fn accumulate_with<'a>(
         (MP_BONUS_CAP * weighted_mean(&mps)).clamp(-MP_BONUS_CAP, MP_BONUS_CAP)
     };
 
+    // Head-to-head against the other side of the garage, damped by how many comparisons exist.
+    let mate_h2h = weighted_mean(&mates);
+    let m = mates.len() as f32;
+    let teammate_bonus = if mates.is_empty() {
+        0.0
+    } else {
+        (TEAMMATE_BONUS_CAP * mate_h2h * m / (m + TEAMMATE_SHRINKAGE))
+            .clamp(-TEAMMATE_BONUS_CAP, TEAMMATE_BONUS_CAP)
+    };
+
     Reputation {
-        value: (base + mp_bonus).clamp(0.0, 100.0),
+        value: (base + mp_bonus + teammate_bonus).clamp(0.0, 100.0),
         pace: pace_score,
         quali: quali_score,
         finish_rate,
         mp_bonus,
+        teammate: mate_h2h,
+        teammate_bonus,
+        mate_wins,
+        mate_losses,
         sp_races: starts,
         mp_races: mps.len() as u32,
         mp_wins,

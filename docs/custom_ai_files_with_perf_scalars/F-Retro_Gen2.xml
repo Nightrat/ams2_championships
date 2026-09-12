@@ -19,8 +19,8 @@
 	<avoidance_of_forced_mistakes>0.77</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.46</vehicle_reliability>
         <power_scalar>1.00</power_scalar>
-        <weight_scalar>1.02</weight_scalar>
-        <drag_scalar>0.95</drag_scalar>
+        <weight_scalar>1.08</weight_scalar>
+        <drag_scalar>0.98</drag_scalar>
      </driver>
      <driver livery_name="Brabham-Alfa Romeo #2 J. Watson"> 
         <name>John Watson</name>     
@@ -39,9 +39,9 @@
 	<avoidance_of_mistakes>0.72</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.33</vehicle_reliability>
-        <power_scalar>1.00</power_scalar>
-        <weight_scalar>1.02</weight_scalar>
-        <drag_scalar>0.95</drag_scalar>
+        <power_scalar>0.98</power_scalar>
+        <weight_scalar>1.08</weight_scalar>
+        <drag_scalar>0.98</drag_scalar>
      </driver>    
      <driver livery_name="Tyrrell-Ford Cosworth #3 D. Pironi"> 
         <name>Didier Pironi</name>     

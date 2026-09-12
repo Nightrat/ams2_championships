@@ -14,7 +14,7 @@ fn default_true() -> bool {
     true
 }
 fn default_show_track_map() -> bool {
-    true
+    false
 }
 fn default_track_map_max_points() -> u32 {
     5000

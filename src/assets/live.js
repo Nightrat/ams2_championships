@@ -68,9 +68,15 @@ function applyLiveSort() {
   });
 }());
 
-var topSpeeds   = {};   // name → peak km/h this session
-var lastPosPoll = {};   // name → {x, z, t}
-var liveTrack   = null; // track name at last poll, used to reset speed data
+var liveTeams   = { teams: {}, player_team: null }; // driver → historic team name, from the Custom AI file
+var liveTrack   = null; // track name at last poll, used to refresh the team names
+
+function loadLiveTeams() {
+  fetch('/api/live-teams')
+    .then(function (r) { return r.json(); })
+    .then(function (t) { liveTeams = { teams: t.teams || {}, player_team: t.player_team }; })
+    .catch(function () {});
+}
 
 var SESSION_NAMES = ['', 'Practice', 'Test', 'Qualify', 'Formation Lap', 'Race', 'Time Attack'];
 var RACE_NAMES    = ['', 'Not Started', 'Racing', 'Finished', 'DSQ', 'Retired', 'DNF'];
@@ -117,33 +123,21 @@ function processLiveData(d) {
       }
       updateSpotterFocus(d.participants);
 
-      // ── Top speed tracking ────────────────────────────────────────────────
+      // ── Team names ────────────────────────────────────────────────────────
+      // Resolved server-side against the best-matching Custom AI Driver file; refreshed
+      // when the session moves to another track, since that may be another championship.
       if (liveTrack !== d.track_location) {
-        liveTrack   = d.track_location;
-        topSpeeds   = {};
-        lastPosPoll = {};
+        liveTrack = d.track_location;
+        loadLiveTeams();
       }
-      var now = Date.now();
-      d.participants.forEach(function (p) {
-        var kmh;
-        if (p.is_player && d.player_telemetry && d.player_telemetry.speed >= 0) {
-          // Use AMS2's own speed sensor (m/s → km/h) for the player — more accurate than position deltas.
-          kmh = d.player_telemetry.speed * 3.6;
-        } else {
-          var prev = lastPosPoll[p.name];
-          if (prev) {
-            var dt = (now - prev.t) / 1000;
-            if (dt > 0) {
-              var dx = p.world_pos_x - prev.x, dz = p.world_pos_z - prev.z;
-              kmh = Math.sqrt(dx * dx + dz * dz) / dt * 3.6;
-            }
-          }
-        }
-        lastPosPoll[p.name] = { x: p.world_pos_x, z: p.world_pos_z, t: now };
-        if (kmh !== undefined && kmh < 450 && (!(p.name in topSpeeds) || kmh > topSpeeds[p.name])) {
-          topSpeeds[p.name] = kmh;
-        }
-      });
+
+      // Same order as recorded results: Custom AI livery, then the player's manual
+      // team override, then whatever car name AMS2 reports.
+      function fmtTeam(p) {
+        var team = liveTeams.teams[p.name] ||
+          (p.is_player ? liveTeams.player_team : null) || p.car_name;
+        return team ? esc(team) : '—';
+      }
 
       // ── Interval (gap to car ahead) — computed in Rust ───────────────────
       function fmtInterval(p) {
@@ -202,7 +196,7 @@ function processLiveData(d) {
           '<td class="live-time">' + fmtSector(p.cur_s3, p.best_s3, bestS3) + '</td>' +
           '<td class="live-time">' + fmtLapTime(p.fastest_lap_time) + '</td>' +
           '<td class="live-time">' + fmtLapTime(p.last_lap_time) + '</td>' +
-          '<td class="live-num">'  + (topSpeeds[p.name] ? Math.round(topSpeeds[p.name]) : '\u2014') + '</td>' +
+          '<td class="live-team">' + fmtTeam(p) + '</td>' +
           '<td class="live-tyre">' + (p.is_player && d.player_telemetry ? esc(d.player_telemetry.tyre_compound[0]) || '\u2014' : '\u2014') + '</td>' +
           '</tr>';
       }).join('');

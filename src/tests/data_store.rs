@@ -1251,3 +1251,69 @@ fn test_track_stats_different_session_cars_are_separate_entries() {
     assert!((ferrari.best_lap - 89.5).abs() < 0.001);
     assert!((mclaren.best_lap - 88.0).abs() < 0.001);
 }
+
+// ── Pre-selecting the performance tabs' class filter ──────────────────────────
+
+fn champ_with(id: &str, status: ChampionshipStatus, file: Option<&str>) -> Championship {
+    Championship {
+        id: id.into(),
+        name: id.into(),
+        status,
+        points_system: vec![25, 18, 15],
+        manufacturer_scoring: false,
+        rounds: vec![],
+        session_ids: vec![],
+        custom_ai_file: file.map(str::to_string),
+        player_team: None,
+    }
+}
+
+#[test]
+fn test_active_classes_prefers_championships_under_way() {
+    let champs = vec![
+        champ_with("a", ChampionshipStatus::Active, Some("F-Vintage_Gen1.xml")),
+        champ_with("b", ChampionshipStatus::Progress, Some("F-Retro_Gen2.xml")),
+        champ_with("c", ChampionshipStatus::Final, Some("F-Classic_Gen1.xml")),
+    ];
+    // Rounds are under way in exactly one, so that is the season being raced.
+    assert_eq!(active_classes(&champs), vec!["F-Retro_Gen2"]);
+}
+
+#[test]
+fn test_active_classes_falls_back_to_not_yet_started() {
+    let champs = vec![
+        champ_with("a", ChampionshipStatus::Active, Some("F-Vintage_Gen1.xml")),
+        champ_with("c", ChampionshipStatus::Final, Some("F-Classic_Gen1.xml")),
+    ];
+    // Nothing under way: the one being set up is the next best answer.
+    assert_eq!(active_classes(&champs), vec!["F-Vintage_Gen1"]);
+}
+
+#[test]
+fn test_active_classes_never_offers_a_finished_season() {
+    let champs = vec![champ_with(
+        "c",
+        ChampionshipStatus::Final,
+        Some("F-Classic_Gen1.xml"),
+    )];
+    assert!(active_classes(&champs).is_empty(), "no preference is right");
+}
+
+#[test]
+fn test_active_classes_dedupes_and_skips_championships_without_a_roster() {
+    let champs = vec![
+        champ_with("a", ChampionshipStatus::Progress, Some("F-Retro_Gen2.xml")),
+        champ_with("b", ChampionshipStatus::Progress, Some("F-Retro_Gen2.xml")),
+        champ_with("c", ChampionshipStatus::Progress, Some("F-Retro_Gen3.xml")),
+        champ_with("d", ChampionshipStatus::Progress, None),
+    ];
+    assert_eq!(
+        active_classes(&champs),
+        vec!["F-Retro_Gen2", "F-Retro_Gen3"]
+    );
+}
+
+#[test]
+fn test_active_classes_empty_for_no_championships() {
+    assert!(active_classes(&[]).is_empty());
+}

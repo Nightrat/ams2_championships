@@ -20,7 +20,7 @@ fn test_load_or_create_missing_file_writes_defaults_and_creates_file() {
     assert!(cfg.record_practice);
     assert!(cfg.record_qualify);
     assert!(cfg.record_race);
-    assert!(cfg.show_track_map);
+    assert!(!cfg.show_track_map);
     assert_eq!(cfg.track_map_max_points, 5000);
     assert!(cfg.data_file.is_none());
     assert!(path.exists(), "config file should be created");
@@ -52,7 +52,7 @@ fn test_load_or_create_partial_json_fills_serde_defaults() {
     assert_eq!(cfg.host, "127.0.0.1");
     assert_eq!(cfg.poll_ms, 200);
     assert!(cfg.record_race);
-    assert!(cfg.show_track_map);
+    assert!(!cfg.show_track_map);
     assert_eq!(cfg.track_map_max_points, 5000);
     let _ = fs::remove_file(&path);
 }
@@ -101,7 +101,7 @@ fn test_config_default_values() {
     assert!(cfg.record_practice);
     assert!(cfg.record_qualify);
     assert!(cfg.record_race);
-    assert!(cfg.show_track_map);
+    assert!(!cfg.show_track_map);
     assert_eq!(cfg.track_map_max_points, 5000);
     assert!(cfg.data_file.is_none());
     assert!(cfg.enforce_team_eligibility);

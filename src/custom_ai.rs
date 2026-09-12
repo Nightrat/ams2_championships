@@ -51,7 +51,7 @@ pub fn list_teams(path: &Path) -> Vec<String> {
     teams
 }
 
-fn strip_comments(xml: &str) -> String {
+pub(crate) fn strip_comments(xml: &str) -> String {
     let mut out = String::with_capacity(xml.len());
     let mut rest = xml;
     while let Some(start) = rest.find("<!--") {
@@ -65,7 +65,7 @@ fn strip_comments(xml: &str) -> String {
     out
 }
 
-fn attr_value<'a>(tag: &'a str, attr: &str) -> Option<&'a str> {
+pub(crate) fn attr_value<'a>(tag: &'a str, attr: &str) -> Option<&'a str> {
     let needle = format!("{attr}=\"");
     let start = tag.find(needle.as_str())? + needle.len();
     let end = tag[start..].find('"')? + start;
@@ -156,6 +156,10 @@ pub fn parse_driver_teams_str(xml: &str) -> HashMap<String, String> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CarPerformance {
     pub team: String,
+    /// Everyone listed for this team, in document order. A seat shared by alternate drivers
+    /// (1986 Brabham #8 is both De Angelis and Warwick) contributes both names, so this can be
+    /// longer than the team's seat count.
+    pub drivers: Vec<String>,
     pub power_scalar: f32,
     pub weight_scalar: f32,
     pub drag_scalar: f32,
@@ -170,17 +174,26 @@ fn parse_scalar(block: &str, tag: &str) -> f32 {
 /// Parses `power_scalar`/`weight_scalar`/`drag_scalar` per team from a `CustomAIDrivers` XML file,
 /// deduped by team (first occurrence wins — every driver on the same team shares one physical car).
 /// Missing scalar tags default to `1.0` (no tuning applied yet), not an error.
+/// The team's `drivers` accumulate across all its blocks, unlike its scalars.
 /// Sorted alphabetically by team.
 pub fn parse_car_performance_str(xml: &str) -> Vec<CarPerformance> {
     let mut map: BTreeMap<String, CarPerformance> = BTreeMap::new();
     for (livery, block) in primary_driver_blocks(xml) {
         let team = extract_team_name(&livery);
-        map.entry(team.clone()).or_insert_with(|| CarPerformance {
+        let car = map.entry(team.clone()).or_insert_with(|| CarPerformance {
             team,
+            drivers: Vec::new(),
             power_scalar: parse_scalar(&block, "power_scalar"),
             weight_scalar: parse_scalar(&block, "weight_scalar"),
             drag_scalar: parse_scalar(&block, "drag_scalar"),
         });
+        // A driver listed twice for one team (a second livery of the same car) is still one
+        // driver, so names are deduped even though the blocks are not.
+        if let Some(name) = element_text(&block, "name") {
+            if !car.drivers.iter().any(|d| d == name) {
+                car.drivers.push(name.to_string());
+            }
+        }
     }
     map.into_values().collect()
 }
@@ -192,6 +205,476 @@ pub fn parse_car_performance(path: &Path) -> Vec<CarPerformance> {
         Ok(content) => parse_car_performance_str(&content),
         Err(_) => Vec::new(),
     }
+}
+
+// ── Writing scalars back to the XML ──────────────────────────────────────────
+
+/// The three tuning scalars of one car, as edited from the Car Performance tab.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Scalars {
+    pub power: f32,
+    pub weight: f32,
+    pub drag: f32,
+}
+
+/// Accepted range for an edited scalar, straight from Reiza's Custom AI documentation: "Valid
+/// values range from 0.900 to 1.100, where 1.000 means no change". All 253 scalars in the shipped
+/// files sit inside it.
+///
+/// See `UserData/CustomAIDrivers/README.txt` for the thread this comes from.
+pub const SCALAR_MIN: f32 = 0.9;
+pub const SCALAR_MAX: f32 = 1.1;
+
+impl Scalars {
+    /// `Err` with a human-readable reason when any value is not a finite number inside
+    /// [`SCALAR_MIN`]..=[`SCALAR_MAX`].
+    pub fn validate(&self) -> Result<(), String> {
+        for (name, v) in [
+            ("power_scalar", self.power),
+            ("weight_scalar", self.weight),
+            ("drag_scalar", self.drag),
+        ] {
+            if !v.is_finite() || !(SCALAR_MIN..=SCALAR_MAX).contains(&v) {
+                return Err(format!(
+                    "{name} must be between {SCALAR_MIN:.2} and {SCALAR_MAX:.2}, got {v}"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Two decimals like the shipped files, unless a third is actually needed.
+fn fmt_scalar(v: f32) -> String {
+    let three = format!("{v:.3}");
+    if three.ends_with('0') {
+        format!("{v:.2}")
+    } else {
+        three
+    }
+}
+
+/// Byte ranges of primary `<driver>` blocks in the **raw** text, paired with their `livery_name`.
+///
+/// [`primary_driver_blocks`] strips comments first and hands back copies, so its offsets do not
+/// index the original file — no good for an edit that must leave every other byte alone. This
+/// walks the untouched text instead, stepping over comment regions as it goes.
+fn primary_driver_spans(xml: &str) -> Vec<(std::ops::Range<usize>, String)> {
+    let mut out = Vec::new();
+    let mut pos = 0usize;
+    while let Some(next) = xml[pos..].find('<') {
+        let at = pos + next;
+        let tail = &xml[at..];
+        if tail.starts_with("<!--") {
+            match tail.find("-->") {
+                Some(end) => pos = at + end + 3,
+                None => break,
+            }
+            continue;
+        }
+        // `<driver` must be the whole element name, not the prefix of a longer one.
+        let is_driver = tail
+            .strip_prefix("<driver")
+            .is_some_and(|r| r.starts_with(['>', '/']) || r.starts_with(char::is_whitespace));
+        if !is_driver {
+            pos = at + 1;
+            continue;
+        }
+        let Some(tag_end) = tail.find('>') else { break };
+        let tag = &tail[..=tag_end];
+        let block_len = if tag.trim_end().ends_with("/>") {
+            tag_end + 1
+        } else if let Some(close) = tail.find("</driver>") {
+            close + "</driver>".len()
+        } else {
+            tail.len()
+        };
+        let block = &xml[at..at + block_len];
+        if let (Some(_), Some(livery)) =
+            (element_text(block, "name"), attr_value(tag, "livery_name"))
+        {
+            out.push((at..at + block_len, livery.to_string()));
+        }
+        pos = at + block_len;
+    }
+    out
+}
+
+/// Indentation used by the first child element of a `<driver>` block, so an inserted tag lines up
+/// with the ones already there. Falls back to eight spaces, the shipped files' style.
+fn child_indent(block: &str) -> String {
+    block
+        .lines()
+        .skip(1)
+        .find(|l| l.trim_start().starts_with('<'))
+        .map(|l| l[..l.len() - l.trim_start().len()].to_string())
+        .unwrap_or_else(|| " ".repeat(8))
+}
+
+/// Sets `<tag>` inside one `<driver>` block to `value`, replacing the existing text when the tag
+/// is present and appending the tag as a last child when it is not. Everything else in the block
+/// — spacing, tag order, trailing whitespace — is left exactly as found.
+fn set_tag_in_block(block: &str, tag: &str, value: f32) -> String {
+    let text = fmt_scalar(value);
+    let open = format!("<{tag}>");
+    let close = format!("</{tag}>");
+    if let Some(start) = block.find(open.as_str()) {
+        let inner = start + open.len();
+        if let Some(rel) = block[inner..].find(close.as_str()) {
+            let mut out = String::with_capacity(block.len() + text.len());
+            out.push_str(&block[..inner]);
+            out.push_str(&text);
+            out.push_str(&block[inner + rel..]);
+            return out;
+        }
+    }
+    let Some(close_idx) = block.rfind("</driver>") else {
+        return block.to_string();
+    };
+    let element = format!("{open}{text}{close}");
+    let head = &block[..close_idx];
+    let line_start = head.rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let mut out = String::with_capacity(block.len() + element.len() + 16);
+    if head[line_start..].trim().is_empty() {
+        // `</driver>` sits on its own line: give the new tag a line of its own above it.
+        out.push_str(&block[..line_start]);
+        out.push_str(&child_indent(block));
+        out.push_str(&element);
+        out.push('\n');
+        out.push_str(&block[line_start..]);
+    } else {
+        out.push_str(head);
+        out.push_str(&element);
+        out.push_str(&block[close_idx..]);
+    }
+    out
+}
+
+/// Rewrites the three pace scalars of every primary `<driver>` block whose livery resolves to
+/// `team`, returning the new file text. Comments, formatting, and every other tag survive byte
+/// for byte.
+///
+/// One row in the Car Performance table is one *team*, so an edit applies to the whole team:
+/// teammates that were tuned apart (the shipped 1980 Brabham gives Lauda 1.00 power and Watson
+/// 0.98) end up sharing the edited value. Track-specific override blocks — which repeat
+/// `livery_name` but carry no `<name>` — are left alone, so a per-track scalar there still wins
+/// at that track.
+///
+/// `Err` when the file has no driver on that team.
+pub fn set_team_scalars_str(xml: &str, team: &str, s: Scalars) -> Result<String, String> {
+    let team = team.trim();
+    let spans: Vec<(std::ops::Range<usize>, String)> = primary_driver_spans(xml)
+        .into_iter()
+        .filter(|(_, livery)| extract_team_name(livery).eq_ignore_ascii_case(team))
+        .collect();
+    if spans.is_empty() {
+        return Err(format!("no driver in this file drives for {team}"));
+    }
+    let mut out = String::with_capacity(xml.len() + spans.len() * 48);
+    let mut pos = 0usize;
+    for (range, _) in spans {
+        out.push_str(&xml[pos..range.start]);
+        let mut block = xml[range.clone()].to_string();
+        for (tag, v) in [
+            ("power_scalar", s.power),
+            ("weight_scalar", s.weight),
+            ("drag_scalar", s.drag),
+        ] {
+            block = set_tag_in_block(&block, tag, v);
+        }
+        out.push_str(&block);
+        pos = range.end;
+    }
+    out.push_str(&xml[pos..]);
+    Ok(out)
+}
+
+/// Applies [`set_team_scalars_str`] to a file on disk.
+///
+/// These files live in the user's AMS2 install and were hand-tuned, so the first edit of a given
+/// file copies it to `<name>.xml.bak` first. Later edits keep that original backup rather than
+/// overwriting it with an already-edited copy.
+pub fn set_team_scalars(path: &Path, team: &str, s: Scalars) -> Result<(), String> {
+    s.validate()?;
+    let xml =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let updated = set_team_scalars_str(&xml, team, s)?;
+    write_with_backup(path, &updated)
+}
+
+/// Overwrites `path`, keeping a one-time `<name>.xml.bak` of whatever was there first.
+fn write_with_backup(path: &Path, contents: &str) -> Result<(), String> {
+    let backup = path.with_extension("xml.bak");
+    if !backup.exists() {
+        fs::copy(path, &backup).map_err(|e| format!("cannot write backup: {e}"))?;
+    }
+    fs::write(path, contents).map_err(|e| format!("cannot write {}: {e}", path.display()))
+}
+
+// ── Per-driver AI attributes ─────────────────────────────────────────────────
+
+/// The AI behaviour tags a driver entry can carry, in the order the Driver Performance table
+/// shows them. This is the whole editable set: anything outside it is refused rather than
+/// written, so a typo in a request cannot invent a tag AMS2 will not read.
+pub const DRIVER_ATTRS: [&str; 15] = [
+    "race_skill",
+    "qualifying_skill",
+    "aggression",
+    "defending",
+    "stamina",
+    "consistency",
+    "start_reactions",
+    "wet_skill",
+    "tyre_management",
+    "fuel_management",
+    "blue_flag_conceding",
+    "weather_tyre_changes",
+    "avoidance_of_mistakes",
+    "avoidance_of_forced_mistakes",
+    "vehicle_reliability",
+];
+
+/// Accepted range for a personality attribute: Reiza documents "valid personality values range
+/// is between 0 and 1 (inclusive)" for every one of them.
+pub const ATTR_MIN: f32 = 0.0;
+pub const ATTR_MAX: f32 = 1.0;
+
+/// `vehicle_reliability` is the documented exception — "if you go below 0.0 or above 1.0, that
+/// can be done too", with a different formula applied when it is negative. The shipped files use
+/// that freely (F-Classic_Gen1 has 166 entries at -0.25, and values run to 1.15 elsewhere).
+///
+/// Reiza states no bound, so these exist only to catch a slipped decimal point rather than to
+/// express a rule.
+pub const RELIABILITY_MIN: f32 = -1.0;
+pub const RELIABILITY_MAX: f32 = 2.0;
+
+/// The accepted range for one attribute — [`ATTR_MIN`]..=[`ATTR_MAX`] for the fourteen
+/// personality tags, the wider reliability range for `vehicle_reliability`.
+pub fn attr_range(field: &str) -> (f32, f32) {
+    if field == "vehicle_reliability" {
+        (RELIABILITY_MIN, RELIABILITY_MAX)
+    } else {
+        (ATTR_MIN, ATTR_MAX)
+    }
+}
+
+/// Every editable attribute with the range it accepts, for clients that render one input per
+/// attribute and must bound each correctly.
+pub fn attr_ranges() -> Vec<(&'static str, f32, f32)> {
+    DRIVER_ATTRS
+        .iter()
+        .map(|f| {
+            let (lo, hi) = attr_range(f);
+            (*f, lo, hi)
+        })
+        .collect()
+}
+
+/// F-Retro_Gen1 spells `wet_skill` as `wet_skills` throughout. That is almost certainly a typo —
+/// AMS2 reads `wet_skill` — but silently renaming a tag across someone's hand-tuned file is not
+/// this feature's job, so both spellings are read and an edit updates whichever the block uses.
+const WET_SKILL_ALT: &str = "wet_skills";
+
+/// How much each attribute counts toward a driver's composite rating, in percentage points.
+///
+/// Pace dominates because that is what AMS2 actually scales an AI's speed by; the rest adjusts
+/// for how reliably that pace is delivered over a race.
+///
+/// Four attributes are deliberately absent, because "higher" does not mean "better driver":
+/// - `aggression` is a driving *style*. A maximally aggressive AI is not a stronger one.
+/// - `blue_flag_conceding` is courtesy toward faster cars, not ability.
+/// - `weather_tyre_changes` is a pit-strategy trigger.
+/// - `vehicle_reliability` is a property of the car, and track overrides carry it as a negative
+///   offset (the shipped 1986 Prost has -0.25 at Jacarepagua), which no rating should absorb.
+///
+/// The weights total 100, so a driver at 1.00 across the board rates 100. That puts this on the
+/// same nominal scale as the player reputation in the Car Performance tab — which already treats
+/// `race_skill * 100` as comparable to a reputation (see `driver_rating::required_rating`) — but
+/// the two are not measured the same way: this is an aggregate of declared stats, that one is
+/// results against expectation.
+pub const RATING_WEIGHTS: [(&str, f32); 11] = [
+    ("race_skill", 30.0),
+    ("qualifying_skill", 15.0),
+    ("consistency", 12.0),
+    ("avoidance_of_mistakes", 9.0),
+    ("avoidance_of_forced_mistakes", 8.0),
+    ("tyre_management", 7.0),
+    ("wet_skill", 6.0),
+    ("start_reactions", 5.0),
+    ("defending", 4.0),
+    ("stamina", 3.0),
+    ("fuel_management", 1.0),
+];
+
+/// A 0–100 composite of one entry's declared attributes, weighted by [`RATING_WEIGHTS`].
+///
+/// Averaged over only the attributes the entry actually declares, then renormalised — otherwise
+/// a sparse entry would be punished for silence rather than rated on what it says. The shipped
+/// files are uneven about this: `fuel_management` appears in three of seven, and F-Retro_Gen1's
+/// per-track substitutes declare only a handful of tags each.
+///
+/// `None` unless `race_skill` is present. It is the single largest term and the one AMS2 leans on
+/// hardest; without it there is no pace to rate, and a number built from the trimmings would look
+/// authoritative while meaning very little.
+pub fn rate_driver(attrs: &BTreeMap<String, f32>) -> Option<f32> {
+    attrs.get("race_skill")?;
+    let (sum, weight) = RATING_WEIGHTS
+        .iter()
+        .filter_map(|(field, w)| attrs.get(*field).map(|v| (v * w, *w)))
+        .fold((0.0, 0.0), |(s, t), (sv, w)| (s + sv, t + w));
+    if weight <= 0.0 {
+        return None;
+    }
+    Some((100.0 * sum / weight).clamp(0.0, 100.0))
+}
+
+/// The tag name to actually read or write in `block` for the attribute `field`.
+fn block_tag<'a>(block: &str, field: &'a str) -> &'a str {
+    if field == "wet_skill"
+        && !block.contains("<wet_skill>")
+        && block.contains(&format!("<{WET_SKILL_ALT}>"))
+    {
+        WET_SKILL_ALT
+    } else {
+        field
+    }
+}
+
+/// One `<driver>` entry with a `<name>`, as shown in the Driver Performance table.
+///
+/// `index` is the entry's position in document order among named blocks — the same order
+/// [`primary_driver_blocks`] yields — and is how an edit addresses it. Neither the driver name
+/// nor the livery is unique: drivers changed teams mid-season, and F-Retro_Gen1 uses
+/// `tracks="..."` blocks as full per-race driver substitutions under a livery it shares with the
+/// regular entry.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct DriverAttributes {
+    pub index: usize,
+    pub driver: String,
+    pub team: String,
+    /// The raw `livery_name` this entry binds to — the string AMS2 matches against its own
+    /// liveries, and the key [`crate::liveries`] checks for existence.
+    pub livery: String,
+    /// The `tracks="..."` attribute, when this entry only applies at certain circuits.
+    pub tracks: Option<String>,
+    /// Only the attributes the entry actually declares; a missing one shows as blank rather
+    /// than as a default that was never written.
+    pub attrs: BTreeMap<String, f32>,
+    /// Composite 0–100 strength from those attributes — see [`rate_driver`].
+    pub rating: Option<f32>,
+    /// `Some(true)` when no installed livery matches `livery`, so AMS2 will never spawn this
+    /// driver. `None` means it could not be checked — see [`crate::liveries::phantom_liveries`].
+    pub phantom: Option<bool>,
+}
+
+/// Every named `<driver>` entry in a `CustomAIDrivers` XML file, in document order.
+///
+/// `phantom` is left `None`; run [`mark_phantom_entries`] to fill it in.
+pub fn parse_driver_attributes_str(xml: &str) -> Vec<DriverAttributes> {
+    primary_driver_blocks(xml)
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, (livery, block))| {
+            let driver = element_text(&block, "name")?.to_string();
+            let tag_end = block.find('>')?;
+            let tracks = attr_value(&block[..=tag_end], "tracks").map(|s| s.to_string());
+            let attrs: BTreeMap<String, f32> = DRIVER_ATTRS
+                .iter()
+                .filter_map(|field| {
+                    let text = element_text(&block, block_tag(&block, field))?;
+                    Some((field.to_string(), text.parse::<f32>().ok()?))
+                })
+                .collect();
+            Some(DriverAttributes {
+                index,
+                driver,
+                team: extract_team_name(&livery),
+                livery,
+                tracks,
+                rating: rate_driver(&attrs),
+                attrs,
+                phantom: None,
+            })
+        })
+        .collect()
+}
+
+/// File-reading wrapper around [`parse_driver_attributes_str`]. Empty list if unreadable.
+pub fn parse_driver_attributes(path: &Path) -> Vec<DriverAttributes> {
+    match fs::read_to_string(path) {
+        Ok(content) => parse_driver_attributes_str(&content),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Fills in each entry's `phantom` flag against the liveries actually installed.
+///
+/// Every entry keeps `None` when the check cannot be made for this roster, so "unknown" is never
+/// rendered as "fine" or as "broken" — see [`crate::liveries::phantom_liveries`].
+pub fn mark_phantom_entries(entries: &mut [DriverAttributes], installed: Option<&HashSet<String>>) {
+    let roster: Vec<String> = entries.iter().map(|e| e.livery.clone()).collect();
+    let Some(phantoms) = crate::liveries::phantom_liveries(installed, &roster) else {
+        return;
+    };
+    for e in entries.iter_mut() {
+        e.phantom = Some(phantoms.contains(&e.livery));
+    }
+}
+
+/// Sets one attribute on the named `<driver>` entry at `index`, returning the new file text.
+///
+/// `expect_driver` must match the entry's `<name>`. The index comes from a table the client
+/// loaded earlier, and the file can change underneath it (another edit, a hand edit, a different
+/// roster dropped in), so the name is checked before anything is written — otherwise a stale
+/// index would quietly retune the wrong driver.
+pub fn set_driver_attr_str(
+    xml: &str,
+    index: usize,
+    expect_driver: &str,
+    field: &str,
+    value: f32,
+) -> Result<String, String> {
+    if !DRIVER_ATTRS.contains(&field) {
+        return Err(format!("{field} is not an editable driver attribute"));
+    }
+    let (lo, hi) = attr_range(field);
+    if !value.is_finite() || !(lo..=hi).contains(&value) {
+        return Err(format!(
+            "{field} must be between {lo:.2} and {hi:.2}, got {value}"
+        ));
+    }
+    let spans = primary_driver_spans(xml);
+    let Some((range, _)) = spans.get(index).cloned() else {
+        return Err(format!("this file has no driver entry at position {index}"));
+    };
+    let block = &xml[range.clone()];
+    let found = element_text(block, "name").unwrap_or_default();
+    if found != expect_driver.trim() {
+        return Err(format!(
+            "entry {index} is {found}, not {expect_driver} - reload the tab, the file changed"
+        ));
+    }
+    let updated = set_tag_in_block(block, block_tag(block, field), value);
+    let mut out = String::with_capacity(xml.len() + updated.len());
+    out.push_str(&xml[..range.start]);
+    out.push_str(&updated);
+    out.push_str(&xml[range.end..]);
+    Ok(out)
+}
+
+/// Applies [`set_driver_attr_str`] to a file on disk, keeping the same one-time `.xml.bak` that
+/// [`set_team_scalars`] does.
+pub fn set_driver_attr(
+    path: &Path,
+    index: usize,
+    expect_driver: &str,
+    field: &str,
+    value: f32,
+) -> Result<(), String> {
+    let xml =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let updated = set_driver_attr_str(&xml, index, expect_driver, field, value)?;
+    write_with_backup(path, &updated)
 }
 
 /// Estimated relative single-lap pace impact of a car's scalars, in "% lap time" units, lower is
@@ -206,6 +689,8 @@ fn pace_score(c: &CarPerformance) -> f32 {
 #[derive(Serialize, Clone, Debug)]
 pub struct CarPerformanceRow {
     pub team: String,
+    /// The team's line-up — see [`CarPerformance::drivers`].
+    pub drivers: Vec<String>,
     pub power_scalar: f32,
     pub weight_scalar: f32,
     pub drag_scalar: f32,
@@ -278,6 +763,7 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
                     let score = pace_score(c);
                     CarPerformanceRow {
                         team: c.team.clone(),
+                        drivers: c.drivers.clone(),
                         power_scalar: c.power_scalar,
                         weight_scalar: c.weight_scalar,
                         drag_scalar: c.drag_scalar,
@@ -353,6 +839,8 @@ pub struct SeatEntry {
     pub team: String,
     /// The `<name>` AMS2 shows for this entry.
     pub driver: String,
+    /// The raw `livery_name`, so [`without_phantom_seats`] can tell whether AMS2 owns this car.
+    pub livery: String,
 }
 
 /// A team plus car number, without the driver — the unit the player declares.
@@ -423,7 +911,12 @@ pub fn parse_seats_str(xml: &str) -> Vec<SeatEntry> {
                 Some(num) => format!("{team} #{num}"),
                 None => team.clone(),
             };
-            Some(SeatEntry { seat, team, driver })
+            Some(SeatEntry {
+                seat,
+                team,
+                driver,
+                livery,
+            })
         })
         .collect()
 }
@@ -433,6 +926,28 @@ pub fn parse_seats(path: &Path) -> Vec<SeatEntry> {
     match fs::read_to_string(path) {
         Ok(content) => parse_seats_str(&content),
         Err(_) => Vec::new(),
+    }
+}
+
+/// Drops seats whose livery AMS2 does not have, so seat accounting only counts seats that can
+/// actually be occupied.
+///
+/// A phantom seat is never filled by an AI, so [`infer_player_seat`] would see it as free for
+/// every session forever — either offering it as the player's seat or, once the car-model filter
+/// removes it, leaving no free seat at all and failing an otherwise legitimate session. Removing
+/// them first is what makes the elimination sound. When the check cannot be made the list is
+/// returned untouched, which is the existing behaviour.
+pub fn without_phantom_seats(
+    entries: Vec<SeatEntry>,
+    installed: Option<&HashSet<String>>,
+) -> Vec<SeatEntry> {
+    let roster: Vec<String> = entries.iter().map(|e| e.livery.clone()).collect();
+    match crate::liveries::phantom_liveries(installed, &roster) {
+        Some(phantoms) => entries
+            .into_iter()
+            .filter(|e| !phantoms.contains(&e.livery))
+            .collect(),
+        None => entries,
     }
 }
 

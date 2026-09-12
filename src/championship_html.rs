@@ -19,6 +19,7 @@ fn generate_html() -> String {
     <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
     <button class="tab-btn" data-tab="config">&#9965; Config</button>
     <button class="tab-btn" data-tab="carperf">&#128202; Car Performance</button>
+    <button class="tab-btn" data-tab="driverperf">&#128100; Driver Performance</button>
   </div>
   <div class="save-switcher">
     <label class="save-switcher-label" for="save-select">Career</label>
@@ -72,7 +73,9 @@ fn generate_html() -> String {
       </nav>
       <div id="live-sub-timing" class="live-subpanel">
         <div class="live-body">
-          <canvas id="track-map" width="280" height="280" class="track-map"></canvas>
+          <!-- Starts hidden: config.js reveals it only when show_track_map is on, so no frames
+               are accumulated or drawn in the window before /api/config resolves. -->
+          <canvas id="track-map" width="280" height="280" class="track-map" style="display:none"></canvas>
           <div class="grid-scroll">
             <table id="live-table" class="live-table">
               <thead>
@@ -87,7 +90,7 @@ fn generate_html() -> String {
                   <th data-col="7" data-type="time">S3</th>
                   <th data-col="8" data-type="time">Best Lap</th>
                   <th data-col="9" data-type="time">Last Lap</th>
-                  <th data-col="10" data-type="num">Top km/h</th>
+                  <th data-col="10" data-type="str">Car / Team</th>
                   <th data-col="11" data-type="str">Tyre</th>
                 </tr>
               </thead>
@@ -229,6 +232,9 @@ fn generate_html() -> String {
   <div id="tab-carperf" class="tab-panel tab-panel-hidden">
     <div id="carperf-container"></div>
   </div>
+  <div id="tab-driverperf" class="tab-panel tab-panel-hidden">
+    <div id="driverperf-container"></div>
+  </div>
 </main>
 <script>{js_utils}</script>
 <script>{js_telemetry}</script>
@@ -239,6 +245,7 @@ fn generate_html() -> String {
 <script>{js_config}</script>
 <script>{js_saves}</script>
 <script>{js_carperf}</script>
+<script>{js_driverperf}</script>
 <script>{js_main}</script>
 </body>
 </html>"##,
@@ -252,6 +259,7 @@ fn generate_html() -> String {
         js_config = JS_CONFIG,
         js_saves = JS_SAVES,
         js_carperf = JS_CARPERF,
+        js_driverperf = JS_DRIVERPERF,
         js_main = JS_MAIN,
     )
 }
@@ -277,4 +285,5 @@ const JS_MANAGE: &str = include_str!("assets/manage.js");
 const JS_CONFIG: &str = include_str!("assets/config.js");
 const JS_SAVES: &str = include_str!("assets/saves.js");
 const JS_CARPERF: &str = include_str!("assets/car_performance.js");
+const JS_DRIVERPERF: &str = include_str!("assets/driver_performance.js");
 const JS_MAIN: &str = include_str!("assets/main.js");

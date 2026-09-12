@@ -355,6 +355,38 @@ fn resolve_team_map(champ: &Championship, ai_dir: Option<&Path>) -> HashMap<Stri
     }
 }
 
+/// Car classes the user is currently racing, used to pre-select the class filter on the
+/// performance tabs so a 14-class list opens on the one season that matters.
+///
+/// `Progress` means rounds are already under way, so those win outright. When nothing is under
+/// way the not-yet-started `Active` ones are the next best answer — they are what is being set
+/// up. `Final` is never offered: that season is done. A championship with no Custom AI file has
+/// no class to contribute.
+///
+/// Empty means "no preference", which callers should render as everything selected rather than
+/// nothing.
+pub fn active_classes(champs: &[Championship]) -> Vec<String> {
+    fn classes_of(champs: &[Championship], want: ChampionshipStatus) -> Vec<String> {
+        let mut out: Vec<String> = champs
+            .iter()
+            .filter(|c| c.status == want)
+            .filter_map(|c| {
+                let file = c.custom_ai_file.as_deref()?;
+                Path::new(file).file_stem()?.to_str().map(str::to_string)
+            })
+            .collect();
+        out.sort();
+        out.dedup();
+        out
+    }
+    let in_progress = classes_of(champs, ChampionshipStatus::Progress);
+    if in_progress.is_empty() {
+        classes_of(champs, ChampionshipStatus::Active)
+    } else {
+        in_progress
+    }
+}
+
 pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> CareerResponse {
     compute_career_full(champs, sessions, None)
 }

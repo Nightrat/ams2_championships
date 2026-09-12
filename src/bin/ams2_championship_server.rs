@@ -29,15 +29,23 @@ struct ClassData {
 }
 
 /// Loads every readable car class from the configured Custom AI Drivers folder.
+///
+/// Ratings are measured against where a car *should* finish, which is a function of how many
+/// cars are ahead of it — so the seat list has to be the grid AMS2 will actually field. Entries
+/// whose livery the game does not own never start, and counting them stretches every expected
+/// position down the order, making the whole field look easier to beat than it was.
 fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
     use ams2_championship::{custom_ai, driver_rating};
     let Some(dir) = cfg_custom_ai_dir(config_path) else {
         return vec![];
     };
+    // One scan for every class: the manifests are per car model, not per class.
+    let installed = ams2_championship::liveries::installed_livery_names(&dir);
     custom_ai::class_performance(&dir)
         .into_iter()
         .map(|perf| {
-            let path = dir.join(format!("{}.xml", perf.class));
+            let file = format!("{}.xml", perf.class);
+            let path = dir.join(&file);
             let pace: std::collections::HashMap<String, f32> = perf
                 .cars
                 .iter()
@@ -45,7 +53,7 @@ fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
                 .collect();
             let ctx = driver_rating::RatingContext::new(
                 &perf.class,
-                custom_ai::parse_seats(&path),
+                roster_seats_with(&dir, &file, installed.as_ref()),
                 &pace,
             );
             ClassData {
@@ -55,6 +63,235 @@ fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
             }
         })
         .collect()
+}
+
+/// The `/api/car-performance` payload: every class ranked, each team's required rating, and the
+/// career rating of every human recorded in any of those classes.
+///
+/// Built fresh from the XML files on each call, so a scalar edit is reflected immediately —
+/// nothing about this table is cached.
+fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> Vec<u8> {
+    use ams2_championship::{custom_ai, driver_rating};
+
+    #[derive(serde::Serialize)]
+    struct CarRow {
+        #[serde(flatten)]
+        car: custom_ai::CarPerformanceRow,
+        /// Reputation needed to claim this seat, 0–100. `None` when the team has no seat AMS2
+        /// can actually field, so there is no seat to claim — distinct from a requirement of 0,
+        /// which would read as "anyone may drive this".
+        required_rating: Option<f32>,
+        /// True when every one of the team's entries names a livery AMS2 does not own.
+        phantom: bool,
+    }
+    #[derive(serde::Serialize)]
+    struct PlayerRow {
+        name: String,
+        rating: f32,
+        sp_races: u32,
+        mp_races: u32,
+        mp_wins: u32,
+        mp_losses: u32,
+    }
+    #[derive(serde::Serialize)]
+    struct ClassRow {
+        class: String,
+        year: Option<u16>,
+        cars: Vec<CarRow>,
+    }
+    #[derive(serde::Serialize)]
+    struct Body {
+        /// Career ratings across every class, not per class.
+        players: Vec<PlayerRow>,
+        /// Classes the user is actually racing, for the tab's initial filter selection.
+        active_classes: Vec<String>,
+        /// The range the writer will accept, so the table enforces the same bounds the server
+        /// does instead of keeping its own copy that can drift out of step.
+        scalar_min: f32,
+        scalar_max: f32,
+        classes: Vec<ClassRow>,
+    }
+
+    let classes = load_classes(config_path);
+    // Only sessions committed to a championship are rated.
+    let (sessions, active) = {
+        let data = store.read().unwrap();
+        (
+            driver_rating::assigned_sessions(&data.championships, &data.sessions),
+            ams2_championship::data_store::active_classes(&data.championships),
+        )
+    };
+
+    let class_rows: Vec<ClassRow> = classes
+        .iter()
+        .map(|cd| {
+            let required: std::collections::HashMap<String, f32> =
+                driver_rating::team_requirements(&cd.ctx.expected, &cd.skills)
+                    .into_iter()
+                    .collect();
+            // `ctx.seats` is the phantom-filtered list, so a team missing from it has no car
+            // AMS2 will field. The ranking table still lists it — it is in the roster, and its
+            // scalars are still editable — but it has no seat to demand a rating for.
+            let real_teams: std::collections::HashSet<&str> =
+                cd.ctx.seats.iter().map(|s| s.team.as_str()).collect();
+            ClassRow {
+                class: cd.perf.class.clone(),
+                year: cd.perf.year,
+                cars: cd
+                    .perf
+                    .cars
+                    .iter()
+                    .map(|c| {
+                        let real = real_teams.contains(c.team.as_str());
+                        CarRow {
+                            required_rating: if real {
+                                Some(required.get(&c.team).copied().unwrap_or(0.0))
+                            } else {
+                                None
+                            },
+                            phantom: !real,
+                            car: c.clone(),
+                        }
+                    })
+                    .collect(),
+            }
+        })
+        .collect();
+
+    let contexts: Vec<driver_rating::RatingContext> = classes.into_iter().map(|c| c.ctx).collect();
+    let players: Vec<PlayerRow> = driver_rating::recorded_players_global(&sessions, &contexts)
+        .into_iter()
+        .map(|name| {
+            let r =
+                driver_rating::compute_reputation_global(Some(&name), &sessions, &contexts, None);
+            PlayerRow {
+                name,
+                rating: r.value,
+                sp_races: r.sp_races,
+                mp_races: r.mp_races,
+                mp_wins: r.mp_wins,
+                mp_losses: r.mp_losses,
+            }
+        })
+        .collect();
+
+    serde_json::to_vec(&Body {
+        players,
+        active_classes: active,
+        scalar_min: custom_ai::SCALAR_MIN,
+        scalar_max: custom_ai::SCALAR_MAX,
+        classes: class_rows,
+    })
+    .unwrap_or_default()
+}
+
+/// Resolves `<class>.xml` inside the configured Custom AI Drivers folder.
+///
+/// A class name reaches us as a file name, so it goes through the same gate as a save name.
+/// `Err` carries a status and message ready for `json_err`.
+fn class_file(
+    config_path: &std::path::Path,
+    class: &str,
+) -> Result<PathBuf, (&'static str, String)> {
+    let dir = cfg_custom_ai_dir(config_path).ok_or((
+        "400 Bad Request",
+        "no Custom AI Drivers folder is configured".to_string(),
+    ))?;
+    let name = ams2_championship::saves::sanitize_name(class)
+        .ok_or(("400 Bad Request", "invalid class name".to_string()))?;
+    let file = dir.join(format!("{name}.xml"));
+    if !file.is_file() {
+        return Err(("404 Not Found", "no such car class file".to_string()));
+    }
+    Ok(file)
+}
+
+/// Seats a roster actually offers: the Custom AI file's entries minus any whose livery AMS2 does
+/// not own.
+///
+/// Everything that reasons about the grid goes through here — both enforcement paths and the
+/// rating contexts. A phantom seat can never be occupied by an AI, so leaving it in makes it look
+/// free in every session forever (corrupting the elimination `infer_player_seat` relies on) and
+/// inflates the field size every expected finishing position is derived from.
+///
+/// Takes the installed set rather than reading it, so a caller looping over every class scans the
+/// manifests once instead of once per class.
+fn roster_seats_with(
+    dir: &std::path::Path,
+    file: &str,
+    installed: Option<&std::collections::HashSet<String>>,
+) -> Vec<ams2_championship::custom_ai::SeatEntry> {
+    let seats = ams2_championship::custom_ai::parse_seats(&dir.join(file));
+    ams2_championship::custom_ai::without_phantom_seats(seats, installed)
+}
+
+/// [`roster_seats_with`] for a one-off lookup, reading the manifests itself.
+fn roster_seats(dir: &std::path::Path, file: &str) -> Vec<ams2_championship::custom_ai::SeatEntry> {
+    let installed = ams2_championship::liveries::installed_livery_names(dir);
+    roster_seats_with(dir, file, installed.as_ref())
+}
+
+/// The `/api/driver-performance` payload: every class in the same chronological order the Car
+/// Performance tab uses, each with its named driver entries.
+///
+/// `attrs` is the server's own editable-tag list, so the table's columns and the writer's
+/// allowlist cannot drift apart.
+fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -> Vec<u8> {
+    use ams2_championship::custom_ai;
+
+    #[derive(serde::Serialize)]
+    struct ClassRow {
+        class: String,
+        year: Option<u16>,
+        drivers: Vec<custom_ai::DriverAttributes>,
+    }
+    #[derive(serde::Serialize)]
+    struct Body {
+        attrs: Vec<&'static str>,
+        /// What each attribute contributes to the Rating column, so the table can show its own
+        /// formula instead of asking the reader to take the number on trust.
+        rating_weights: Vec<(&'static str, f32)>,
+        /// Per-attribute accepted range, since vehicle_reliability is documented as the one
+        /// that may leave 0–1. Each is (field, min, max).
+        attr_ranges: Vec<(&'static str, f32, f32)>,
+
+        /// Classes the user is actually racing, for the tab's initial filter selection.
+        active_classes: Vec<String>,
+        classes: Vec<ClassRow>,
+    }
+
+    let classes = match cfg_custom_ai_dir(config_path) {
+        Some(dir) => {
+            // Read once for the whole payload: the manifests cover every car model at once, and
+            // a livery belongs to a model rather than to a class.
+            let installed = ams2_championship::liveries::installed_livery_names(&dir);
+            custom_ai::class_performance(&dir)
+                .into_iter()
+                .map(|c| {
+                    let mut drivers =
+                        custom_ai::parse_driver_attributes(&dir.join(format!("{}.xml", c.class)));
+                    custom_ai::mark_phantom_entries(&mut drivers, installed.as_ref());
+                    ClassRow {
+                        drivers,
+                        class: c.class,
+                        year: c.year,
+                    }
+                })
+                .collect()
+        }
+        None => vec![],
+    };
+    serde_json::to_vec(&Body {
+        attrs: custom_ai::DRIVER_ATTRS.to_vec(),
+        rating_weights: custom_ai::RATING_WEIGHTS.to_vec(),
+        attr_ranges: custom_ai::attr_ranges(),
+
+        active_classes: ams2_championship::data_store::active_classes(
+            &store.read().unwrap().championships,
+        ),
+        classes,
+    })
+    .unwrap_or_default()
 }
 
 /// Driver rating and per-team eligibility for a championship.
@@ -159,6 +396,63 @@ fn handle(
         return;
     }
 
+    // GET /api/live-teams — driver -> team/livery names for the live timing grid.
+    // AMS2's shared memory carries no team field, so the names come from a championship's
+    // Custom AI Driver file. Which championship is not knowable during a live session, so
+    // every unfinished one with a file assigned is scored by how many drivers currently on
+    // track it names, and the best match wins — that is what separates two historic seasons
+    // of the same series. Ties go to the championship already in progress.
+    if method == "GET" && path == "/api/live-teams" {
+        #[derive(serde::Serialize)]
+        struct LiveTeams {
+            teams: std::collections::HashMap<String, String>,
+            /// Manual override for the player's row — their profile name won't be in the file.
+            player_team: Option<String>,
+        }
+        let live = read_live_session();
+        let mut best = LiveTeams {
+            teams: std::collections::HashMap::new(),
+            player_team: None,
+        };
+        if let Some(dir) = cfg_custom_ai_dir(&config_path) {
+            let data = store.read().unwrap();
+            let mut best_score = 0usize;
+            let mut best_in_progress = false;
+            for champ in data
+                .championships
+                .iter()
+                .filter(|c| c.status != ChampionshipStatus::Final)
+            {
+                let Some(file) = champ.custom_ai_file.as_deref() else {
+                    continue;
+                };
+                let teams = ams2_championship::custom_ai::parse_driver_teams(&dir.join(file));
+                let score = live
+                    .participants
+                    .iter()
+                    .filter(|p| teams.contains_key(&p.name))
+                    .count();
+                let in_progress = champ.status == ChampionshipStatus::Progress;
+                // A better match wins outright; an equal match only takes over when it is
+                // the championship already in progress.
+                let better =
+                    score > best_score || (score == best_score && in_progress && !best_in_progress);
+                if score == 0 || !better {
+                    continue;
+                }
+                best_score = score;
+                best_in_progress = in_progress;
+                best = LiveTeams {
+                    teams,
+                    player_team: champ.player_team.clone().filter(|t| !t.is_empty()),
+                };
+            }
+        }
+        let json = serde_json::to_vec(&best).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
     // GET /live — real-time telemetry (kept for backwards compatibility)
     if path == "/live" {
         let data = read_live_session();
@@ -201,94 +495,92 @@ fn handle(
     // GET /api/car-performance — ranked power/weight/drag table per car class, each team's
     // required driver rating, and the rating of every human recorded in that class.
     if method == "GET" && path == "/api/car-performance" {
-        use ams2_championship::{custom_ai, driver_rating};
+        json_ok(&mut stream, &car_performance_json(&config_path, &store));
+        return;
+    }
 
-        #[derive(serde::Serialize)]
-        struct CarRow {
-            #[serde(flatten)]
-            car: custom_ai::CarPerformanceRow,
-            /// Reputation needed to claim this seat, 0–100.
-            required_rating: f32,
-        }
-        #[derive(serde::Serialize)]
-        struct PlayerRow {
-            name: String,
-            rating: f32,
-            sp_races: u32,
-            mp_races: u32,
-            mp_wins: u32,
-            mp_losses: u32,
-        }
-        #[derive(serde::Serialize)]
-        struct ClassRow {
-            class: String,
-            year: Option<u16>,
-            cars: Vec<CarRow>,
-        }
-        #[derive(serde::Serialize)]
+    // PATCH /api/car-performance — write one team's scalars back into its Custom AI XML file.
+    // Answers with the whole recomputed table: an edit shifts the class baseline, every other
+    // car's pace delta, and the ratings derived from them.
+    if method == "PATCH" && path == "/api/car-performance" {
+        #[derive(serde::Deserialize)]
         struct Body {
-            /// Career ratings across every class, not per class.
-            players: Vec<PlayerRow>,
-            classes: Vec<ClassRow>,
+            class: String,
+            team: String,
+            power_scalar: f32,
+            weight_scalar: f32,
+            drag_scalar: f32,
         }
-
-        let classes = load_classes(&config_path);
-        // Only sessions committed to a championship are rated.
-        let sessions = {
-            let data = store.read().unwrap();
-            driver_rating::assigned_sessions(&data.championships, &data.sessions)
+        let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
+            json_err(&mut stream, "400 Bad Request", "invalid body");
+            return;
         };
+        let file = match class_file(&config_path, &body.class) {
+            Ok(f) => f,
+            Err((status, msg)) => {
+                json_err(&mut stream, status, &msg);
+                return;
+            }
+        };
+        let scalars = ams2_championship::custom_ai::Scalars {
+            power: body.power_scalar,
+            weight: body.weight_scalar,
+            drag: body.drag_scalar,
+        };
+        if let Err(e) = ams2_championship::custom_ai::set_team_scalars(&file, &body.team, scalars) {
+            json_err(&mut stream, "400 Bad Request", &e);
+            return;
+        }
+        json_ok(&mut stream, &car_performance_json(&config_path, &store));
+        return;
+    }
 
-        let class_rows: Vec<ClassRow> = classes
-            .iter()
-            .map(|cd| {
-                let required: std::collections::HashMap<String, f32> =
-                    driver_rating::team_requirements(&cd.ctx.expected, &cd.skills)
-                        .into_iter()
-                        .collect();
-                ClassRow {
-                    class: cd.perf.class.clone(),
-                    year: cd.perf.year,
-                    cars: cd
-                        .perf
-                        .cars
-                        .iter()
-                        .map(|c| CarRow {
-                            required_rating: required.get(&c.team).copied().unwrap_or(0.0),
-                            car: c.clone(),
-                        })
-                        .collect(),
-                }
-            })
-            .collect();
+    // GET /api/driver-performance — every named driver entry per class with its AI attributes.
+    if method == "GET" && path == "/api/driver-performance" {
+        json_ok(&mut stream, &driver_performance_json(&config_path, &store));
+        return;
+    }
 
-        let contexts: Vec<driver_rating::RatingContext> =
-            classes.into_iter().map(|c| c.ctx).collect();
-        let players: Vec<PlayerRow> = driver_rating::recorded_players_global(&sessions, &contexts)
+    // PATCH /api/driver-performance — write one attribute of one driver entry back to its XML.
+    // Nothing else in the table derives from it, so only the edited row comes back.
+    if method == "PATCH" && path == "/api/driver-performance" {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            class: String,
+            /// Position among the file's named `<driver>` blocks, from the GET payload.
+            index: usize,
+            /// The `<name>` that position is expected to hold — a stale-index guard.
+            driver: String,
+            field: String,
+            value: f32,
+        }
+        let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
+            json_err(&mut stream, "400 Bad Request", "invalid body");
+            return;
+        };
+        let file = match class_file(&config_path, &body.class) {
+            Ok(f) => f,
+            Err((status, msg)) => {
+                json_err(&mut stream, status, &msg);
+                return;
+            }
+        };
+        if let Err(e) = ams2_championship::custom_ai::set_driver_attr(
+            &file,
+            body.index,
+            &body.driver,
+            &body.field,
+            body.value,
+        ) {
+            json_err(&mut stream, "400 Bad Request", &e);
+            return;
+        }
+        // Read the row back rather than echoing the request: the stored value is what the file
+        // now says, after the writer's own number formatting.
+        let row = ams2_championship::custom_ai::parse_driver_attributes(&file)
             .into_iter()
-            .map(|name| {
-                let r = driver_rating::compute_reputation_global(
-                    Some(&name),
-                    &sessions,
-                    &contexts,
-                    None,
-                );
-                PlayerRow {
-                    name,
-                    rating: r.value,
-                    sp_races: r.sp_races,
-                    mp_races: r.mp_races,
-                    mp_wins: r.mp_wins,
-                    mp_losses: r.mp_losses,
-                }
-            })
-            .collect();
-
-        let json = serde_json::to_vec(&Body {
-            players,
-            classes: class_rows,
-        })
-        .unwrap_or_default();
+            .nth(body.index);
+        let json = serde_json::to_vec(&row).unwrap_or_default();
         json_ok(&mut stream, &json);
         return;
     }
@@ -466,7 +758,7 @@ fn handle(
                 .as_deref()
                 .filter(|t| !t.trim().is_empty()),
         ) {
-            let seats = ams2_championship::custom_ai::parse_seats(&dir.join(file));
+            let seats = roster_seats(&dir, file);
             out.enforced = true;
             for s in &data.sessions {
                 let grid: Vec<ams2_championship::custom_ai::GridEntry> = s
@@ -543,6 +835,25 @@ fn handle(
                 None
             };
         }
+        // Whether the championship is under way. The first assigned session commits both the
+        // roster and the seat: the results already scored were measured against that grid.
+        let started = current.rounds.iter().any(|r| !r.session_ids.is_empty());
+
+        // ── The Custom AI file is committed once the championship is under way ─
+        // Every expected position, team requirement and rating figure is relative to this
+        // file's grid, so swapping it mid-season would silently re-score the rounds already
+        // run. Like the team lock below, this is a championship integrity rule rather than a
+        // rating one, so the Config switch does not disable it.
+        if prospective.custom_ai_file != current.custom_ai_file && started {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "The Custom AI Drivers file is locked once a championship has its first \
+                 session. Remove the assigned sessions first to change it.",
+            );
+            return;
+        }
+
         let claimed = prospective
             .player_team
             .clone()
@@ -554,9 +865,8 @@ fn handle(
         // ── The team is committed once the championship is under way ─────────
         // Swapping seats mid-season would rewrite the meaning of results already scored, so the
         // first assigned session locks it in. This is a championship integrity rule rather than
-        // a rating one, so the Config switch does not disable it. Note it also blocks
-        // unassigning the Custom AI file, since that would clear the team as a side effect.
-        if changed && current.rounds.iter().any(|r| !r.session_ids.is_empty()) {
+        // a rating one, so the Config switch does not disable it.
+        if changed && started {
             json_err(
                 &mut stream,
                 "409 Conflict",
@@ -742,7 +1052,7 @@ fn handle(
                 .as_deref()
                 .filter(|t| !t.trim().is_empty())?;
             let session = data.sessions.iter().find(|s| s.id == sid)?;
-            let seats = ams2_championship::custom_ai::parse_seats(&dir.join(file));
+            let seats = roster_seats(&dir, file);
             let grid: Vec<ams2_championship::custom_ai::GridEntry> = session
                 .results
                 .iter()

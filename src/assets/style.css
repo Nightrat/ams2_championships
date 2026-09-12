@@ -586,6 +586,7 @@ table { border-collapse: collapse; width: 100%; }
 .live-pos  { text-align: center; width: 3rem; color: #95a5a6; font-weight: 700; }
 .live-name { min-width: 150px; font-weight: 500; color: #e0e0f0; }
 .live-num  { text-align: center; width: 3.5rem; color: #bdc3c7; }
+.live-team { min-width: 110px; color: #bdc3c7; font-size: 0.85rem; }
 .live-tyre { text-align: center; width: 5rem; color: #a0c8a0; font-size: 0.8rem; }
 .live-gap  { text-align: right; width: 6rem; font-family: 'Courier New', monospace; font-size: 0.82rem; color: #bdc3c7; }
 .live-time { text-align: right; width: 7rem; font-family: 'Courier New', monospace; font-size: 0.82rem; color: #2ecc71; }
@@ -985,6 +986,51 @@ table { border-collapse: collapse; width: 100%; }
   font-size: 0.85rem; color: #ccc; white-space: nowrap;
 }
 .carperf-filter-check input[type="checkbox"] { accent-color: #e74c3c; cursor: pointer; }
+.carperf-drivers { color: #999; font-size: 0.92em; }
+/* ── Driver Performance tab ─────────────────────────────────────────────────── */
+#driverperf-container { padding: 1rem; }
+/* 15 attribute columns will not fit most windows — scroll the table, not the page. */
+.driverperf-scroll { overflow-x: auto; }
+.driverperf-table { min-width: 100%; }
+.driverperf-table th { white-space: nowrap; }
+.driverperf-team { color: #bbb; }
+.driverperf-tracks {
+  color: #888; font-size: 0.85em;
+  max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.driverperf-attr {
+  width: 3.6rem; padding: 0.2rem 0.25rem; text-align: right;
+  background: #12121f; color: #e0e0e0;
+  border: 1px solid #333; border-radius: 3px;
+  font-family: inherit; font-size: 0.82rem;
+}
+.driverperf-attr:hover { border-color: #4a4a6a; }
+.driverperf-attr:focus { outline: none; border-color: #6aa9ff; background: #161628; }
+.driverperf-attr.driverperf-saving { opacity: 0.5; }
+/* An entry AMS2 owns no livery for: still editable, but it can never reach a grid. */
+.driverperf-phantom { opacity: 0.55; }
+.driverperf-phantom td:first-child { border-left: 2px solid #b0603a; }
+.driverperf-phantom-tag {
+  display: inline-block; margin-left: 0.35rem; padding: 0 0.3rem;
+  border: 1px solid #b0603a; border-radius: 3px;
+  color: #b0603a; font-size: 0.72rem; white-space: nowrap; cursor: help;
+}
+.driverperf-phantom-count { color: #b0603a; font-size: 0.8rem; font-weight: 400; cursor: help; }
+.driverperf-allreal { color: #4caf50; font-size: 0.8rem; font-weight: 400; }
+.driverperf-unverified { color: #888; font-size: 0.8rem; font-weight: 400; cursor: help; }
+.carperf-status { font-size: 0.8rem; margin-left: auto; white-space: nowrap; }
+.carperf-status-ok { color: #4caf50; }
+.carperf-status-error { color: #e74c3c; }
+.carperf-scalar-cell { padding: 0.15rem 0.35rem; }
+.carperf-scalar {
+  width: 4.5rem; padding: 0.2rem 0.3rem; text-align: right;
+  background: #12121f; color: #e0e0e0;
+  border: 1px solid #333; border-radius: 3px;
+  font-family: inherit; font-size: 0.85rem;
+}
+.carperf-scalar:hover { border-color: #4a4a6a; }
+.carperf-scalar:focus { outline: none; border-color: #6aa9ff; background: #161628; }
+.carperf-row-saving .carperf-scalar { opacity: 0.5; }
 
 /* ── Config tab ──────────────────────────────────────────────────────────────── */
 .config-panel { max-width: 640px; padding: 1.5rem 1rem; }
@@ -1057,3 +1103,7 @@ header h1 { flex: 1 1 100%; }
 .saves-actions { margin-left: auto; display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .config-panel-wide { max-width: 900px; padding-bottom: 0.25rem; }
 .saves-actions .manage-btn { padding: 0.25rem 0.55rem; font-size: 0.78rem; }
+.carperf-req-none { color: #777; }
+.driverperf-rating { font-weight: 600; color: #6aa9ff; cursor: help; }
+.driverperf-rating-none { color: #777; font-weight: 400; }
+.carperf-status-note { color: #888; }

@@ -103,20 +103,23 @@ function renderChampDetail(id) {
 
   var rounds = champ.rounds || [];
 
+  // The roster and the seat are both committed once the championship has a session: either
+  // change would rewrite the meaning of results already scored, so the server refuses them too.
+  var started = rounds.some(function (r) { return (r.session_ids || []).length > 0; });
+
   var aiOptions = '<option value="">None</option>' +
     manageState.customAiFiles.map(function (f) {
       return '<option value="' + esc(f) + '"' + (f === champ.custom_ai_file ? ' selected' : '') + '>' + esc(f) + '</option>';
     }).join('');
-  var aiHint = manageState.customAiFiles.length
-    ? 'Driver names matching a &lt;name&gt; entry in this file show its livery/team name instead of the AMS2 car class.'
-    : 'No .xml files found. Set a Custom AI Drivers folder in the Config tab.';
+  var aiHint = started
+    ? 'Locked in: the championship has started. Remove its assigned sessions to change the roster.'
+    : manageState.customAiFiles.length
+      ? 'Driver names matching a <name> entry in this file show its livery/team name instead of the AMS2 car class.'
+      : 'No .xml files found. Set a Custom AI Drivers folder in the Config tab.';
   // A player team is only checkable against a Custom AI roster, so without a file assigned the
   // field is disabled and the server keeps player_team null — that is also what switches
   // session enforcement off.
   var hasAi = !!champ.custom_ai_file;
-  // The team is committed once the championship has a session: changing it would rewrite the
-  // meaning of results already scored, so the server refuses it too.
-  var started = rounds.some(function (r) { return (r.session_ids || []).length > 0; });
   var teamLocked = !hasAi || started;
   var playerTeamHint = !hasAi
     ? 'Assign a Custom AI Drivers file first — its roster is what your seat is checked against.'
@@ -166,7 +169,9 @@ function renderChampDetail(id) {
     '<div class="champ-detail-meta">' +
       '<label>Points&nbsp;<input class="manage-input champ-points-input" value="' + esc(champ.points_system.join(',')) + '" data-id="' + esc(champ.id) + '" size="32" title="Comma-separated points per finishing position"></label>' +
       '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
-      '<label title="' + aiHint + '">Custom AI Drivers&nbsp;<select class="manage-select champ-custom-ai-select">' + aiOptions + '</select></label>' +
+      '<label title="' + esc(aiHint) + '">Custom AI Drivers&nbsp;' +
+        '<select class="manage-select champ-custom-ai-select"' + (started ? ' disabled' : '') + '>' + aiOptions + '</select>' +
+      '</label>' +
       // Teams are picked, never typed: a free-text seat could name a team that is not in the
       // roster at all, which the rating cannot judge and so would silently never be enforced.
       // Options arrive from loadPlayerTeamOptions; until then only the current value is listed.
@@ -200,7 +205,12 @@ function renderChampDetail(id) {
     patchChamp(champ.id, { manufacturer_scoring: this.checked });
   });
   right.querySelector('.champ-custom-ai-select').addEventListener('change', function () {
-    patchChamp(champ.id, { custom_ai_file: this.value || null });
+    var select = this;
+    patchChamp(champ.id, { custom_ai_file: this.value || null }, function (err) {
+      // 409 = the championship has started and its roster is locked in.
+      alert(err);
+      select.value = champ.custom_ai_file || '';
+    });
   });
   right.querySelector('.champ-player-team-select').addEventListener('change', function () {
     var val = this.value;

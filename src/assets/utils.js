@@ -55,7 +55,10 @@ function initSortableTableEl(table) {
   var headers = table.tHead.rows[0].cells;
   var sortCol = 0, sortAsc = true;
   function cellVal(row, col, type) {
-    var text = row.cells[col].textContent.trim();
+    // An editable cell holds its value in an input, where textContent is empty.
+    var cell = row.cells[col];
+    var input = cell.querySelector('input');
+    var text = (input ? input.value : cell.textContent).trim();
     return type === 'num' ? (parseFloat(text) || 0) : text.toLowerCase();
   }
   function sort(col, type) {

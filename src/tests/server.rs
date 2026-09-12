@@ -31,6 +31,17 @@ fn call(
     data_path: std::path::PathBuf,
     request_bytes: Vec<u8>,
 ) -> String {
+    call_with_config(store, data_path, request_bytes, None)
+}
+
+/// [`call`] with a caller-supplied `config.json`, for routes that read configured folders.
+/// `None` gives each call a fresh path, so the defaults apply.
+fn call_with_config(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    request_bytes: Vec<u8>,
+    config: Option<std::path::PathBuf>,
+) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let html = Arc::new(b"<html/>".to_vec());
@@ -48,7 +59,9 @@ fn call(
         .as_nanos();
     let layouts_dir = Arc::new(std::env::temp_dir().join(format!("ams2_layouts_{ns}")));
     std::fs::create_dir_all(layouts_dir.as_ref()).unwrap();
-    let config_path = Arc::new(std::env::temp_dir().join(format!("ams2_cfg_{ns}.json")));
+    let config_path = Arc::new(
+        config.unwrap_or_else(|| std::env::temp_dir().join(format!("ams2_cfg_{ns}.json"))),
+    );
     let s = store;
     std::thread::spawn(move || {
         let (conn, _) = listener.accept().unwrap();
@@ -182,6 +195,19 @@ fn test_route_get_career_empty() {
     assert!(v.get("championships").is_some());
     assert!(v.get("driver_stats").is_some());
     assert!(v.get("track_stats").is_some());
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_get_live_teams_without_custom_ai() {
+    // No Custom AI folder configured (and no live session in the test environment),
+    // so the live grid falls back to whatever car name AMS2 reports.
+    let (store, path) = make_test_store();
+    let resp = get(store, path.clone(), "/api/live-teams");
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    assert_eq!(v["teams"].as_object().unwrap().len(), 0);
+    assert!(v["player_team"].is_null());
     let _ = std::fs::remove_file(&path);
 }
 
@@ -570,7 +596,7 @@ fn test_route_patch_team_changeable_before_any_session() {
 }
 
 #[test]
-fn test_route_patch_locked_team_blocks_clearing_the_custom_ai_file() {
+fn test_route_patch_started_champ_blocks_clearing_the_custom_ai_file() {
     let (store, path) = make_test_store();
     {
         let mut data = store.write().unwrap();
@@ -582,7 +608,8 @@ fn test_route_patch_locked_team_blocks_clearing_the_custom_ai_file() {
         });
         data.championships.push(champ);
     }
-    // Unassigning the roster clears the team as a side effect, which is still a team change.
+    // Unassigning the roster would leave the rounds already scored with nothing to have been
+    // measured against, and clears the team as a side effect too.
     let resp = patch(
         store.clone(),
         path.clone(),
@@ -599,6 +626,88 @@ fn test_route_patch_locked_team_blocks_clearing_the_custom_ai_file() {
         data.championships[0].player_team.as_deref(),
         Some("Brabham")
     );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_custom_ai_file_locked_once_a_session_is_assigned() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        champ.rounds.push(Round {
+            session_ids: vec!["sess1".into()],
+        });
+        data.championships.push(champ);
+    }
+    // No team is claimed here, so only the roster lock can catch this: swapping the file would
+    // re-score the assigned round against a different grid.
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"custom_ai_file":"F-Retro_Gen2.xml"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "got {resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0]
+            .custom_ai_file
+            .as_deref(),
+        Some("F-Classic_Gen1.xml"),
+        "a rejected change must leave the roster untouched"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_custom_ai_file_changeable_before_any_session() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        // An empty round is not a started championship.
+        champ.rounds.push(Round::default());
+        data.championships.push(champ);
+    }
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"custom_ai_file":"F-Retro_Gen2.xml"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0]
+            .custom_ai_file
+            .as_deref(),
+        Some("F-Retro_Gen2.xml")
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_patch_started_champ_accepts_an_unchanged_custom_ai_file() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.custom_ai_file = Some("F-Classic_Gen1.xml".into());
+        champ.rounds.push(Round {
+            session_ids: vec!["sess1".into()],
+        });
+        data.championships.push(champ);
+    }
+    // Only a *change* is gated — re-sending the value it already has must not 409.
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"custom_ai_file":"F-Classic_Gen1.xml","name":"1986 Season"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(store.read().unwrap().championships[0].name, "1986 Season");
     let _ = std::fs::remove_file(&path);
 }
 
@@ -1345,4 +1454,307 @@ fn test_route_patch_config_unchanged_saves_dir_keeps_data_file() {
     );
 
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+// ── PATCH /api/car-performance ────────────────────────────────────────────────
+
+const PERF_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<custom_ai_drivers>
+    <driver livery_name="Williams #5 N. Mansell">
+        <name>Nigel Mansell</name>
+        <power_scalar>1.10</power_scalar>
+        <weight_scalar>0.97</weight_scalar>
+        <drag_scalar>0.95</drag_scalar>
+    </driver>
+    <driver livery_name="AGS #31 I. Capelli">
+        <name>Ivan Capelli</name>
+        <power_scalar>0.90</power_scalar>
+        <weight_scalar>1.05</weight_scalar>
+        <drag_scalar>1.10</drag_scalar>
+    </driver>
+</custom_ai_drivers>
+"#;
+
+/// A temp Custom AI Drivers folder holding `F-Test.xml`, plus a config.json pointing at it.
+fn make_perf_fixture() -> (std::path::PathBuf, std::path::PathBuf) {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_perf_route_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("F-Test.xml"), PERF_XML).unwrap();
+    let config = dir.join("config.json");
+    std::fs::write(
+        &config,
+        format!(
+            "{{\"custom_ai_dir\":{}}}",
+            serde_json::to_string(&dir.display().to_string()).unwrap()
+        ),
+    )
+    .unwrap();
+    (dir, config)
+}
+
+fn patch_perf(body: &str, config: &std::path::Path) -> String {
+    let (store, data_path) = make_test_store();
+    let mut req = format!(
+        "PATCH /api/car-performance HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    call_with_config(store, data_path, req, Some(config.to_path_buf()))
+}
+
+#[test]
+fn test_route_patch_car_performance_writes_the_xml_and_returns_the_new_table() {
+    let (dir, config) = make_perf_fixture();
+    let resp = patch_perf(
+        r#"{"class":"F-Test","team":"AGS","power_scalar":1.1,"weight_scalar":0.97,"drag_scalar":0.95}"#,
+        &config,
+    );
+    assert!(resp.starts_with("HTTP/1.1 200 OK"), "{resp}");
+
+    let cars = ams2_championship::custom_ai::parse_car_performance(&dir.join("F-Test.xml"));
+    let ags = cars.iter().find(|c| c.team == "AGS").unwrap();
+    assert_eq!(ags.power_scalar, 1.10);
+    assert_eq!(ags.weight_scalar, 0.97);
+    assert_eq!(ags.drag_scalar, 0.95);
+    // The original is kept next to it.
+    assert_eq!(
+        std::fs::read_to_string(dir.join("F-Test.xml.bak")).unwrap(),
+        PERF_XML
+    );
+
+    // AGS now matches Williams exactly, so the response shows both as class-fastest.
+    let body = resp.split("\r\n\r\n").nth(1).unwrap();
+    assert!(body.contains("\"pace_delta_pct\":0.0"), "{body}");
+    assert_eq!(body.matches("\"pace_delta_pct\":0.0").count(), 2, "{body}");
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_patch_car_performance_rejects_out_of_range_scalar() {
+    let (dir, config) = make_perf_fixture();
+    let resp = patch_perf(
+        r#"{"class":"F-Test","team":"AGS","power_scalar":10.8,"weight_scalar":1.0,"drag_scalar":1.0}"#,
+        &config,
+    );
+    assert!(resp.starts_with("HTTP/1.1 400"), "{resp}");
+    // The file is untouched — validation runs before it is opened.
+    assert_eq!(
+        std::fs::read_to_string(dir.join("F-Test.xml")).unwrap(),
+        PERF_XML
+    );
+    assert!(!dir.join("F-Test.xml.bak").exists());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_patch_car_performance_rejects_class_name_escaping_the_folder() {
+    let (dir, config) = make_perf_fixture();
+    let resp = patch_perf(
+        r#"{"class":"../F-Test","team":"AGS","power_scalar":1.0,"weight_scalar":1.0,"drag_scalar":1.0}"#,
+        &config,
+    );
+    assert!(resp.starts_with("HTTP/1.1 400"), "{resp}");
+    assert!(resp.contains("invalid class name"), "{resp}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_patch_car_performance_unknown_team_and_class_are_errors() {
+    let (dir, config) = make_perf_fixture();
+    let team = patch_perf(
+        r#"{"class":"F-Test","team":"Ferrari","power_scalar":1.0,"weight_scalar":1.0,"drag_scalar":1.0}"#,
+        &config,
+    );
+    assert!(team.starts_with("HTTP/1.1 400"), "{team}");
+    assert!(team.contains("Ferrari"), "{team}");
+
+    let class = patch_perf(
+        r#"{"class":"F-Missing","team":"AGS","power_scalar":1.0,"weight_scalar":1.0,"drag_scalar":1.0}"#,
+        &config,
+    );
+    assert!(class.starts_with("HTTP/1.1 404"), "{class}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_patch_car_performance_without_configured_folder() {
+    let (store, data_path) = make_test_store();
+    let body = r#"{"class":"F-Test","team":"AGS","power_scalar":1.0,"weight_scalar":1.0,"drag_scalar":1.0}"#;
+    let resp = patch(store, data_path, "/api/car-performance", body.as_bytes());
+    assert!(resp.starts_with("HTTP/1.1 400"), "{resp}");
+    assert!(resp.contains("Custom AI Drivers folder"), "{resp}");
+}
+
+// ── /api/driver-performance ───────────────────────────────────────────────────
+
+fn get_with_config(path: &str, config: &std::path::Path) -> String {
+    let (store, data_path) = make_test_store();
+    call_with_config(
+        store,
+        data_path,
+        format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").into_bytes(),
+        Some(config.to_path_buf()),
+    )
+}
+
+fn patch_driver_perf(body: &str, config: &std::path::Path) -> String {
+    let (store, data_path) = make_test_store();
+    let mut req = format!(
+        "PATCH /api/driver-performance HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    call_with_config(store, data_path, req, Some(config.to_path_buf()))
+}
+
+#[test]
+fn test_route_get_driver_performance_lists_entries_with_the_editable_attrs() {
+    let (dir, config) = make_perf_fixture();
+    let resp = get_with_config("/api/driver-performance", &config);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+    // The column list comes from the server so it cannot drift from the writer's allowlist.
+    let attrs = v["attrs"].as_array().unwrap();
+    assert_eq!(
+        attrs.len(),
+        ams2_championship::custom_ai::DRIVER_ATTRS.len()
+    );
+    assert_eq!(attrs[0], "race_skill");
+
+    let drivers = v["classes"][0]["drivers"].as_array().unwrap();
+    assert_eq!(drivers.len(), 2);
+    assert_eq!(drivers[0]["driver"], "Nigel Mansell");
+    assert_eq!(drivers[0]["team"], "Williams");
+    assert_eq!(drivers[0]["index"], 0);
+    assert!(drivers[0]["tracks"].is_null());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_get_driver_performance_without_configured_folder() {
+    let (store, data_path) = make_test_store();
+    let resp = get(store, data_path, "/api/driver-performance");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+    assert_eq!(v["classes"].as_array().unwrap().len(), 0);
+    // The attribute list is still served, so the tab can explain itself with no files present.
+    assert!(!v["attrs"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn test_route_patch_driver_performance_writes_and_returns_the_row() {
+    let (dir, config) = make_perf_fixture();
+    let resp = patch_driver_perf(
+        r#"{"class":"F-Test","index":1,"driver":"Ivan Capelli","field":"race_skill","value":0.72}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+    assert_eq!(v["driver"], "Ivan Capelli");
+    assert_eq!(v["attrs"]["race_skill"], 0.72);
+
+    let drivers = ams2_championship::custom_ai::parse_driver_attributes(&dir.join("F-Test.xml"));
+    assert_eq!(drivers[1].attrs.get("race_skill"), Some(&0.72));
+    // The other entry is untouched, and the original file is preserved.
+    assert_eq!(drivers[0].attrs.get("race_skill"), None);
+    assert!(dir.join("F-Test.xml.bak").exists());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_patch_driver_performance_rejects_a_stale_index() {
+    let (dir, config) = make_perf_fixture();
+    let resp = patch_driver_perf(
+        r#"{"class":"F-Test","index":0,"driver":"Ivan Capelli","field":"race_skill","value":0.72}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(resp.contains("Nigel Mansell"), "{resp}");
+    assert!(!dir.join("F-Test.xml.bak").exists());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_patch_driver_performance_rejects_a_non_attribute_field() {
+    let (dir, config) = make_perf_fixture();
+    // The car scalars have their own route; they are not editable through this one.
+    let resp = patch_driver_perf(
+        r#"{"class":"F-Test","index":0,"driver":"Nigel Mansell","field":"power_scalar","value":1.0}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(resp.contains("power_scalar"), "{resp}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_patch_driver_performance_rejects_class_name_escaping_the_folder() {
+    let (dir, config) = make_perf_fixture();
+    let resp = patch_driver_perf(
+        r#"{"class":"../F-Test","index":0,"driver":"Nigel Mansell","field":"race_skill","value":0.5}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(resp.contains("invalid class name"), "{resp}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_driver_performance_flags_entries_with_no_installed_livery() {
+    let (dir, config) = make_perf_fixture();
+    // A livery manifest covering Mansell but not Capelli, in the layout the game uses.
+    let overrides = dir
+        .join("Vehicles")
+        .join("Textures")
+        .join("CustomLiveries")
+        .join("Overrides")
+        .join("some_model");
+    std::fs::create_dir_all(&overrides).unwrap();
+    std::fs::write(
+        overrides.join("some_model.xml"),
+        r#"<USER_OVERRIDES>
+        <LIVERY_OVERRIDE LIVERY="1" NAME="Williams #5 N. Mansell" BASELIVERY="Default" />
+        </USER_OVERRIDES>"#,
+    )
+    .unwrap();
+    // The route derives the install root two levels up from the Custom AI folder, so point it
+    // at a nested folder the way a real install nests UserData/CustomAIDrivers.
+    let ai = dir.join("UserData").join("CustomAIDrivers");
+    std::fs::create_dir_all(&ai).unwrap();
+    std::fs::copy(dir.join("F-Test.xml"), ai.join("F-Test.xml")).unwrap();
+    std::fs::write(
+        &config,
+        format!(
+            "{{\"custom_ai_dir\":{}}}",
+            serde_json::to_string(&ai.display().to_string()).unwrap()
+        ),
+    )
+    .unwrap();
+
+    let resp = get_with_config("/api/driver-performance", &config);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let drivers = body_json(&resp)["classes"][0]["drivers"].clone();
+    assert_eq!(drivers[0]["driver"], "Nigel Mansell");
+    assert_eq!(drivers[0]["phantom"], false);
+    assert_eq!(drivers[1]["driver"], "Ivan Capelli");
+    assert_eq!(drivers[1]["phantom"], true);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_driver_performance_leaves_phantom_unknown_without_manifests() {
+    let (dir, config) = make_perf_fixture();
+    let resp = get_with_config("/api/driver-performance", &config);
+    let drivers = body_json(&resp)["classes"][0]["drivers"].clone();
+    // No Overrides folder at all: nothing is claimed either way.
+    assert!(drivers[0]["phantom"].is_null(), "{drivers}");
+    assert!(drivers[1]["phantom"].is_null(), "{drivers}");
+    std::fs::remove_dir_all(&dir).ok();
 }

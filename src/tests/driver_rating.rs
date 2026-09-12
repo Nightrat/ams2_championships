@@ -103,6 +103,29 @@ fn test_retired_separates_retirement_from_lapped_finisher() {
 }
 
 #[test]
+fn test_retired_does_not_fire_two_laps_down_on_a_sprint() {
+    // A real 15-lap race: repairs cost two laps and the car still took the flag in P9. The bare
+    // 10% test puts the line at 1.5 laps and calls that a retirement, which then costs both the
+    // pace credit and a point of finish rate.
+    assert!(!retired(&result("x", 9, 13), 15));
+    // Three laps down on the same race is far enough back to read as a retirement.
+    assert!(retired(&result("x", 12, 12), 15));
+}
+
+#[test]
+fn test_retired_keeps_the_proportional_rule_on_long_races() {
+    // Over 50 laps, 10% is 5 laps and the absolute floor never binds first.
+    assert!(!retired(&result("x", 15, 46), 50));
+    assert!(
+        !retired(&result("x", 15, 45), 50),
+        "exactly 90% is classified"
+    );
+    assert!(retired(&result("x", 20, 44), 50));
+    // Three laps down is not enough on its own — it must also miss 90% of the distance.
+    assert!(!retired(&result("x", 15, 47), 50));
+}
+
+#[test]
 fn test_expected_positions_rank_teams_by_car_pace() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
@@ -443,9 +466,17 @@ fn test_reference_career_rating_snapshot() {
         r.mp_bonus < 0.0,
         "a losing online record must cost, not pay"
     );
+    // Beat the team-mate in 34 of 38 comparisons, which is worth most of the available bonus.
+    assert_eq!((r.mate_wins, r.mate_losses), (34, 4), "team-mate record");
+    assert!(r.teammate > 0.7, "head-to-head {}", r.teammate);
+    assert!(
+        (r.teammate_bonus - 5.50).abs() < 0.1,
+        "teammate_bonus {}",
+        r.teammate_bonus
+    );
     // Snapshot value shifts whenever docs/custom_ai_files_with_perf_scalars/*.xml's scalars change
     // (power_scalar was rescaled so the fastest car in each class is 1.00, not up to 1.10).
-    assert!((r.value - 51.66).abs() < 0.5, "rating {}", r.value);
+    assert!((r.value - 57.16).abs() < 0.5, "rating {}", r.value);
 }
 
 #[test]
@@ -522,4 +553,145 @@ fn test_is_allowed_permits_unknown_teams() {
     // Case-insensitive, and a team with no pace data must never be blocked.
     assert!(is_allowed(&e, "osella"));
     assert!(is_allowed(&e, "Some Team We Know Nothing About"));
+}
+
+// ── Phantom seats and the expected-position model ─────────────────────────────
+
+#[test]
+fn test_expected_positions_shrink_when_phantom_seats_are_removed() {
+    use crate::custom_ai::without_phantom_seats;
+
+    let seats = parse_seats_str(ROSTER);
+    let pace = pace();
+
+    // Every seat counted: 6 cars, so Osella's two sit at P5 and P6, a mean of 5.5.
+    let all = expected_positions(&pace, &seats);
+    assert_eq!(all.get("Williams"), Some(&1.5));
+    assert_eq!(all.get("Brabham"), Some(&3.5));
+    assert_eq!(all.get("Osella"), Some(&5.5));
+
+    // AMS2 has no livery for Brabham #8, so that car never starts. The field is 5, and every
+    // seat behind the gap moves up — Osella now expects P4.5, not P5.5.
+    let installed: std::collections::HashSet<String> = seats
+        .iter()
+        .map(|s| s.livery.clone())
+        .filter(|l| !l.contains("D. Warwick"))
+        .collect();
+    let real = without_phantom_seats(seats, Some(&installed));
+    assert_eq!(real.len(), 5);
+
+    let trimmed = expected_positions(&pace, &real);
+    assert_eq!(trimmed.get("Williams"), Some(&1.5), "the front is unmoved");
+    assert_eq!(
+        trimmed.get("Brabham"),
+        Some(&3.0),
+        "Brabham is now a one-car team at P3, not a two-car team averaging P3.5"
+    );
+    assert_eq!(
+        trimmed.get("Osella"),
+        Some(&4.5),
+        "a phantom ahead of you inflates what your car is expected to beat"
+    );
+}
+
+#[test]
+fn test_expected_positions_unchanged_when_liveries_cannot_be_verified() {
+    use crate::custom_ai::without_phantom_seats;
+
+    let seats = parse_seats_str(ROSTER);
+    let before = expected_positions(&pace(), &seats);
+    // No manifests readable: ratings must stay exactly as they were rather than shift on a guess.
+    let after = expected_positions(&pace(), &without_phantom_seats(seats, None));
+    assert_eq!(before, after);
+}
+
+// ── Team-mate head-to-head ────────────────────────────────────────────────────
+//
+// In `sp_session` the player is the free Brabham #7 seat and Derek Warwick holds Brabham #8 in
+// P3, so the player's position relative to 3 decides each head-to-head. Identical car, so this
+// is the one signal in the rating that owes nothing to the car-pace estimate.
+
+#[test]
+fn test_beating_the_teammate_raises_the_rating() {
+    let seats = parse_seats_str(ROSTER);
+    // Same finishing position in both careers — only the team-mate comparison differs, because
+    // in one the player is ahead of Warwick (P3) and in the other behind.
+    let ahead: Vec<RecordedSession> = (0..8)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 2, 15))
+        .collect();
+    let behind: Vec<RecordedSession> = (0..8)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 4, 15))
+        .collect();
+
+    let hi = compute_reputation(&ahead, &seats, &pace(), Some("Brabham"));
+    let lo = compute_reputation(&behind, &seats, &pace(), Some("Brabham"));
+    assert_eq!((hi.mate_wins, hi.mate_losses), (8, 0));
+    assert_eq!((lo.mate_wins, lo.mate_losses), (0, 8));
+    assert!(hi.teammate_bonus > 0.0 && lo.teammate_bonus < 0.0);
+    assert!(hi.value > lo.value, "{} vs {}", hi.value, lo.value);
+}
+
+#[test]
+fn test_qualifying_head_to_head_counts_too() {
+    let seats = parse_seats_str(ROSTER);
+    // Qualifying only: out-qualifying the team-mate every time must still pay.
+    let sessions: Vec<RecordedSession> = (0..8)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 3, 2, 15))
+        .collect();
+    let r = compute_reputation(&sessions, &seats, &pace(), Some("Brabham"));
+    assert_eq!((r.mate_wins, r.mate_losses), (8, 0));
+    assert!(r.teammate_bonus > 0.0, "{}", r.teammate_bonus);
+}
+
+#[test]
+fn test_teammate_bonus_is_capped_and_damped_on_a_thin_record() {
+    let seats = parse_seats_str(ROSTER);
+    let one = vec![sp_session("a", 100, 5, 1, 15)];
+    let many: Vec<RecordedSession> = (0..30)
+        .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
+        .collect();
+    let a = compute_reputation(&one, &seats, &pace(), Some("Brabham"));
+    let b = compute_reputation(&many, &seats, &pace(), Some("Brabham"));
+    assert!(
+        a.teammate_bonus < b.teammate_bonus,
+        "one comparison must not pay like thirty: {} vs {}",
+        a.teammate_bonus,
+        b.teammate_bonus
+    );
+    // Even a perfect record cannot outweigh the rest of the rating.
+    assert!(b.teammate_bonus <= 8.0 + 0.001, "{}", b.teammate_bonus);
+}
+
+#[test]
+fn test_no_teammate_means_no_bonus_either_way() {
+    // A one-car team has nobody to measure against, so the term must sit out rather than
+    // scoring the player as if they had lost.
+    let roster = r#"<custom_ai_drivers>
+        <driver livery_name="1986 Williams #5 - N. Mansell"><name>Nigel Mansell</name></driver>
+        <driver livery_name="1986 Brabham #7 - R. Patrese"><name>Riccardo Patrese</name></driver>
+    </custom_ai_drivers>"#;
+    let seats = parse_seats_str(roster);
+    let mut s = sp_session("a", 100, 5, 2, 15);
+    // Only Mansell and the player on the grid: the player is the free Brabham, alone.
+    s.results
+        .retain(|r| r.name == "Nigel Mansell" || r.name == "Nightrat");
+    let r = compute_reputation(&[s], &seats, &pace(), Some("Brabham"));
+    assert_eq!((r.mate_wins, r.mate_losses), (0, 0));
+    assert_eq!(r.teammate_bonus, 0.0);
+}
+
+#[test]
+fn test_a_retired_teammate_is_not_counted_as_beaten() {
+    let seats = parse_seats_str(ROSTER);
+    // Warwick stops on lap 2 of 15. Finishing ahead of a parked car says nothing about pace,
+    // and reliability already has its own term.
+    let mut s = sp_session("a", 100, 5, 2, 15);
+    for r in s.results.iter_mut() {
+        if r.name == "Derek Warwick" {
+            r.laps_completed = 2;
+        }
+    }
+    let r = compute_reputation(&[s], &seats, &pace(), Some("Brabham"));
+    assert_eq!((r.mate_wins, r.mate_losses), (0, 0));
+    assert_eq!(r.teammate_bonus, 0.0);
 }
