@@ -1,4 +1,4 @@
-name: Release
+﻿name: Release
 
 on:
   push:
@@ -26,6 +26,18 @@ jobs:
           # Foo.md#anchor -> #anchor ; Foo.md -> #doc-foo
           sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md#([^)]*)\)/](#\2)/g' *.md
           sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md\)/](#doc-\L\1)/g' *.md
+
+      - name: Replace glyphs pdflatex cannot typeset
+        run: |
+          cd build
+          perl -CSD -i -pe 's/\x{1F399}\x{FE0F}?\s*//g' *.md   # microphone, label reads fine without it
+          perl -CSD -i -pe 's/\s*\(\x{270E}\)//g'      *.md    # pencil, prose already says "a pencil icon"
+          perl -CSD -i -pe 's/\x{2190}/<-/g'           *.md    # arrows, these sit inside a code block
+          perl -CSD -i -pe 's/\x{00D7}/\$\x5ctimes\$/g'   *.md    # multiplication sign -> inline math
+          # Safety net: drop any emoji/dingbat/arrow a later docs edit introduces,
+          # so a new glyph degrades the PDF instead of failing the release.
+          perl -CSD -i -pe 's/[\x{1F000}-\x{1FAFF}\x{2190}-\x{21FF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}]//g' *.md
+          echo 'Remaining non-ASCII (dashes expected):'; grep -hoP '[^\x00-\x7F]' *.md | sort -u || true
 
       - name: Build PDF manual
         run: |
