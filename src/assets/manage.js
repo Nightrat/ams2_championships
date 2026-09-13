@@ -112,15 +112,22 @@ function renderChampDetail(id) {
   // change would rewrite the meaning of results already scored, so the server refuses them too.
   var started = rounds.some(function (r) { return (r.session_ids || []).length > 0; });
 
+  // The server only lists files whose name AMS2 recognises as a car class, so an assigned file can
+  // be absent from it — one assigned before this filter existed, or renamed since. Dropping it
+  // would render an assignment that is still scoring results as "None", so it is added back.
+  var aiFiles = manageState.customAiFiles.slice();
+  var aiUnread = !!champ.custom_ai_file && aiFiles.indexOf(champ.custom_ai_file) === -1;
+  if (aiUnread) aiFiles.push(champ.custom_ai_file);
   var aiOptions = '<option value="">None</option>' +
-    manageState.customAiFiles.map(function (f) {
-      return '<option value="' + esc(f) + '"' + (f === champ.custom_ai_file ? ' selected' : '') + '>' + esc(f) + '</option>';
+    aiFiles.map(function (f) {
+      var label = f === champ.custom_ai_file && aiUnread ? f + ' (not read by AMS2)' : f;
+      return '<option value="' + esc(f) + '"' + (f === champ.custom_ai_file ? ' selected' : '') + '>' + esc(label) + '</option>';
     }).join('');
   var aiHint = started
     ? 'Locked in: the championship has started. Remove its assigned sessions to change the roster.'
     : manageState.customAiFiles.length
-      ? 'Driver names matching a <name> entry in this file show its livery/team name instead of the AMS2 car class.'
-      : 'No .xml files found. Set a Custom AI Drivers folder in the Config tab.';
+      ? 'Only files named after a car class AMS2 knows are listed — the game ignores any other name. Driver names matching a <name> entry show its livery/team name instead of the AMS2 car class.'
+      : 'No .xml files named after a known car class. Set a Custom AI Drivers folder in the Config tab; a file must be named exactly as the class AMS2 registers it.';
   // A player team is only checkable against a Custom AI roster, so without a file assigned the
   // field is disabled and the server keeps player_team null — that is also what switches
   // session enforcement off.

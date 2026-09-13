@@ -484,11 +484,15 @@ fn handle(
         return;
     }
 
-    // GET /api/custom-ai-files — list *.xml files in the configured Custom AI Drivers folder
+    // GET /api/custom-ai-files — the *.xml files in the configured Custom AI Drivers folder whose
+    // name AMS2 recognises as a car class. A file the game never reads cannot shape a session, so
+    // it is not offered as a championship roster.
     if method == "GET" && path == "/api/custom-ai-files" {
         let cfg = ams2_championship::config::load_or_create(&config_path);
         let files = match cfg.custom_ai_dir {
-            Some(dir) => ams2_championship::custom_ai::list_files(std::path::Path::new(&dir)),
+            Some(dir) => ams2_championship::custom_ai::list_files_for_known_classes(
+                std::path::Path::new(&dir),
+            ),
             None => vec![],
         };
         let json = serde_json::to_vec(&files).unwrap_or_default();

@@ -733,6 +733,37 @@ pub fn known_class_names(custom_ai_dir: &Path) -> Option<HashSet<String>> {
     Some(names)
 }
 
+/// The class name a `CustomAIDrivers` file claims by its filename — the stem AMS2 matches against
+/// its registry. Falls back to the whole filename when it has no stem.
+pub fn class_of_file(file: &str) -> &str {
+    Path::new(file)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(file)
+}
+
+/// [`list_files`], limited to the files AMS2 actually reads.
+///
+/// The game loads a `CustomAIDrivers` file only when its name minus `.xml` is a class in its own
+/// registry. Anything else is silently ignored — a per-track variant kept beside the real file
+/// (`F-Vintage_Gen2_03Nordschleiffe.xml`), or a class written the way the UI spells it rather than
+/// the way the registry does (`Formula Renault.xml`). Such a file cannot affect a session, so
+/// assigning a championship to it would promise AI behaviour that never happens.
+///
+/// An unreadable registry returns every file rather than none, the same can't-verify rule
+/// [`class_performance`] follows — see [`known_class_names`].
+pub fn list_files_for_known_classes(dir: &Path) -> Vec<String> {
+    let known = known_class_names(dir);
+    list_files(dir)
+        .into_iter()
+        .filter(|file| {
+            known
+                .as_ref()
+                .is_none_or(|names| names.contains(class_of_file(file)))
+        })
+        .collect()
+}
+
 /// Builds a ranked performance table per car class (`*.xml` file) found in `dir`, limited to
 /// files whose name matches a class AMS2 actually reads (see [`known_class_names`]) — when that
 /// can't be determined, every file is included rather than none. Classes are always returned in
@@ -743,11 +774,9 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
     let mut classes: Vec<ClassPerformance> = list_files(dir)
         .into_iter()
         .filter(|file| {
-            let class = Path::new(file)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or(file);
-            known.as_ref().is_none_or(|names| names.contains(class))
+            known
+                .as_ref()
+                .is_none_or(|names| names.contains(class_of_file(file)))
         })
         .map(|file| {
             let class = Path::new(&file)

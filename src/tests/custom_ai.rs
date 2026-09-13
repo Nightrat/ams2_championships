@@ -344,6 +344,67 @@ fn test_list_files_missing_dir_returns_empty() {
     assert!(files.is_empty());
 }
 
+/// An install tree with a class registry naming `F-Vintage_Gen2`, and a Custom AI folder holding
+/// that file plus names AMS2 does not register. Returns `(install_root, custom_ai_dir)`.
+fn make_class_registry_fixture() -> (std::path::PathBuf, std::path::PathBuf) {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ams2_class_names_{ns}"));
+    let ai_dir = root.join("UserData").join("CustomAIDrivers");
+    let hud = root.join("GUI").join("HUD_1_6");
+    std::fs::create_dir_all(&ai_dir).unwrap();
+    std::fs::create_dir_all(&hud).unwrap();
+    std::fs::write(
+        hud.join("HUD_ColoursDefs.xml"),
+        r##"<Colours>
+            <Colour name="F-Vintage_Gen2" value="#fff" />
+            <Colour name="F-Retro_Gen1" value="#000" />
+        </Colours>"##,
+    )
+    .unwrap();
+    for f in [
+        "F-Vintage_Gen2.xml",
+        "F-Retro_Gen1.xml",
+        // A per-track variant kept beside the real file, and a class spelt the way the UI shows
+        // it. AMS2 reads neither.
+        "F-Vintage_Gen2_03Nordschleiffe.xml",
+        "Formula Renault.xml",
+    ] {
+        std::fs::write(ai_dir.join(f), "<custom_ai_drivers/>").unwrap();
+    }
+    (root, ai_dir)
+}
+
+#[test]
+fn test_list_files_for_known_classes_drops_names_ams2_never_reads() {
+    let (root, ai_dir) = make_class_registry_fixture();
+    assert_eq!(
+        list_files_for_known_classes(&ai_dir),
+        vec!["F-Retro_Gen1.xml", "F-Vintage_Gen2.xml"]
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+/// The registry is the only evidence; without it every file must stay listed, or a user whose
+/// install layout we cannot walk loses the dropdown entirely.
+#[test]
+fn test_list_files_for_known_classes_keeps_everything_without_a_registry() {
+    let (root, ai_dir) = make_class_registry_fixture();
+    std::fs::remove_dir_all(root.join("GUI")).unwrap();
+    assert_eq!(list_files_for_known_classes(&ai_dir).len(), 4);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_class_of_file_strips_only_the_extension() {
+    // A class name containing dots must keep them — only the final extension is the extension.
+    assert_eq!(class_of_file("F-Vintage_Gen2.xml"), "F-Vintage_Gen2");
+    assert_eq!(class_of_file("GT3 Gen.2.xml"), "GT3 Gen.2");
+    assert_eq!(class_of_file("noext"), "noext");
+}
+
 const SAMPLE_WITH_SCALARS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <custom_ai_drivers>
     <driver livery_name="Williams #5 N. Mansell">

@@ -1938,3 +1938,57 @@ fn test_live_teams_treats_a_blank_player_team_as_unset() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// An install tree whose class registry names only `F-Vintage_Gen2`, with a per-track variant
+/// beside it that AMS2 would ignore, plus a config.json pointing at the Custom AI folder.
+fn make_class_route_fixture() -> (std::path::PathBuf, std::path::PathBuf) {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ams2_class_route_{ns}"));
+    let ai_dir = root.join("UserData").join("CustomAIDrivers");
+    let hud = root.join("GUI").join("HUD_1_6");
+    std::fs::create_dir_all(&ai_dir).unwrap();
+    std::fs::create_dir_all(&hud).unwrap();
+    std::fs::write(
+        hud.join("HUD_ColoursDefs.xml"),
+        r##"<Colours><Colour name="F-Vintage_Gen2" value="#fff" /></Colours>"##,
+    )
+    .unwrap();
+    std::fs::write(ai_dir.join("F-Vintage_Gen2.xml"), "<custom_ai_drivers/>").unwrap();
+    std::fs::write(
+        ai_dir.join("F-Vintage_Gen2_03Nordschleiffe.xml"),
+        "<custom_ai_drivers/>",
+    )
+    .unwrap();
+
+    let config = root.join("config.json");
+    std::fs::write(
+        &config,
+        format!(
+            "{{\"custom_ai_dir\":{}}}",
+            serde_json::to_string(&ai_dir.display().to_string()).unwrap()
+        ),
+    )
+    .unwrap();
+    (root, config)
+}
+
+#[test]
+fn test_route_custom_ai_files_lists_only_names_ams2_reads() {
+    let (root, config) = make_class_route_fixture();
+    let (store, data_path) = make_test_store();
+    let resp = call_with_config(
+        store,
+        data_path,
+        b"GET /api/custom-ai-files HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    assert!(resp.starts_with("HTTP/1.1 200 OK"), "{resp}");
+    let body = resp.split("\r\n\r\n").nth(1).unwrap_or("");
+    let files: Vec<String> = serde_json::from_str(body).unwrap();
+    assert_eq!(files, vec!["F-Vintage_Gen2.xml"], "{body}");
+
+    std::fs::remove_dir_all(&root).ok();
+}

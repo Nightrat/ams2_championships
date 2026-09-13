@@ -18,9 +18,9 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.77</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.46</vehicle_reliability>
-        <power_scalar>1.00</power_scalar>
-        <weight_scalar>1.08</weight_scalar>
-        <drag_scalar>0.98</drag_scalar>
+        <power_scalar>0.97</power_scalar>
+        <weight_scalar>1.00</weight_scalar>
+        <drag_scalar>0.96</drag_scalar>
      </driver>
      <driver livery_name="Brabham-Alfa Romeo #2 J. Watson"> 
         <name>John Watson</name>     
@@ -39,9 +39,9 @@
 	<avoidance_of_mistakes>0.72</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.70</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.33</vehicle_reliability>
-        <power_scalar>0.98</power_scalar>
-        <weight_scalar>1.08</weight_scalar>
-        <drag_scalar>0.98</drag_scalar>
+        <power_scalar>0.97</power_scalar>
+        <weight_scalar>1.00</weight_scalar>
+        <drag_scalar>0.96</drag_scalar>
      </driver>    
      <driver livery_name="Tyrrell-Ford Cosworth #3 D. Pironi"> 
         <name>Didier Pironi</name>     
@@ -102,8 +102,8 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.5</vehicle_reliability>
-        <power_scalar>0.94</power_scalar>
-        <weight_scalar>0.93</weight_scalar>
+        <power_scalar>0.97</power_scalar>
+        <weight_scalar>0.91</weight_scalar>
         <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="Lotus-Ford Cosworth #6 R. Peterson"> 
@@ -123,8 +123,8 @@
 	<avoidance_of_mistakes>0.80</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.75</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.4</vehicle_reliability>
-        <power_scalar>0.94</power_scalar>
-        <weight_scalar>0.93</weight_scalar>
+        <power_scalar>0.97</power_scalar>
+        <weight_scalar>0.91</weight_scalar>
         <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="McLaren-Ford Cosworth #7 J. Hunt"> 
@@ -146,7 +146,7 @@
 	<vehicle_reliability>0.35</vehicle_reliability>
         <power_scalar>0.94</power_scalar>
         <weight_scalar>0.98</weight_scalar>
-        <drag_scalar>1.01</drag_scalar>
+        <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="McLaren-Ford Cosworth #8 P. Tambay"> 
         <name>Patrick Tambay</name>   
@@ -167,7 +167,7 @@
 	<vehicle_reliability>0.3</vehicle_reliability>
         <power_scalar>0.94</power_scalar>
         <weight_scalar>0.98</weight_scalar>
-        <drag_scalar>1.01</drag_scalar>
+        <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="ATS-Ford Cosworth #9 J. Mass"> 
         <name>Jochen Mass</name>   
@@ -230,7 +230,7 @@
 	<vehicle_reliability>0.46</vehicle_reliability>
         <power_scalar>0.98</power_scalar>
         <weight_scalar>0.97</weight_scalar>
-        <drag_scalar>0.94</drag_scalar>
+        <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="Ferrari #12 G. Villeneuve"> 
         <name>Gilles Villeneuve</name>  
@@ -251,7 +251,7 @@
 	<vehicle_reliability>0.44</vehicle_reliability>
         <power_scalar>0.98</power_scalar>
         <weight_scalar>0.97</weight_scalar>
-        <drag_scalar>0.94</drag_scalar>
+        <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="Copersucar-Ford Cosworth #14 E. Fittipaldi"> 
         <name>Emerson Fittipaldi</name>     
@@ -396,9 +396,9 @@
 	<avoidance_of_mistakes>0.55</avoidance_of_mistakes>
 	<avoidance_of_forced_mistakes>0.50</avoidance_of_forced_mistakes>
 	<vehicle_reliability>0.22</vehicle_reliability>
-        <power_scalar>0.94</power_scalar>
-        <weight_scalar>1.00</weight_scalar>
-        <drag_scalar>1.00</drag_scalar>
+        <power_scalar>0.97</power_scalar>
+        <weight_scalar>0.91</weight_scalar>
+        <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="Ligier-Matra #26 J. Laffite"> 
         <name>Jacques Laffite</name>     
@@ -440,7 +440,7 @@
 	<vehicle_reliability>0.27</vehicle_reliability>
         <power_scalar>0.94</power_scalar>
         <weight_scalar>0.98</weight_scalar>
-        <drag_scalar>1.02</drag_scalar>
+        <drag_scalar>0.90</drag_scalar>
     </driver>
     <driver livery_name="Martini-Ford Cosworth #31 R. Arnoux"> 
         <name>Rene Arnoux</name>     
