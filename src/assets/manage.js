@@ -35,17 +35,40 @@ function renderChampList() {
   function statusColourClass(status) {
     return status === 'Final' ? 'status-final' : status === 'Progress' ? 'status-progress' : 'status-active';
   }
+  // A singleplayer career has one unfinished season at a time, so "Progress" — started, but not
+  // the current one — has nothing to distinguish. Its whole state machine is the season being
+  // raced and then the season being over, which is one button, not a three-way choice.
+  var sp = careerMode === 'singleplayer';
   el.innerHTML = manageState.champs.map(function (c) {
     var sel = c.id === manageState.selectedId ? ' selected' : '';
-    var opts = ['Active', 'Progress', 'Final'].map(function (s) {
-      return '<option' + (s === c.status ? ' selected' : '') + '>' + s + '</option>';
-    }).join('');
+    var control;
+    if (sp) {
+      control = c.status === 'Final'
+        ? '<span class="champ-list-status status-final">Finished</span>'
+        : '<button class="champ-list-finish" data-cid="' + esc(c.id) + '"' +
+          ' title="Close the season: it pays out, and the next one can be created">Finish</button>';
+    } else {
+      var opts = ['Active', 'Progress', 'Final'].map(function (s) {
+        return '<option' + (s === c.status ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+      control = '<select class="champ-list-status ' + statusColourClass(c.status) +
+        '" data-cid="' + esc(c.id) + '">' + opts + '</select>';
+    }
     return '<div class="champ-list-item' + sel + '" data-id="' + esc(c.id) + '">' +
       '<span class="champ-list-name">' + esc(c.name) + '</span>' +
       '<button class="champ-rename-btn" data-cid="' + esc(c.id) + '" title="Rename">&#9998;</button>' +
-      '<select class="champ-list-status ' + statusColourClass(c.status) + '" data-cid="' + esc(c.id) + '">' + opts + '</select>' +
+      control +
       '</div>';
   }).join('');
+  el.querySelectorAll('.champ-list-finish').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      // Final is terminal in singleplayer, so this is the one irreversible thing the Manage tab
+      // does — and it is what pays the season out.
+      if (!confirm('Finish this season? It pays out and cannot be reopened.')) return;
+      patchChamp(btn.dataset.cid, { status: 'Final' });
+    });
+  });
   el.querySelectorAll('.champ-list-item').forEach(function (item) {
     item.addEventListener('click', function () {
       manageState.selectedId = item.dataset.id;

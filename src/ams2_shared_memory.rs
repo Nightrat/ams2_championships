@@ -74,6 +74,20 @@ pub struct PlayerTelemetry {
     pub fuel_level: f32,
     /// Fuel tank capacity in litres (mFuelCapacity).
     pub fuel_capacity: f32,
+    /// mCrashState: 0=none, 1=off-track, 2=hit scenery, 3=spinning, 4=rolling.
+    pub crash_state: u32,
+    /// Bodywork damage 0–1 (0 = intact). The one that costs lap time.
+    pub aero_damage: f32,
+    /// Engine damage 0–1.
+    pub engine_damage: f32,
+    /// Brake damage per corner, 0–1.
+    pub brake_damage: [f32; 4],
+    /// Suspension damage per corner, 0–1.
+    pub suspension_damage: [f32; 4],
+    /// Participant index of the last car hit; -1 when nothing has been hit.
+    pub last_collision_index: i32,
+    /// Force of that last contact. Non-zero without any damage means a clean tap.
+    pub last_collision_magnitude: f32,
 }
 
 /// Snapshot of the current AMS2 session state.
@@ -136,6 +150,13 @@ fn disconnected() -> LiveSessionData {
             tyre_compound: [String::new(), String::new(), String::new(), String::new()],
             fuel_level: 0.0,
             fuel_capacity: 0.0,
+            crash_state: 0,
+            aero_damage: 0.0,
+            engine_damage: 0.0,
+            brake_damage: [0.0; 4],
+            suspension_damage: [0.0; 4],
+            last_collision_index: -1,
+            last_collision_magnitude: 0.0,
         },
     }
 }
@@ -211,7 +232,16 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_STEERING: usize = 6872; // float mSteering (filtered)
     const OFF_GEAR: usize = 6876; // int mGear
     const OFF_TYRE_WEAR: usize = 7136; // float mTyreWear[4]
+    const OFF_BRAKE_DAMAGE: usize = 7152; // float mBrakeDamage[4]
+    const OFF_SUSPENSION_DAMAGE: usize = 7168; // float mSuspensionDamage[4]
     const OFF_BRAKE_TEMP: usize = 7184; // float mBrakeTempCelsius[4]
+    // mTyreTreadTemp / LayerTemp / CarcassTemp / RimTemp / InternalAirTemp: 7200..7280
+    const OFF_CRASH_STATE: usize = 7280; // unsigned int mCrashState
+    const OFF_AERO_DAMAGE: usize = 7284; // float mAeroDamage
+    const OFF_ENGINE_DAMAGE: usize = 7288; // float mEngineDamage
+    // mAntiLockActive (bool) at 6888 pads to 4, so the collision pair starts at 6892.
+    const OFF_LAST_COLLISION_INDEX: usize = 6892; // int mLastOpponentCollisionIndex (-1 = none)
+    const OFF_LAST_COLLISION_MAG: usize = 6896; // float mLastOpponentCollisionMagnitude
     const OFF_SUSPENSION_TRAVEL: usize = 7340; // float mSuspensionTravel[4] (metres)
     const OFF_TYRE_PRESSURE: usize = 7372; // float mAirPressure[4] (PSI)
                                            // AMS2-specific additions (not in original PC2 header):
@@ -321,6 +351,13 @@ pub fn read_live_session() -> LiveSessionData {
             ],
             fuel_level: rf32(ptr, OFF_FUEL_LEVEL),
             fuel_capacity: rf32(ptr, OFF_FUEL_CAPACITY),
+            crash_state: ru32(ptr, OFF_CRASH_STATE),
+            aero_damage: rf32(ptr, OFF_AERO_DAMAGE),
+            engine_damage: rf32(ptr, OFF_ENGINE_DAMAGE),
+            brake_damage: rf32x4(ptr, OFF_BRAKE_DAMAGE),
+            suspension_damage: rf32x4(ptr, OFF_SUSPENSION_DAMAGE),
+            last_collision_index: ri32(ptr, OFF_LAST_COLLISION_INDEX),
+            last_collision_magnitude: rf32(ptr, OFF_LAST_COLLISION_MAG),
         };
         let game_state = ru32(ptr, OFF_GAME_STATE);
         let session_state = ru32(ptr, OFF_SESSION_STATE);

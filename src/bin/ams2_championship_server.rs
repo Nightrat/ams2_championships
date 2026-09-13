@@ -795,7 +795,7 @@ fn handle(
         let champ = Championship {
             id,
             name: body.name,
-            status: ChampionshipStatus::Progress,
+            status: mode.new_season_status(),
             points_system: if body.points_system.is_empty() {
                 vec![25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
             } else {
@@ -984,6 +984,7 @@ fn handle(
                     id,
                     &class,
                     rep.value,
+                    ledger.balance,
                     eligibility,
                     &standing,
                     &cfg.offer_params(),
@@ -1096,6 +1097,7 @@ fn handle(
             &id,
             &champ_class(&current),
             reputation.value,
+            ledger.balance,
             &eligibility,
             &standing,
             &cfg.offer_params(),
@@ -1346,6 +1348,19 @@ fn handle(
                 &mut stream,
                 "409 Conflict",
                 "sign for a team instead — a singleplayer seat comes from a contract.",
+            );
+            return;
+        }
+        // `Progress` distinguishes an unfinished season from *the* current one, and singleplayer
+        // never has two to tell apart. Its whole state machine is the season being raced, then
+        // the season being over.
+        if !mode.uses_progress_state()
+            && body.status.as_ref() == Some(&ChampionshipStatus::Progress)
+        {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "a singleplayer season is either the one being raced or finished.",
             );
             return;
         }

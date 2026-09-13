@@ -25,6 +25,13 @@ fn empty_telemetry() -> PlayerTelemetry {
         tyre_compound: [String::new(), String::new(), String::new(), String::new()],
         fuel_level: 0.0,
         fuel_capacity: 0.0,
+        crash_state: 0,
+        aero_damage: 0.0,
+        engine_damage: 0.0,
+        brake_damage: [0.0; 4],
+        suspension_damage: [0.0; 4],
+        last_collision_index: -1,
+        last_collision_magnitude: 0.0,
     }
 }
 

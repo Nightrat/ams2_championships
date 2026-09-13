@@ -154,6 +154,28 @@ impl CareerMode {
         self == CareerMode::Singleplayer
     }
 
+    /// Whether a season may sit in [`ChampionshipStatus::Progress`].
+    ///
+    /// `Progress` means "started, but not the current one". A singleplayer career never has a
+    /// second unfinished season for it to distinguish from, so the state cannot mean anything
+    /// there — it has only the season being raced and the seasons that are over.
+    pub fn uses_progress_state(self) -> bool {
+        self != CareerMode::Singleplayer
+    }
+
+    /// What a newly created season starts as.
+    ///
+    /// A singleplayer season is the current one the moment it exists, because it is the only
+    /// unfinished season a career may have. Creating it as `Progress` left a fresh career with
+    /// *nothing* marked `Active`, which is what `/api/live-teams` looks for — so the live timing
+    /// grid showed no team names until the user found the dropdown.
+    pub fn new_season_status(self) -> ChampionshipStatus {
+        match self {
+            CareerMode::Singleplayer => ChampionshipStatus::Active,
+            _ => ChampionshipStatus::Progress,
+        }
+    }
+
     /// Human-readable, for refusal messages.
     pub fn label(self) -> &'static str {
         match self {

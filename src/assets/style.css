@@ -611,35 +611,27 @@ table { border-collapse: collapse; width: 100%; }
 .spotter-voice:hover, .spotter-focus:hover { border-color: #9b59b6; color: #bdc3c7; }
 .live-subpanel-hidden { display: none; }
 
-/* Setup telemetry panel */
+/* Damage panel */
 .setup-panel { padding: 0.5rem 0; }
-.setup-driver-name { font-size: 0.78rem; font-weight: 700; color: #bdc3c7; margin-bottom: 0.5rem; }
 .setup-no-data { color: #555; font-style: italic; font-size: 0.82rem; }
-.setup-columns { display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap; }
-.setup-legend { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.78rem; color: #7f8c8d; }
-.leg-cold { background: #1a5276; color: #fff; padding: 1px 7px; border-radius: 3px; font-size: 0.72rem; }
-.leg-ok   { background: #1e8449; color: #fff; padding: 1px 7px; border-radius: 3px; font-size: 0.72rem; }
-.leg-hot  { background: #7b241c; color: #fff; padding: 1px 7px; border-radius: 3px; font-size: 0.72rem; }
-.tc-grid { display: flex; flex-direction: column; gap: 0.35rem; }
-.tc-row  { display: flex; gap: 0.35rem; }
-.tc-card { background: #1a1a2e; border: 1px solid #2a2a3e; border-radius: 6px; padding: 0.4rem 0.5rem; min-width: 136px; }
-.tc-label { font-size: 0.72rem; font-weight: 700; color: #9b59b6; margin-bottom: 0.22rem; letter-spacing: 0.06em; }
-.tc-temps { display: flex; gap: 2px; margin-bottom: 0.28rem; }
-.tc-cell  { flex: 1; border-radius: 3px; padding: 2px 3px; text-align: center; }
-.tc-cell-lbl { font-size: 0.58rem; color: rgba(255,255,255,0.55); }
-.tc-cell-val { font-size: 0.72rem; font-weight: 600; color: #fff; }
-.tc-meta { display: flex; gap: 0.5rem; font-size: 0.7rem; color: #bdc3c7; margin-bottom: 0.22rem; }
-.tc-chassis { display: flex; gap: 0.4rem; align-items: center; font-size: 0.7rem; }
-.tc-brake { border-radius: 3px; padding: 1px 5px; color: #fff; }
-.tc-susp  { color: #7f8c8d; }
-.setup-recs { max-width: 360px; }
-.setup-recs h4 { font-size: 0.8rem; color: #bdc3c7; margin-bottom: 0.4rem; font-weight: 600; }
-.recs-list { list-style: none; display: flex; flex-direction: column; gap: 0.28rem; }
-.rec-ok   { font-size: 0.78rem; color: #27ae60; }
-.rec-warn { font-size: 0.78rem; color: #e74c3c; }
-.rec-warn::before { content: '\26A0 '; }
-.rec-info { font-size: 0.78rem; color: #f39c12; }
-.rec-info::before { content: '\25CB '; }
+.dmg-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
+.dmg-state { font-size: 0.78rem; font-weight: 700; padding: 2px 9px; border-radius: 3px; letter-spacing: 0.04em; }
+.dmg-state-ok  { background: #1e8449; color: #fff; }
+.dmg-state-bad { background: #7b241c; color: #fff; }
+.dmg-head-meta { font-size: 0.7rem; color: #555; font-family: monospace; }
+.dmg-cols { display: flex; gap: 1.6rem; align-items: flex-start; flex-wrap: wrap; }
+.dmg-block { min-width: 240px; }
+.dmg-block h4 { font-size: 0.72rem; font-weight: 700; color: #9b59b6; letter-spacing: 0.06em;
+  text-transform: uppercase; margin-bottom: 0.35rem; }
+.dmg-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.22rem; }
+.dmg-row-lbl { width: 6.6rem; font-size: 0.74rem; color: #bdc3c7; }
+.dmg-row-val { width: 3.2rem; text-align: right; font-size: 0.74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dmg-track { flex: 1; height: 9px; background: #12121e; border: 1px solid #2a2a3e; border-radius: 3px; overflow: hidden; }
+.dmg-fill { height: 100%; transition: width 0.15s linear; }
+.dmg-contact { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.9rem;
+  padding-top: 0.6rem; border-top: 1px solid #2a2a3e; font-size: 0.74rem; }
+.dmg-contact-lbl { color: #7f8c8d; }
+.dmg-contact-val { color: #bdc3c7; font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 0.9rem; }
 
 /* ── Manage tab ──────────────────────────────────────────────────────────── */
 .manage-layout {
@@ -702,6 +694,13 @@ table { border-collapse: collapse; width: 100%; }
 .champ-list-item:hover .champ-rename-btn { display: inline; }
 .champ-list-rename-input { flex: 1; min-width: 0; background: #12121e; border: 1px solid #3a3a5a; color: #e0e0f0; font-size: 0.88rem; padding: 1px 4px; border-radius: 3px; }
 .champ-list-status { font-size: 0.75rem; padding: 0.1rem 0.2rem; flex-shrink: 0; border: none; border-radius: 3px; cursor: pointer; }
+/* Singleplayer swaps the three-way status picker for the one transition it has. */
+.champ-list-finish {
+  font-size: 0.75rem; padding: 0.1rem 0.4rem; flex-shrink: 0; border-radius: 3px; cursor: pointer;
+  background: #2a1a1a; border: 1px solid #c0392b; color: #e74c3c;
+}
+.champ-list-finish:hover { background: #3a1a1a; }
+span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
 .status-final    { background: #1e4d2b; color: #2ecc71; }
 .status-progress { background: #4d3000; color: #f39c12; }
 .status-active   { background: #7b1a1a; color: #f1948a; }

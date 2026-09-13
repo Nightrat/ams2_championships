@@ -377,6 +377,7 @@ pub fn offers_for(
         champ_id,
         "",
         reputation,
+        0,
         eligibility,
         &Standing::default(),
         params,
@@ -402,6 +403,7 @@ pub fn offers_for_with(
     champ_id: &str,
     class: &str,
     reputation: f32,
+    balance: i64,
     eligibility: &[TeamEligibility],
     standing: &Standing,
     params: &OfferParams,
@@ -414,7 +416,7 @@ pub fn offers_for_with(
         .map(|e| e.expected_position)
         .fold(0.0f32, f32::max);
 
-    eligibility
+    let offers: Vec<Offer> = eligibility
         .iter()
         .enumerate()
         .filter_map(|(rank, e)| {
@@ -485,7 +487,78 @@ pub fn offers_for_with(
                 expected_position: e.expected_position,
             })
         })
-        .collect()
+        .collect();
+
+    open_a_way_in(offers, eligibility, balance, params)
+}
+
+/// Guarantees a career is never left with no seat it can take.
+///
+/// A grid may ask more than an unproven driver has everywhere on it — on most shipped rosters it
+/// does — and the sponsorship a locked team wants can easily exceed a new career's whole
+/// balance. Left alone that is a dead end: nothing earned, nothing affordable, no way to start
+/// earning either.
+///
+/// So when nothing at all is obtainable, the cheapest seat for sale drops its price to exactly
+/// what the career has. The seat still costs everything, which is the point — a way in, not a
+/// gift. This replaced a rule in [`crate::driver_rating`] that handed the least demanding team
+/// over free; that one could not do better because it did not know what the driver could pay.
+fn open_a_way_in(
+    mut offers: Vec<Offer>,
+    eligibility: &[TeamEligibility],
+    balance: i64,
+    params: &OfferParams,
+) -> Vec<Offer> {
+    let obtainable = offers
+        .iter()
+        .any(|o| o.kind == OfferKind::Paid || o.buy_in <= balance);
+    if obtainable {
+        return offers;
+    }
+
+    // Cheapest seat on the market, discounted to whatever there is.
+    if let Some(cheapest) = offers
+        .iter_mut()
+        .filter(|o| o.kind == OfferKind::Pay)
+        .min_by_key(|o| o.buy_in)
+    {
+        cheapest.buy_in = balance.max(0);
+        return offers;
+    }
+
+    // Nothing is even for sale — pay-driver seats are switched off. The least demanding team
+    // takes the driver anyway, because the alternative is a career that cannot begin.
+    if let Some(easiest) = eligibility
+        .iter()
+        .min_by(|a, b| a.required.total_cmp(&b.required))
+    {
+        let rank = eligibility
+            .iter()
+            .position(|e| e.team == easiest.team)
+            .unwrap_or(0);
+        let field = eligibility
+            .iter()
+            .map(|e| e.expected_position)
+            .fold(0.0f32, f32::max);
+        offers.push(Offer {
+            team: easiest.team.clone(),
+            kind: OfferKind::Paid,
+            renewal: false,
+            salary: (base_salary(rank, eligibility.len(), params)).round() as i64,
+            objective: objective(
+                easiest.expected_position,
+                field,
+                params.objective_slack,
+                OfferKind::Paid,
+            ),
+            buy_in: 0,
+            rank,
+            required: easiest.required,
+            expected_position: easiest.expected_position,
+        });
+        offers.sort_by_key(|o| o.rank);
+    }
+    offers
 }
 
 // ── What the career has earned ───────────────────────────────────────────────

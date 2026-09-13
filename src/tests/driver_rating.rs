@@ -526,12 +526,15 @@ fn test_eligibility_locks_top_teams_and_opens_the_back() {
     let williams = low.iter().find(|e| e.team == "Williams").unwrap();
     let osella = low.iter().find(|e| e.team == "Osella").unwrap();
     assert_eq!(williams.tier, Tier::Locked);
-    // Osella's own bar (Ghinzani at 0.66) is above a 40 rating, but the slowest team is always
-    // open so a new driver has somewhere to start.
-    assert_eq!(osella.tier, Tier::Available);
+    // Nothing is forced open here any more. Osella's own bar (Ghinzani at 0.66) is above a 40
+    // rating, so it is locked like the rest — a grid may leave a driver nothing they have
+    // earned. Where a career goes from there is a question about money, answered by
+    // `contracts::offers_for_with`.
+    assert!(osella.required > 40.0);
+    assert_eq!(osella.tier, Tier::Locked);
     assert!(
-        osella.required > 40.0,
-        "the floor should override the bar, not lower it"
+        low.iter().all(|e| e.tier != Tier::Available),
+        "an unproven driver clears nothing on this grid"
     );
     // The bar is the weaker incumbent: Brabham asks for Warwick's 0.78, not Patrese's 0.81.
     let brabham = low.iter().find(|e| e.team == "Brabham").unwrap();
@@ -547,7 +550,8 @@ fn test_is_allowed_permits_unknown_teams() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
     let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
-    let e = team_eligibility(40.0, &exp, &skills);
+    // A rating that clears Osella's bar, so there is a permitted team to contrast against.
+    let e = team_eligibility(70.0, &exp, &skills);
     assert!(!is_allowed(&e, "Williams"));
     assert!(is_allowed(&e, "Osella"));
     // Case-insensitive, and a team with no pace data must never be blocked.

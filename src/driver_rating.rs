@@ -916,6 +916,11 @@ pub fn recorded_players(sessions: &[RecordedSession], seats: &[SeatEntry]) -> Ve
 /// Two gates combine into a single requirement: how far up the grid the player's reputation
 /// reaches, and whether they would beat the team's weaker incumbent. The stricter one wins, so
 /// a fast car staffed by two greats stays shut longer than its pace alone implies.
+///
+/// Every seat on the grid may come back `Locked`, and for an unproven driver most rosters do
+/// exactly that. This function judges a rating against a grid and nothing else; what to do about
+/// a driver who has earned nothing is a question about money, and it is answered in
+/// [`crate::contracts::offers_for_with`].
 pub fn team_eligibility(
     reputation: f32,
     expected: &HashMap<String, f32>,
@@ -935,7 +940,7 @@ pub fn team_eligibility_with(
     teams.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal));
     let total = teams.len() as f32;
 
-    let mut out: Vec<TeamEligibility> = teams
+    let out: Vec<TeamEligibility> = teams
         .into_iter()
         .enumerate()
         .map(|(i, (team, exp))| {
@@ -958,15 +963,11 @@ pub fn team_eligibility_with(
         })
         .collect();
 
-    // A grid whose slowest car is still staffed by capable drivers can demand more than a new
-    // driver has, locking every seat and leaving no way into the sport. The least demanding
-    // team is therefore always open, whatever the rating.
-    if !out.iter().any(|e| e.tier == Tier::Available) {
-        let floor = out.iter().map(|e| e.required).fold(f32::MAX, f32::min);
-        for e in out.iter_mut().filter(|e| e.required <= floor) {
-            e.tier = Tier::Available;
-        }
-    }
+    // No floor here. A grid can leave every seat locked, and on most shipped rosters a new
+    // driver's rating clears nothing at all — this used to hand over the least demanding team
+    // free so a career always had somewhere to start. That guarantee now lives in
+    // `contracts::offers_for_with`, which knows what the career can afford and so can charge for
+    // the seat instead of giving it away. Deciding it here meant deciding it blind to money.
     out
 }
 

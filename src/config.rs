@@ -56,21 +56,19 @@ fn default_floor_prize() -> i64 {
 /// sponsorship — a choice of way in, rather than one take-it-or-leave-it.
 ///
 /// Measured, not guessed. Across the eight rosters in `docs/custom_ai_files_with_perf_scalars`
-/// the second-cheapest pay-driver seat for a driver on the starting rating costs between
-/// 2,250,000 and 4,050,000, the dearest being F-Classic_Gen2. This is that dearest figure, so
-/// the promise holds on every grid that has two such seats at all. `test_a_new_career_can_buy
-/// _into_two_pay_seats_on_every_shipped_grid` re-measures it, and will fail if retuning the
-/// economy moves the costs out from under it.
+/// the second-cheapest pay-driver seat for a driver on the starting rating runs to 3,449,998 at
+/// worst (F-Retro_Gen3); this covers it with a little room.
+/// `test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid` re-measures it and fails
+/// if retuning the economy moves the costs out from under it.
 ///
-/// Two shipped classes cannot satisfy it whatever the balance: F-Vintage_Gen2 offers only one
-/// pay seat and F-Classic_Gen3 none, because their back rows are reachable on merit.
+/// Two shipped classes cannot satisfy it whatever the balance: F-Vintage_Gen2 offers one pay seat
+/// and F-Classic_Gen3 none, because their back rows are reachable on merit.
 ///
-/// Note what this is worth elsewhere — about one season at the quickest car on the grid. If that
-/// reads as too rich for someone who has raced nothing, the figure to lower is
-/// [`Config::contract_buy_in_per_point`]: 150,000 a point is what makes any real shortfall cost
-/// millions in the first place.
+/// Falling short of every seat is not a dead end — `contracts::offers_for_with` drops the
+/// cheapest to whatever the career holds. This figure is what stops that last resort being the
+/// *normal* way a career begins.
 fn default_starting_balance() -> i64 {
-    4_050_000
+    3_500_000
 }
 
 /// Upper bound on every configurable money figure. Not a rule about what a career should be

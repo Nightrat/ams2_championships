@@ -3130,11 +3130,12 @@ fn test_route_a_finished_singleplayer_season_stays_finished() {
     let (store, path) = mode_store(CareerMode::Singleplayer);
     store.write().unwrap().championships[0].status = ChampionshipStatus::Final;
 
+    // `Active` is the only other state singleplayer has, so that is what reopening would mean.
     let resp = patch(
         store.clone(),
         path.clone(),
         "/api/championships/c1",
-        br#"{"status":"Progress"}"#,
+        br#"{"status":"Active"}"#,
     );
     assert!(status_line(&resp).contains("409"), "{resp}");
     assert!(resp.contains("stays finished"), "{resp}");
@@ -3338,4 +3339,122 @@ fn test_route_changing_the_config_does_not_move_an_existing_careers_balance() {
 
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_a_singleplayer_season_is_the_current_one_from_the_moment_it_exists() {
+    // It is the only unfinished season a career may have, so there is nothing for it to be
+    // "in progress but not current" relative to. Creating it as Progress also left a fresh
+    // career with nothing marked Active — which is what /api/live-teams looks for, so the live
+    // grid showed no team names until the user found the dropdown.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].status,
+        ChampionshipStatus::Active
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_a_multiplayer_season_still_starts_in_progress() {
+    // Several can run at once there, so "started, but not the one I am racing tonight" is a
+    // state that means something.
+    let (store, path) = mode_store(CareerMode::Multiplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"Thursday","points_system":[],"manufacturer_scoring":false}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].status,
+        ChampionshipStatus::Progress
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_singleplayer_has_no_progress_state() {
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"status":"Progress"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("being raced or finished"), "{resp}");
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_the_only_singleplayer_transition_is_finishing() {
+    // Active → Final, and that is the whole state machine.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships[0].status = ChampionshipStatus::Active;
+
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"status":"Final"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].status,
+        ChampionshipStatus::Final
+    );
+    // And there is no way back, by either route.
+    for body in [
+        &br#"{"status":"Active"}"#[..],
+        &br#"{"status":"Progress"}"#[..],
+    ] {
+        let resp = patch(store.clone(), path.clone(), "/api/championships/c1", body);
+        assert!(status_line(&resp).contains("409"), "{resp}");
+    }
+    assert_eq!(
+        store.read().unwrap().championships[0].status,
+        ChampionshipStatus::Final
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_a_fresh_singleplayer_career_shows_team_names_live() {
+    // The bug this fixes, end to end: /api/live-teams reads the Active championship, and a
+    // newly created season used to be Progress — so a fresh career had no Active one at all.
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_sp_store();
+    let body = br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#;
+    let mut req = format!(
+        "POST /api/championships HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body);
+    let resp = call_with_config(store.clone(), data_path.clone(), req, Some(config.clone()));
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let resp = call_with_config(
+        store,
+        data_path,
+        b"GET /api/live-teams HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    let v = body_json(&resp);
+    assert!(
+        v["teams"].as_object().is_some_and(|t| !t.is_empty()),
+        "the roster's team names should be live immediately: {resp}"
+    );
+    std::fs::remove_dir_all(&root).ok();
 }

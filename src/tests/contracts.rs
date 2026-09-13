@@ -934,9 +934,15 @@ fn test_only_a_bought_seat_carries_a_price() {
 #[test]
 fn test_buy_in_rises_with_the_shortfall() {
     let p = params();
-    let g = vec![elig("Williams", Tier::Locked, 90.0, 1.5)];
-    let close = offers_for("c1", 80.0, &g, &p)[0].buy_in;
-    let far = offers_for("c1", 40.0, &g, &p)[0].buy_in;
+    // Fastest first, as eligibility always is, with a seat the driver already has on merit — so
+    // the last-resort discount never fires and the price on the back car is the honest one.
+    let g = vec![
+        elig("Fast", Tier::Available, 10.0, 1.5),
+        elig("Mid", Tier::Available, 10.0, 3.5),
+        elig("Osella", Tier::Locked, 90.0, 5.5),
+    ];
+    let close = offer(&offers_for("c1", 80.0, &g, &p), "Osella").buy_in;
+    let far = offer(&offers_for("c1", 40.0, &g, &p), "Osella").buy_in;
     assert!(far > close, "{far} should cost more than {close}");
 }
 
@@ -1097,6 +1103,7 @@ fn test_delivering_earns_a_renewal_whatever_the_rating_says() {
         "c1",
         CLASS,
         40.0,
+        0,
         &grid(),
         &served("Williams", Some(true), 1),
         &params(),
@@ -1111,8 +1118,16 @@ fn test_a_renewal_pays_more_than_the_open_market() {
     let p = params();
     let g = vec![elig("Osella", Tier::Available, REQ, 5.5)];
     let open = offers_for("c1", REQ, &g, &p)[0].salary;
-    let renewed =
-        offers_for_with("c1", CLASS, REQ, &g, &served("Osella", Some(true), 1), &p)[0].salary;
+    let renewed = offers_for_with(
+        "c1",
+        CLASS,
+        REQ,
+        0,
+        &g,
+        &served("Osella", Some(true), 1),
+        &p,
+    )[0]
+    .salary;
     assert!(renewed > open, "renewal {renewed} against market {open}");
 }
 
@@ -1121,7 +1136,16 @@ fn test_loyalty_grows_with_tenure_and_then_stops() {
     let p = params();
     let g = vec![elig("Osella", Tier::Available, REQ, 5.5)];
     let pay = |t: u32| {
-        offers_for_with("c1", CLASS, REQ, &g, &served("Osella", Some(true), t), &p)[0].salary
+        offers_for_with(
+            "c1",
+            CLASS,
+            REQ,
+            0,
+            &g,
+            &served("Osella", Some(true), t),
+            &p,
+        )[0]
+        .salary
     };
     assert!(pay(1) < pay(2) && pay(2) < pay(3));
     assert_eq!(pay(3), pay(9), "loyalty is capped, not compounding forever");
@@ -1134,6 +1158,7 @@ fn test_missing_the_target_drops_the_driver_back_to_merit() {
         "c1",
         CLASS,
         40.0,
+        0,
         &grid(),
         &served("Williams", Some(false), 3),
         &p,
@@ -1147,6 +1172,7 @@ fn test_missing_the_target_drops_the_driver_back_to_merit() {
         "c1",
         CLASS,
         30.0,
+        0,
         &skint_grid(),
         &served("Osella", Some(false), 2),
         &p,
@@ -1160,7 +1186,15 @@ fn test_a_dropped_driver_keeps_a_seat_they_had_earned_anyway() {
     // free. A team the driver clears on merit still offers.
     let p = params();
     let g = vec![elig("Osella", Tier::Available, REQ, 5.5)];
-    let o = offers_for_with("c1", CLASS, REQ, &g, &served("Osella", Some(false), 2), &p);
+    let o = offers_for_with(
+        "c1",
+        CLASS,
+        REQ,
+        0,
+        &g,
+        &served("Osella", Some(false), 2),
+        &p,
+    );
     assert_eq!(o[0].kind, OfferKind::Paid);
 }
 
@@ -1168,7 +1202,15 @@ fn test_a_dropped_driver_keeps_a_seat_they_had_earned_anyway() {
 fn test_a_deal_that_set_no_target_cannot_be_failed() {
     // A backmarker team asks for nothing, so it has no grounds to drop anyone.
     let p = params();
-    let offers = offers_for_with("c1", CLASS, 40.0, &grid(), &served("Williams", None, 1), &p);
+    let offers = offers_for_with(
+        "c1",
+        CLASS,
+        40.0,
+        0,
+        &grid(),
+        &served("Williams", None, 1),
+        &p,
+    );
     assert_eq!(offer(&offers, "Williams").kind, OfferKind::Paid);
 }
 
@@ -1178,7 +1220,7 @@ fn test_a_renewal_without_a_target_earns_no_loyalty_rise() {
     let p = params();
     let g = vec![elig("Osella", Tier::Available, REQ, 5.5)];
     let plain = offers_for("c1", REQ, &g, &p)[0].salary;
-    let kept = offers_for_with("c1", CLASS, REQ, &g, &served("Osella", None, 3), &p)[0].salary;
+    let kept = offers_for_with("c1", CLASS, REQ, 0, &g, &served("Osella", None, 3), &p)[0].salary;
     assert_eq!(kept, plain);
 }
 
@@ -1189,6 +1231,7 @@ fn test_a_renewal_applies_only_to_the_incumbent() {
         "c1",
         CLASS,
         62.0,
+        0,
         &grid(),
         &served("Williams", Some(true), 2),
         &p,
@@ -1202,7 +1245,7 @@ fn test_offers_for_is_offers_for_with_on_an_empty_standing() {
     let g = grid();
     assert_eq!(
         offers_for("c1", 62.0, &g, &params()),
-        offers_for_with("c1", CLASS, 62.0, &g, &Standing::default(), &params())
+        offers_for_with("c1", CLASS, 62.0, 0, &g, &Standing::default(), &params())
     );
 }
 
@@ -1230,7 +1273,7 @@ fn test_reference_career_renews_the_seat_it_delivered_in() {
     s.incumbent = Some("Brabham".into());
 
     let (rep, eligibility) = reference_eligibility();
-    let offers = offers_for_with("1777758943816", CLASS, rep, &eligibility, &s, &params());
+    let offers = offers_for_with("1777758943816", CLASS, rep, 0, &eligibility, &s, &params());
     assert_eq!(
         s.delivered,
         Some(true),
@@ -1261,14 +1304,14 @@ fn test_a_seat_is_only_held_inside_its_own_series() {
     ];
     let won_elsewhere = served_in("Ferrari", OTHER_CLASS, Some(true), 3);
 
-    let offers = offers_for_with("c1", CLASS, 40.0, &g, &won_elsewhere, &p);
+    let offers = offers_for_with("c1", CLASS, 40.0, 0, &g, &won_elsewhere, &p);
     assert!(
         !offers.iter().any(|o| o.team == "Ferrari"),
         "a Ferrari drive in another series must not open this one: {offers:?}"
     );
 
     // Same standing, same grid, in the series it was actually earned in: the seat is held.
-    let home = offers_for_with("c1", OTHER_CLASS, 40.0, &g, &won_elsewhere, &p);
+    let home = offers_for_with("c1", OTHER_CLASS, 40.0, 0, &g, &won_elsewhere, &p);
     assert_eq!(offer(&home, "Ferrari").kind, OfferKind::Paid);
 }
 
@@ -1279,10 +1322,10 @@ fn test_an_unknown_class_holds_no_seat_either_way() {
     let p = params();
     let g = vec![elig("Osella", Tier::Locked, 90.0, 5.5)];
     let nowhere = served_in("Osella", "", Some(true), 2);
-    assert!(offers_for_with("c1", "", 40.0, &g, &nowhere, &p)
+    assert!(offers_for_with("c1", "", 40.0, 0, &g, &nowhere, &p)
         .iter()
         .all(|o| o.kind != OfferKind::Paid));
-    assert!(offers_for_with("c1", CLASS, 40.0, &g, &nowhere, &p)
+    assert!(offers_for_with("c1", CLASS, 40.0, 0, &g, &nowhere, &p)
         .iter()
         .all(|o| o.kind != OfferKind::Paid));
 }
@@ -1321,7 +1364,7 @@ fn test_changing_series_is_a_fresh_start_not_a_punishment() {
     let g = grid();
     let elsewhere = served_in("Williams", OTHER_CLASS, Some(true), 3);
     assert_eq!(
-        offers_for_with("c1", CLASS, 62.0, &g, &elsewhere, &p),
+        offers_for_with("c1", CLASS, 62.0, 0, &g, &elsewhere, &p),
         offers_for("c1", 62.0, &g, &p),
         "a standing from another series must read exactly like no standing at all"
     );
@@ -1403,7 +1446,19 @@ fn test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid() {
             &crate::custom_ai::parse_team_skills(&path),
         );
 
-        let mut costs: Vec<i64> = offers_for("c", rating, &elig, &params())
+        // Offers generated *at* the balance, so the last-resort discount only fires if the
+        // career genuinely cannot reach anything — reading prices at a balance of zero would
+        // show a discounted seat rather than what it really costs.
+        let offers = offers_for_with(
+            "c",
+            "",
+            rating,
+            balance,
+            &elig,
+            &Standing::default(),
+            &params(),
+        );
+        let mut costs: Vec<i64> = offers
             .iter()
             .filter(|o| o.kind == OfferKind::Pay)
             .map(|o| o.buy_in)
@@ -1434,39 +1489,179 @@ fn test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid() {
 }
 
 #[test]
-fn test_the_starting_balance_is_no_more_than_it_needs_to_be() {
-    // The other half: it buys a choice, not the grid. On the dearest roster the second seat is
-    // only just affordable, so the balance is sized to the promise rather than padded past it.
+fn test_the_starting_balance_buys_a_choice_not_the_grid() {
+    // The other half of the promise. A balance that reached every seat for sale would make the
+    // rating irrelevant in the first season, so on at least one shipped roster it must fall
+    // short of the dearest seats.
     use crate::driver_rating::{expected_positions, team_eligibility, RatingParams};
 
     let balance = crate::config::Config::default().starting_balance;
     let rating = RatingParams::default().starting_rating;
     let dir = std::path::Path::new(AI_DIR);
-    let path = dir.join("F-Classic_Gen2.xml");
-    let perf = crate::custom_ai::class_performance(dir)
-        .into_iter()
-        .find(|p| p.class == "F-Classic_Gen2")
-        .expect("shipped roster");
-    let pace: std::collections::HashMap<String, f32> = perf
-        .cars
-        .iter()
-        .map(|c| (c.team.clone(), c.pace_delta_pct))
-        .collect();
-    let elig = team_eligibility(
-        rating,
-        &expected_positions(&pace, &crate::custom_ai::parse_seats(&path)),
-        &crate::custom_ai::parse_team_skills(&path),
+    let mut grids_with_seats_out_of_reach = 0;
+
+    for perf in crate::custom_ai::class_performance(dir) {
+        let path = dir.join(format!("{}.xml", perf.class));
+        let pace: std::collections::HashMap<String, f32> = perf
+            .cars
+            .iter()
+            .map(|c| (c.team.clone(), c.pace_delta_pct))
+            .collect();
+        let elig = team_eligibility(
+            rating,
+            &expected_positions(&pace, &crate::custom_ai::parse_seats(&path)),
+            &crate::custom_ai::parse_team_skills(&path),
+        );
+        let offers = offers_for_with(
+            "c",
+            "",
+            rating,
+            balance,
+            &elig,
+            &Standing::default(),
+            &params(),
+        );
+        if offers
+            .iter()
+            .any(|o| o.kind == OfferKind::Pay && o.buy_in > balance)
+        {
+            grids_with_seats_out_of_reach += 1;
+        }
+    }
+    assert!(
+        grids_with_seats_out_of_reach >= 4,
+        "a founding balance must leave plenty still to be earned, not open the market"
     );
-    let mut costs: Vec<i64> = offers_for("c", rating, &elig, &params())
+}
+
+// ── Never locked out, but never given a seat either ─────────────────────────
+
+/// A grid an unproven driver has earned nothing on — which, on most shipped rosters, is exactly
+/// what a first season looks like now that eligibility has no floor of its own.
+fn nothing_earned() -> Vec<TeamEligibility> {
+    vec![
+        elig("Williams", Tier::Locked, 95.0, 1.5),
+        elig("Brabham", Tier::Locked, 85.0, 3.5),
+        elig("Osella", Tier::Locked, 70.0, 5.5),
+        elig("AGS", Tier::Locked, 65.0, 7.5),
+    ]
+}
+
+fn at_balance(rating: f32, balance: i64, g: &[TeamEligibility]) -> Vec<Offer> {
+    offers_for_with(
+        "c1",
+        CLASS,
+        rating,
+        balance,
+        g,
+        &Standing::default(),
+        &params(),
+    )
+}
+
+#[test]
+fn test_a_penniless_career_is_never_locked_out() {
+    // Every seat asks more than the driver has earned, and the sponsorship on all of them is
+    // beyond a balance of nothing. Something still has to be takeable, or the career cannot
+    // begin — and a career that cannot begin can never earn its way out.
+    let offers = at_balance(20.0, 0, &nothing_earned());
+    let takeable: Vec<&Offer> = offers
+        .iter()
+        .filter(|o| o.kind == OfferKind::Paid || o.buy_in <= 0)
+        .collect();
+    assert_eq!(takeable.len(), 1, "exactly one way in, not a free-for-all");
+    assert_eq!(
+        takeable[0].kind,
+        OfferKind::Pay,
+        "it is still a bought seat"
+    );
+}
+
+#[test]
+fn test_the_last_resort_asks_for_everything_the_career_has() {
+    // The point of pricing it at the balance rather than at zero: the weakest team still costs
+    // something. A driver who scrapes in arrives with nothing left.
+    for balance in [0, 250_000, 900_000] {
+        let offers = at_balance(20.0, balance, &nothing_earned());
+        let cheapest = offers
+            .iter()
+            .filter(|o| o.kind == OfferKind::Pay)
+            .min_by_key(|o| o.buy_in)
+            .expect("a seat for sale");
+        assert_eq!(cheapest.buy_in, balance, "priced at exactly what there is");
+    }
+}
+
+#[test]
+fn test_the_discount_goes_to_the_cheapest_seat() {
+    // Not to the best car the driver fancies: the way in is the one nobody else wanted.
+    let g = nothing_earned();
+    let offers = at_balance(20.0, 0, &g);
+    let discounted: Vec<&str> = offers
+        .iter()
+        .filter(|o| o.kind == OfferKind::Pay && o.buy_in == 0)
+        .map(|o| o.team.as_str())
+        .collect();
+    // AGS asks least of the four, so its seat is the cheapest to buy.
+    assert_eq!(discounted, vec!["AGS"]);
+}
+
+#[test]
+fn test_no_discount_while_anything_is_already_within_reach() {
+    let g = nothing_earned();
+    // Rich enough for the cheapest seat at its real price: nothing is marked down.
+    let rich = at_balance(20.0, 50_000_000, &g);
+    let poor = at_balance(20.0, 0, &g);
+    let real_cheapest = rich
         .iter()
         .filter(|o| o.kind == OfferKind::Pay)
         .map(|o| o.buy_in)
-        .collect();
-    costs.sort();
-
-    assert_eq!(costs[1], balance, "sized exactly to the second seat");
-    assert!(
-        costs.len() > 2 && costs[2] > balance,
-        "and short of the third: {costs:?}"
+        .min()
+        .unwrap();
+    assert!(real_cheapest > 0, "the honest price survives a full wallet");
+    assert_ne!(
+        real_cheapest,
+        poor.iter()
+            .filter(|o| o.kind == OfferKind::Pay)
+            .map(|o| o.buy_in)
+            .min()
+            .unwrap()
     );
+}
+
+#[test]
+fn test_an_earned_seat_stops_the_last_resort_firing() {
+    // A driver who has earned something needs no way in inventing for them.
+    let mut g = nothing_earned();
+    g.push(elig("Coloni", Tier::Available, 10.0, 9.5));
+    let offers = at_balance(20.0, 0, &g);
+    assert!(
+        offers
+            .iter()
+            .all(|o| o.kind != OfferKind::Pay || o.buy_in > 0),
+        "nothing should be marked down: {offers:?}"
+    );
+}
+
+#[test]
+fn test_a_way_in_exists_even_with_pay_driver_seats_switched_off() {
+    // `buy_in_per_point: 0` means no team sells, so there is nothing to discount. The least
+    // demanding team takes the driver anyway — the alternative is a career that cannot start.
+    let p = OfferParams {
+        buy_in_per_point: 0,
+        ..params()
+    };
+    let g = nothing_earned();
+    let offers = offers_for_with("c1", CLASS, 20.0, 0, &g, &Standing::default(), &p);
+    assert_eq!(offers.len(), 1, "{offers:?}");
+    assert_eq!(offers[0].team, "AGS", "the least demanding team");
+    assert_eq!(offers[0].kind, OfferKind::Paid);
+    assert_eq!(offers[0].buy_in, 0);
+}
+
+#[test]
+fn test_an_empty_grid_still_yields_nothing() {
+    // No teams, no seat to invent. The guarantee is about a career reaching a grid, not about
+    // conjuring one.
+    assert!(at_balance(20.0, 1_000_000, &[]).is_empty());
 }
