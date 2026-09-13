@@ -171,3 +171,35 @@ fn test_resolve_active_empty_folder_yields_default_path() {
     assert!(!picked.exists(), "path is returned, not created");
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_list_saves_marks_a_file_it_cannot_read() {
+    // A broken save stays listed: showing it as an empty career would be a lie, and hiding it
+    // would leave the user wondering where their season went.
+    let dir = tmp_dir("broken");
+    fs::write(save_path(&dir, "ams2_career"), CAREER_JSON).unwrap();
+    fs::write(save_path(&dir, "corrupt"), "{ not json").unwrap();
+
+    let saves = list_saves(&dir, &save_path(&dir, "ams2_career"));
+    let good = saves.iter().find(|s| s.name == "ams2_career").unwrap();
+    let bad = saves.iter().find(|s| s.name == "corrupt").unwrap();
+    assert!(good.error.is_none());
+    assert!(bad.error.is_some(), "a damaged save must say so");
+    assert_eq!((bad.sessions, bad.championships), (0, 0));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_list_saves_reads_a_file_with_a_byte_order_mark() {
+    let dir = tmp_dir("bom");
+    fs::write(
+        save_path(&dir, "ams2_career"),
+        format!("\u{feff}{CAREER_JSON}"),
+    )
+    .unwrap();
+    let saves = list_saves(&dir, &save_path(&dir, "ams2_career"));
+    assert!(saves[0].error.is_none(), "{:?}", saves[0].error);
+    assert_eq!(saves[0].sessions, 1);
+    let _ = fs::remove_dir_all(&dir);
+}

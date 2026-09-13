@@ -62,6 +62,10 @@ const TEAMMATE_SHRINKAGE: f32 = 3.0;
 const TEAMMATE_QUALI_WEIGHT: f32 = 0.55;
 
 /// How far below a team's bar the player may sit and still be told a seat is within reach.
+///
+/// Default for [`RatingParams::offer_margin`]. It is the width of the whole middle tier: a
+/// driver inside it is offered the seat on merit, one outside it is locked out and can only buy
+/// in. Zero removes the tier — every bar must be cleared outright.
 const OFFER_MARGIN: f32 = 10.0;
 
 /// Allowance against the incumbent's `race_skill`, in the same 0–1 units.
@@ -115,6 +119,13 @@ pub struct RatingParams {
     /// Fraction of the leader's distance a car must fall short of to be called a retirement,
     /// 0..1. See [`RETIREMENT_DISTANCE`]; the config carries it as a percentage.
     pub retirement_distance: f32,
+    /// How far below a team's bar a driver may sit and still be offered the seat on merit.
+    ///
+    /// Widening it opens the grid without moving any bar, which is the difference between this
+    /// and [`Self::strictness`]: that shifts what teams ask, this shifts how far short of it
+    /// they will still take you. Zero means every bar must be cleared outright, and every team
+    /// short of that is locked.
+    pub offer_margin: f32,
 }
 
 impl Default for RatingParams {
@@ -127,6 +138,7 @@ impl Default for RatingParams {
             count_retirements: true,
             retirement_min_laps_down: RETIREMENT_MIN_LAPS_DOWN,
             retirement_distance: RETIREMENT_DISTANCE,
+            offer_margin: OFFER_MARGIN,
         }
     }
 }
@@ -481,7 +493,14 @@ pub fn compute_reputation_with(
     params: &RatingParams,
 ) -> Reputation {
     let name = infer_player_name(sessions, seats);
-    compute_reputation_inner(name.as_deref(), sessions, seats, pace, declared_team, params)
+    compute_reputation_inner(
+        name.as_deref(),
+        sessions,
+        seats,
+        pace,
+        declared_team,
+        params,
+    )
 }
 
 /// Like [`compute_reputation`] but for a named driver, so every recorded human can be rated
@@ -787,7 +806,7 @@ fn accumulate_with<'a>(
 pub enum Tier {
     /// Both gates cleared — the seat can be claimed.
     Available,
-    /// Within [`OFFER_MARGIN`] of the bar; a few more good results will open it.
+    /// Within [`RatingParams::offer_margin`] of the bar; a few more good results will open it.
     OfferPossible,
     /// Out of reach for now.
     Locked,
@@ -924,7 +943,7 @@ pub fn team_eligibility_with(
             let incumbent_skill = skills.get(team).copied();
             let tier = if reputation >= required {
                 Tier::Available
-            } else if reputation >= required - OFFER_MARGIN {
+            } else if reputation >= required - params.offer_margin {
                 Tier::OfferPossible
             } else {
                 Tier::Locked

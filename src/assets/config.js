@@ -22,8 +22,15 @@ function loadConfig() {
       document.getElementById('cfg-record-race').checked     = cfg.record_race;
       document.getElementById('cfg-enforce-team-eligibility').checked = cfg.enforce_team_eligibility;
       document.getElementById('cfg-hide-locked-teams').checked = cfg.hide_locked_teams;
+      document.getElementById('cfg-contract-top-salary').value = cfg.contract_top_salary;
+      document.getElementById('cfg-contract-floor-salary').value = cfg.contract_floor_salary;
+      document.getElementById('cfg-contract-buy-in').value = cfg.contract_buy_in_per_point;
+      document.getElementById('cfg-champion-prize').value = cfg.champion_prize;
+      document.getElementById('cfg-last-place-prize').value = cfg.last_place_prize;
+      document.getElementById('cfg-starting-balance').value = cfg.starting_balance;
       document.getElementById('cfg-starting-rating').value   = cfg.starting_rating;
       document.getElementById('cfg-rating-strictness').value = cfg.rating_strictness;
+      document.getElementById('cfg-offer-margin').value = cfg.offer_margin;
       document.getElementById('cfg-eligibility-gates').value = cfg.eligibility_gates;
       document.getElementById('cfg-rating-half-life').value  = cfg.rating_half_life;
       document.getElementById('cfg-count-retirements').checked = cfg.count_retirements;
@@ -95,10 +102,19 @@ document.getElementById('config-form').addEventListener('submit', function (e) {
     record_race:          document.getElementById('cfg-record-race').checked,
     enforce_team_eligibility: document.getElementById('cfg-enforce-team-eligibility').checked,
     hide_locked_teams:    document.getElementById('cfg-hide-locked-teams').checked,
+    // Money fields fall back the same way the rating ones do: a blank box must not wipe the
+    // economy, and the server clamps whatever arrives.
+    contract_top_salary:   Math.round(numOr('cfg-contract-top-salary', _loadedConfig && _loadedConfig.contract_top_salary, 4000000)),
+    contract_floor_salary: Math.round(numOr('cfg-contract-floor-salary', _loadedConfig && _loadedConfig.contract_floor_salary, 200000)),
+    contract_buy_in_per_point: Math.round(numOr('cfg-contract-buy-in', _loadedConfig && _loadedConfig.contract_buy_in_per_point, 150000)),
+    champion_prize:        Math.round(numOr('cfg-champion-prize', _loadedConfig && _loadedConfig.champion_prize, 2000000)),
+    last_place_prize:      Math.round(numOr('cfg-last-place-prize', _loadedConfig && _loadedConfig.last_place_prize, 50000)),
+    starting_balance:      Math.round(numOr('cfg-starting-balance', _loadedConfig && _loadedConfig.starting_balance, 4050000)),
     // An empty or unparseable field falls back to the value the server last sent, so a blank
     // box cannot silently reset a rating to 0.
     starting_rating:      numOr('cfg-starting-rating', _loadedConfig && _loadedConfig.starting_rating, 50),
     rating_strictness:    numOr('cfg-rating-strictness', _loadedConfig && _loadedConfig.rating_strictness, 0),
+    offer_margin:         numOr('cfg-offer-margin', _loadedConfig && _loadedConfig.offer_margin, 10),
     eligibility_gates:    document.getElementById('cfg-eligibility-gates').value,
     rating_half_life:     numOr('cfg-rating-half-life', _loadedConfig && _loadedConfig.rating_half_life, 10),
     count_retirements:    document.getElementById('cfg-count-retirements').checked,

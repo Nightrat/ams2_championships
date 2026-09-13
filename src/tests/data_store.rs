@@ -106,7 +106,7 @@ fn test_persist_and_reload_championship() {
         .unwrap()
         .championships
         .push(sample_championship());
-    persist(&store, &path);
+    persist(&store, &path).expect("the save must actually be written");
 
     let store2 = load_store(&path);
     let data = store2.read().unwrap();
@@ -127,7 +127,7 @@ fn test_persist_and_reload_session() {
     let path = tmp();
     let store = load_store(&path);
     store.write().unwrap().sessions.push(sample_session());
-    persist(&store, &path);
+    persist(&store, &path).expect("the save must actually be written");
 
     let store2 = load_store(&path);
     let data = store2.read().unwrap();
@@ -149,14 +149,14 @@ fn test_persist_overwrites_previous_contents() {
         .unwrap()
         .championships
         .push(sample_championship());
-    persist(&store, &path);
+    persist(&store, &path).expect("the save must actually be written");
 
     // Add a second championship and persist again.
     let mut c2 = sample_championship();
     c2.id = "2".into();
     c2.name = "Second Champ".into();
     store.write().unwrap().championships.push(c2);
-    persist(&store, &path);
+    persist(&store, &path).expect("the save must actually be written");
 
     let store3 = load_store(&path);
     assert_eq!(store3.read().unwrap().championships.len(), 2);
@@ -168,7 +168,7 @@ fn test_persist_writes_valid_json() {
     let path = tmp();
     let store = load_store(&path);
     store.write().unwrap().sessions.push(sample_session());
-    persist(&store, &path);
+    persist(&store, &path).expect("the save must actually be written");
 
     let raw = fs::read_to_string(&path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
@@ -184,7 +184,7 @@ fn test_dnf_result_round_trips() {
     let mut session = sample_session();
     session.results[1].dnf = true;
     store.write().unwrap().sessions.push(session);
-    persist(&store, &path);
+    persist(&store, &path).expect("the save must actually be written");
 
     let store2 = load_store(&path);
     let data = store2.read().unwrap();
@@ -1316,4 +1316,96 @@ fn test_active_classes_dedupes_and_skips_championships_without_a_roster() {
 #[test]
 fn test_active_classes_empty_for_no_championships() {
     assert!(active_classes(&[]).is_empty());
+}
+
+// ── Loading a damaged or BOM-prefixed save ───────────────────────────────────
+
+fn load_tmp(tag: &str) -> PathBuf {
+    let ns = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    std::env::temp_dir().join(format!("ams2_load_test_{tag}_{ns}.json"))
+}
+
+const ONE_CHAMP: &str = r#"{"sessions":[],"championships":[{"id":"c1","name":"Season","points_system":[25],"rounds":[]}]}"#;
+
+#[test]
+fn test_a_missing_save_is_an_empty_career_not_an_error() {
+    // That is how a new save begins, so it must not read as damage.
+    let path = load_tmp("missing");
+    let data = try_load_data(&path).expect("a file that is not there yet is not an error");
+    assert!(data.sessions.is_empty() && data.championships.is_empty());
+}
+
+#[test]
+fn test_a_byte_order_mark_is_stripped_before_parsing() {
+    // Notepad and PowerShell both write one by default on Windows, and serde_json rejects it.
+    let path = load_tmp("bom");
+    fs::write(&path, format!("\u{feff}{ONE_CHAMP}")).unwrap();
+    let data = try_load_data(&path).expect("a BOM must not make a save unreadable");
+    assert_eq!(data.championships.len(), 1);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_damaged_save_is_an_error_rather_than_an_empty_career() {
+    // The whole point: defaulting here would present an empty career as if it were real.
+    let path = load_tmp("damaged");
+    fs::write(&path, "{ this is not json").unwrap();
+    assert!(try_load_data(&path).is_err());
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_persist_refuses_to_overwrite_a_save_it_could_not_read() {
+    let path = load_tmp("guard");
+    let broken = "{ not json at all";
+    fs::write(&path, broken).unwrap();
+
+    // An empty store, exactly as the startup path would leave it after a failed load.
+    let store = load_store(&path);
+    let err = persist(&store, &path).expect_err("writing over an unread career must be refused");
+    assert!(err.contains("refusing to overwrite"), "{err}");
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        broken,
+        "the file must be byte-for-byte untouched"
+    );
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_persist_writes_a_save_it_can_read() {
+    let path = load_tmp("ok");
+    fs::write(&path, ONE_CHAMP).unwrap();
+    let store = load_store(&path);
+    store.write().unwrap().championships.clear();
+
+    persist(&store, &path).expect("a readable save may be written");
+    assert!(try_load_data(&path).unwrap().championships.is_empty());
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_persist_creates_a_save_that_does_not_exist_yet() {
+    // The guard must not stop a brand new career from ever being written.
+    let path = load_tmp("new");
+    let store = load_store(&path);
+    persist(&store, &path).expect("a missing file is not a career to protect");
+    assert!(path.exists());
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_persist_accepts_a_save_that_only_had_a_byte_order_mark() {
+    // The guard parses the same way the loader does, so a BOM must not make a file permanently
+    // unwritable — the career was read fine, and the rewrite drops the mark.
+    let path = load_tmp("bomguard");
+    fs::write(&path, format!("\u{feff}{ONE_CHAMP}")).unwrap();
+    let store = load_store(&path);
+    assert_eq!(store.read().unwrap().championships.len(), 1);
+    persist(&store, &path).expect("a BOM is not damage");
+    assert!(!fs::read_to_string(&path).unwrap().starts_with('\u{feff}'));
+    let _ = fs::remove_file(&path);
 }

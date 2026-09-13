@@ -1,5 +1,7 @@
 use super::*;
-use ams2_championship::data_store::{CareerData, Championship, ChampionshipStatus, Round};
+use ams2_championship::data_store::{
+    CareerData, Championship, ChampionshipStatus, RecordedSession, Round, SessionResult,
+};
 use ams2_championship::http::{parse_request, track_slug, Request};
 use ams2_championship::websocket::{base64_encode, sha1, ws_accept_key, ws_send_text};
 use std::io::{Read, Write};
@@ -150,6 +152,16 @@ fn body(resp: &str) -> &str {
 
 fn body_json(resp: &str) -> serde_json::Value {
     serde_json::from_str(body(resp)).expect("response body should be valid JSON")
+}
+
+/// A store for a singleplayer career — the only kind that signs contracts.
+fn make_sp_store() -> (
+    ams2_championship::data_store::SharedStore,
+    std::path::PathBuf,
+) {
+    let (store, path) = make_test_store();
+    store.write().unwrap().mode = ams2_championship::data_store::CareerMode::Singleplayer;
+    (store, path)
 }
 
 fn make_champ(id: &str) -> Championship {
@@ -1211,7 +1223,7 @@ fn make_saves_dir(
     let path = dir.join("ams2_career.json");
     let store = Arc::new(RwLock::new(CareerData::default()));
     store.write().unwrap().championships.push(make_champ("c1"));
-    ams2_championship::data_store::persist(&store, &path);
+    ams2_championship::data_store::persist(&store, &path).expect("fixture save must be written");
     (store, path)
 }
 
@@ -1236,7 +1248,7 @@ fn test_route_post_saves_creates_empty_and_activates() {
         store.clone(),
         path.clone(),
         "/api/saves",
-        br#"{"name":"GT3 Career"}"#,
+        br#"{"name":"GT3 Career","mode":"multiplayer"}"#,
     );
     assert!(status_line(&resp).contains("200"));
     let v = body_json(&resp);
@@ -1245,6 +1257,8 @@ fn test_route_post_saves_creates_empty_and_activates() {
     // The in-memory store was swapped to the new, empty career.
     assert!(store.read().unwrap().championships.is_empty());
     assert!(path.parent().unwrap().join("GT3 Career.json").exists());
+    // The kind is recorded at creation and is what every rule below turns on.
+    assert_eq!(store.read().unwrap().mode, ams2_championship::data_store::CareerMode::Multiplayer);
     // The previous career is untouched on disk.
     let old = ams2_championship::data_store::load_data(&path);
     assert_eq!(old.championships.len(), 1);
@@ -1289,7 +1303,8 @@ fn test_route_activate_swaps_store_contents() {
         .unwrap()
         .championships
         .push(make_champ("x2"));
-    ams2_championship::data_store::persist(&other_store, &other);
+    ams2_championship::data_store::persist(&other_store, &other)
+        .expect("fixture save must be written");
 
     let resp = post(
         store.clone(),
@@ -1991,4 +2006,1336 @@ fn test_route_custom_ai_files_lists_only_names_ams2_reads() {
     assert_eq!(files, vec!["F-Vintage_Gen2.xml"], "{body}");
 
     std::fs::remove_dir_all(&root).ok();
+}
+
+// ── GET /api/championships/:id/offers ─────────────────────────────────────────
+
+/// A roster with two teams of real pace scalars, so the offers route has something to rate
+/// against rather than falling through to `rated: false`.
+const OFFER_ROSTER: &str = r##"<custom_ai_drivers>
+    <driver livery_name="1986 Williams #5 - N. Mansell" power_scalar="1.00" weight_scalar="1.00" drag_scalar="1.00"><name>Nigel Mansell</name><race_skill>0.98</race_skill></driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" power_scalar="1.00" weight_scalar="1.00" drag_scalar="1.00"><name>Nelson Piquet</name><race_skill>0.98</race_skill></driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" power_scalar="0.90" weight_scalar="1.00" drag_scalar="1.00"><name>Piercarlo Ghinzani</name><race_skill>0.55</race_skill></driver>
+    <driver livery_name="1986 Osella #22 - A. Berg" power_scalar="0.90" weight_scalar="1.00" drag_scalar="1.00"><name>Allan Berg</name><race_skill>0.54</race_skill></driver>
+</custom_ai_drivers>"##;
+
+/// A Custom AI folder holding [`OFFER_ROSTER`] as `F-Classic_Gen1.xml`, plus a config.json
+/// pointing at it. `contracts_enabled` follows the flag.
+fn make_offer_fixture(enabled: bool) -> (std::path::PathBuf, std::path::PathBuf) {
+    offer_fixture(enabled, "")
+}
+
+/// [`make_offer_fixture`] with pay-driver seats switched off, so a team out of reach makes no
+/// offer at all rather than naming a price.
+fn make_offer_fixture_no_buy_in() -> (std::path::PathBuf, std::path::PathBuf) {
+    offer_fixture(true, r#","contract_buy_in_per_point":0"#)
+}
+
+/// A five-team grid, which is the smallest that puts a *locked* team on the market: only the
+/// back third sells, and the very slowest car is always opened by the rating's own floor rule.
+/// Coloni sits one place off the back and just out of reach, so it is the pay-driver seat.
+const PAY_DRIVER_ROSTER: &str = r##"<custom_ai_drivers>
+    <driver livery_name="1986 Williams #5 - N. Mansell" power_scalar="1.00" weight_scalar="1.00" drag_scalar="1.00"><name>Nigel Mansell</name><race_skill>0.98</race_skill></driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet" power_scalar="1.00" weight_scalar="1.00" drag_scalar="1.00"><name>Nelson Piquet</name><race_skill>0.98</race_skill></driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" power_scalar="0.97" weight_scalar="1.00" drag_scalar="1.00"><name>Riccardo Patrese</name><race_skill>0.85</race_skill></driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick" power_scalar="0.97" weight_scalar="1.00" drag_scalar="1.00"><name>Derek Warwick</name><race_skill>0.85</race_skill></driver>
+    <driver livery_name="1986 Lotus #11 - J. Dumfries" power_scalar="0.94" weight_scalar="1.00" drag_scalar="1.00"><name>Johnny Dumfries</name><race_skill>0.70</race_skill></driver>
+    <driver livery_name="1986 Lotus #12 - A. Senna" power_scalar="0.94" weight_scalar="1.00" drag_scalar="1.00"><name>Ayrton Senna</name><race_skill>0.70</race_skill></driver>
+    <driver livery_name="1986 Coloni #31 - N. Larini" power_scalar="0.91" weight_scalar="1.00" drag_scalar="1.00"><name>Nicola Larini</name><race_skill>0.75</race_skill></driver>
+    <driver livery_name="1986 Coloni #32 - G. Tarquini" power_scalar="0.91" weight_scalar="1.00" drag_scalar="1.00"><name>Gabriele Tarquini</name><race_skill>0.75</race_skill></driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani" power_scalar="0.88" weight_scalar="1.00" drag_scalar="1.00"><name>Piercarlo Ghinzani</name><race_skill>0.55</race_skill></driver>
+    <driver livery_name="1986 Osella #22 - A. Berg" power_scalar="0.88" weight_scalar="1.00" drag_scalar="1.00"><name>Allan Berg</name><race_skill>0.54</race_skill></driver>
+</custom_ai_drivers>"##;
+
+/// The seat on [`PAY_DRIVER_ROSTER`] that money — and only money — opens.
+const PAY_SEAT: &str = "Coloni";
+
+fn pay_driver_fixture(extra: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+    let (root, config) = offer_fixture(true, extra);
+    let ai_dir = root.join("CustomAIDrivers");
+    std::fs::write(ai_dir.join("F-Classic_Gen1.xml"), PAY_DRIVER_ROSTER).unwrap();
+    (root, config)
+}
+
+/// `extra` is appended to the config object verbatim, leading comma and all.
+fn offer_fixture(enabled: bool, extra: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ams2_offers_route_{ns}"));
+    let ai_dir = root.join("CustomAIDrivers");
+    std::fs::create_dir_all(&ai_dir).unwrap();
+    std::fs::write(ai_dir.join("F-Classic_Gen1.xml"), OFFER_ROSTER).unwrap();
+
+    let config = root.join("config.json");
+    std::fs::write(
+        &config,
+        format!(
+            "{{\"custom_ai_dir\":{},\"contracts_enabled\":{enabled}{extra}}}",
+            serde_json::to_string(&ai_dir.display().to_string()).unwrap()
+        ),
+    )
+    .unwrap();
+    (root, config)
+}
+
+fn rated_champ(id: &str) -> Championship {
+    Championship {
+        custom_ai_file: Some("F-Classic_Gen1.xml".into()),
+        ..make_champ(id)
+    }
+}
+
+fn offers_resp(champ: Championship, config: &std::path::Path) -> String {
+    let (store, data_path) = make_sp_store();
+    let id = champ.id.clone();
+    store.write().unwrap().championships.push(champ);
+    call_with_config(
+        store,
+        data_path,
+        format!("GET /api/championships/{id}/offers HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .into_bytes(),
+        Some(config.to_path_buf()),
+    )
+}
+
+#[test]
+fn test_route_offers_unknown_championship_is_404() {
+    let (store, path) = make_test_store();
+    let resp = get(store, path.clone(), "/api/championships/nope/offers");
+    assert!(status_line(&resp).contains("404"));
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_offers_unrated_without_custom_ai_file() {
+    let (store, path) = make_test_store();
+    store.write().unwrap().championships.push(make_champ("c1"));
+    let resp = get(store, path.clone(), "/api/championships/c1/offers");
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    // No roster means no teams and no car pace, so there is nothing to offer — but the season is
+    // still open, and the config switch is still reported.
+    assert_eq!(v["rated"], false);
+    assert_eq!(v["open"], true);
+    assert_eq!(v["enabled"], false, "contracts default off");
+    assert_eq!(v["offers"].as_array().unwrap().len(), 0);
+    assert!(v["signed"].is_null());
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_offers_lists_terms_for_a_rated_season() {
+    let (root, config) = make_offer_fixture(true);
+    let resp = offers_resp(rated_champ("c1"), &config);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+
+    assert_eq!(v["enabled"], true);
+    assert_eq!(v["rated"], true);
+    assert_eq!(v["open"], true);
+    let offers = v["offers"].as_array().unwrap();
+    assert!(!offers.is_empty(), "{resp}");
+    // Every offer carries the terms the UI needs without a second request.
+    for o in offers {
+        assert!(o["salary"].as_i64().unwrap() > 0);
+        assert!(o["seasons"].is_null(), "deals are single-season: {o}");
+        assert!(!o["team"].as_str().unwrap().is_empty());
+        // Two kinds, and only two: either the team pays the driver or the driver pays the team.
+        let kind = o["kind"].as_str().unwrap();
+        assert!(["paid", "pay"].contains(&kind), "{o}");
+        assert!(o["renewal"].is_boolean(), "{o}");
+        // Only a bought seat is priced, and it always is.
+        assert_eq!(
+            o["buy_in"].as_i64().unwrap() > 0,
+            kind == "pay",
+            "{o}"
+        );
+    }
+    // A fresh career has no seat behind it and nothing banked.
+    assert!(v["standing"]["incumbent"].is_null());
+    assert_eq!(v["balance"], 0);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_offers_stay_open_for_a_team_picked_without_a_contract() {
+    let (root, config) = make_offer_fixture(true);
+    let champ = Championship {
+        player_team: Some("Osella".into()),
+        ..rated_champ("c1")
+    };
+    let v = body_json(&offers_resp(champ, &config));
+    // A team set through the picker is not a commitment — `PATCH` may still change it before
+    // the first session, so signing may too. Only a contract or a raced session closes a season.
+    assert_eq!(v["open"], true);
+    assert!(v["signed"].is_null());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_offers_closed_once_the_season_has_started() {
+    let (root, config) = make_offer_fixture(true);
+    let champ = Championship {
+        rounds: vec![Round {
+            session_ids: vec!["s1".into()],
+        }],
+        ..rated_champ("c1")
+    };
+    assert_eq!(body_json(&offers_resp(champ, &config))["open"], false);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_offers_are_advisory_in_a_career_that_does_not_sign() {
+    // Contracts follow the career kind, not a config switch. An unset career still sees what
+    // the grid would offer, but `enabled` says it cannot act on it.
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_test_store();
+    store.write().unwrap().championships.push(rated_champ("c1"));
+    let resp = call_with_config(
+        store,
+        data_path,
+        b"GET /api/championships/c1/offers HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    let v = body_json(&resp);
+    assert_eq!(v["enabled"], false, "{resp}");
+    assert!(!v["offers"].as_array().unwrap().is_empty());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_offers_shows_a_signed_deal() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(rated_champ("c1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: "Osella".into(),
+            signed_at: 42,
+            salary: 500_000,
+            objective: Some(4),
+            bought_for: 0,
+        });
+    }
+    let resp = call_with_config(
+        store,
+        data_path,
+        b"GET /api/championships/c1/offers HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    let v = body_json(&resp);
+    assert_eq!(v["signed"]["team"], "Osella");
+    assert_eq!(v["signed"]["salary"], 500_000);
+    assert_eq!(v["open"], false, "a signed season takes no more offers");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+// ── GET /api/career/finances ──────────────────────────────────────────────────
+
+/// A two-car race the player won, flagged as the recorder writes it.
+fn win_session(id: &str) -> RecordedSession {
+    let driver = |name: &str, pos: u32, is_player: bool| SessionResult {
+        name: name.into(),
+        car_name: String::new(),
+        car_class: "F-Classic_Gen1".into(),
+        race_position: pos,
+        laps_completed: 10,
+        fastest_lap: 90.0,
+        last_lap: 90.0,
+        dnf: false,
+        is_player,
+    };
+    RecordedSession {
+        id: id.into(),
+        recorded_at: 1,
+        track: "Monza".into(),
+        track_variation: String::new(),
+        car_name: String::new(),
+        car_class: "F-Classic_Gen1".into(),
+        session_type: 5,
+        results: vec![driver("Nightrat", 1, true), driver("Berg", 2, false)],
+        lap_chart: vec![],
+    }
+}
+
+#[test]
+fn test_route_finances_empty_career() {
+    let (store, path) = make_test_store();
+    let resp = get(store, path.clone(), "/api/career/finances");
+    assert!(status_line(&resp).contains("200"));
+    let v = body_json(&resp);
+    assert_eq!(v["balance"], 0);
+    assert_eq!(v["earned"], 0);
+    assert_eq!(v["spent"], 0);
+    assert_eq!(v["enabled"], false);
+    assert_eq!(v["seasons"].as_array().unwrap().len(), 0);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_finances_pays_a_completed_season() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.status = ChampionshipStatus::Final;
+        champ.rounds = vec![Round {
+            session_ids: vec!["s1".into()],
+        }];
+        data.championships.push(champ);
+        data.sessions.push(win_session("s1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: "Osella".into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: Some(3),
+            bought_for: 0,
+        });
+    }
+    let resp = get(store, path.clone(), "/api/career/finances");
+    let v = body_json(&resp);
+
+    let season = &v["seasons"][0];
+    assert_eq!(season["team"], "Osella");
+    assert_eq!(season["complete"], true);
+    assert_eq!(season["position"], 1);
+    assert_eq!(season["salary"], 500_000);
+    assert_eq!(season["objective_met"], true);
+    assert!(season["prize"].as_i64().unwrap() > 0);
+    assert_eq!(
+        v["balance"].as_i64().unwrap(),
+        season["salary"].as_i64().unwrap() + season["prize"].as_i64().unwrap()
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_finances_withholds_an_unfinished_season() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(make_champ("c1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: "Osella".into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: None,
+            bought_for: 0,
+        });
+    }
+    let v = body_json(&get(store, path.clone(), "/api/career/finances"));
+    assert_eq!(v["seasons"][0]["complete"], false);
+    assert_eq!(v["seasons"][0]["salary"], 0);
+    assert_eq!(v["balance"], 0);
+    let _ = std::fs::remove_file(&path);
+}
+
+
+// ── POST / DELETE /api/championships/:id/sign ─────────────────────────────────
+
+/// Sends `request` against a store holding `champ`, and hands back both the response and the
+/// store so the caller can inspect what was actually written.
+fn sign_call(
+    champ: Championship,
+    config: &std::path::Path,
+    method: &str,
+    body: &str,
+) -> (String, ams2_championship::data_store::SharedStore) {
+    let (store, data_path) = make_sp_store();
+    let id = champ.id.clone();
+    store.write().unwrap().championships.push(champ);
+    let mut req = format!(
+        "{method} /api/championships/{id}/sign HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    let resp = call_with_config(store.clone(), data_path, req, Some(config.to_path_buf()));
+    (resp, store)
+}
+
+/// The team the offer fixture's rating can actually reach — the slowest car on its two-team grid.
+const OPEN_SEAT: &str = "Osella";
+
+#[test]
+fn test_route_sign_records_the_deal_and_takes_the_seat() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, store) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+
+    // The response carries both halves: what was agreed, and the championship it applies to.
+    assert_eq!(v["contract"]["team"], OPEN_SEAT);
+    assert_eq!(v["contract"]["champ_id"], "c1");
+    assert!(v["contract"]["salary"].as_i64().unwrap() > 0);
+    assert!(v["contract"]["signed_at"].as_u64().unwrap() > 0);
+    assert_eq!(v["championship"]["player_team"], OPEN_SEAT);
+
+    let data = store.read().unwrap();
+    assert_eq!(data.contracts.len(), 1);
+    assert_eq!(
+        data.championships[0].player_team.as_deref(),
+        Some(OPEN_SEAT)
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_terms_are_the_servers_not_the_callers() {
+    // A caller naming its own salary must not get it: terms are regenerated from the grid.
+    let (root, config) = make_offer_fixture(true);
+    let (resp, _) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}","salary":999999999,"seasons":99}}"#),
+    );
+    let v = body_json(&resp);
+    assert_ne!(v["contract"]["salary"], 999_999_999i64);
+    // `seasons` is not a term any more; a caller sending one is simply ignored.
+    assert!(v["contract"]["seasons"].is_null(), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_matches_the_team_name_case_insensitively() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, _) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        r#"{"team":"  osella  "}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    // The roster's own spelling is what gets recorded, not the caller's.
+    assert_eq!(body_json(&resp)["contract"]["team"], OPEN_SEAT);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refuses_a_team_that_is_not_offering() {
+    // With pay-driver seats off, the quick car on this grid is simply not available, and the
+    // refusal is the useful half of the answer: what it would take.
+    let (root, config) = make_offer_fixture_no_buy_in();
+    let (resp, store) = sign_call(rated_champ("c1"), &config, "POST", r#"{"team":"Williams"}"#);
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(
+        resp.contains("driver rating"),
+        "should quote the bar: {resp}"
+    );
+    assert!(
+        store.read().unwrap().contracts.is_empty(),
+        "nothing written"
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refuses_a_seat_the_career_cannot_afford() {
+    // Coloni will take sponsorship. A career that has earned nothing has none to bring, and the
+    // balance is derived from results — naming a price in the request changes nothing.
+    let (root, config) = pay_driver_fixture("");
+    let (resp, store) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{PAY_SEAT}","buy_in":1}}"#),
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("in sponsorship"), "{resp}");
+    assert!(
+        store.read().unwrap().contracts.is_empty(),
+        "nothing written"
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_buys_a_seat_the_career_can_afford() {
+    // A nominal sponsorship rate against a career that has banked a title.
+    let (root, config) = pay_driver_fixture(r#","contract_buy_in_per_point":1"#);
+    let (store, data_path) = make_sp_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(rated_champ("c1"));
+
+        // A completed, won season under a contract, which is what puts money in the bank.
+        let mut past = rated_champ("past");
+        past.status = ChampionshipStatus::Final;
+        past.rounds = vec![Round {
+            session_ids: vec!["s1".into()],
+        }];
+        data.championships.push(past);
+        data.sessions.push(win_session("s1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "past".into(),
+            team: OPEN_SEAT.into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: None,
+            bought_for: 0,
+        });
+    }
+    let body = format!(r#"{{"team":"{PAY_SEAT}"}}"#);
+    let mut req = format!(
+        "POST /api/championships/c1/sign HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    let resp = call_with_config(store.clone(), data_path, req, Some(config));
+
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+    assert_eq!(v["contract"]["team"], PAY_SEAT);
+    assert!(
+        v["contract"]["bought_for"].as_i64().unwrap() > 0,
+        "the sponsorship brought is on the record: {resp}"
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refuses_a_team_not_on_the_grid() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, _) = sign_call(rated_champ("c1"), &config, "POST", r#"{"team":"Ferrari"}"#);
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("not a team on this grid"), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refused_in_a_career_that_does_not_sign() {
+    // Only a singleplayer career takes seats by contract. Recording a salary in a multiplayer or
+    // unset one would put money in a ledger the user never opted into.
+    let (root, config) = make_offer_fixture(true);
+    for mode in [
+        ams2_championship::data_store::CareerMode::Unset,
+        ams2_championship::data_store::CareerMode::Multiplayer,
+    ] {
+        let (store, data_path) = make_test_store();
+        {
+            let mut data = store.write().unwrap();
+            data.mode = mode;
+            data.championships.push(rated_champ("c1"));
+        }
+        let body = format!(r#"{{"team":"{OPEN_SEAT}"}}"#);
+        let mut req = format!(
+            "POST /api/championships/c1/sign HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        )
+        .into_bytes();
+        req.extend_from_slice(body.as_bytes());
+        let resp = call_with_config(store.clone(), data_path, req, Some(config.clone()));
+
+        assert!(status_line(&resp).contains("409"), "{mode:?}: {resp}");
+        assert!(resp.contains("singleplayer career"), "{resp}");
+        assert!(store.read().unwrap().contracts.is_empty());
+    }
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refused_once_the_season_has_started() {
+    let (root, config) = make_offer_fixture(true);
+    let champ = Championship {
+        rounds: vec![Round {
+            session_ids: vec!["s1".into()],
+        }],
+        ..rated_champ("c1")
+    };
+    let (resp, store) = sign_call(
+        champ,
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("already started"), "{resp}");
+    assert!(store.read().unwrap().contracts.is_empty());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refused_without_a_roster() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, _) = sign_call(
+        make_champ("c1"),
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("Custom AI Drivers file"), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refuses_a_second_deal_for_one_season() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_sp_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(rated_champ("c1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: OPEN_SEAT.into(),
+            signed_at: 1,
+            salary: 1,
+            objective: None,
+            bought_for: 0,
+        });
+    }
+    let body = format!(r#"{{"team":"{OPEN_SEAT}"}}"#);
+    let mut req = format!(
+        "POST /api/championships/c1/sign HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    let resp = call_with_config(store.clone(), data_path, req, Some(config));
+
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("already signed"), "{resp}");
+    assert_eq!(store.read().unwrap().contracts.len(), 1, "no duplicate row");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_unknown_championship_is_404() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_test_store();
+    let body = r#"{"team":"Osella"}"#;
+    let mut req = format!(
+        "POST /api/championships/nope/sign HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    let resp = call_with_config(store, data_path, req, Some(config));
+    assert!(status_line(&resp).contains("404"), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_rejects_a_malformed_body() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, _) = sign_call(rated_champ("c1"), &config, "POST", "{}");
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_replaces_a_team_picked_directly() {
+    // The old picker is still there; signing over the top of it is the same move `PATCH` allows
+    // before the first session, so it must not be a dead end.
+    let (root, config) = make_offer_fixture(true);
+    let champ = Championship {
+        player_team: Some("Williams".into()),
+        ..rated_champ("c1")
+    };
+    let (resp, store) = sign_call(
+        champ,
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0]
+            .player_team
+            .as_deref(),
+        Some(OPEN_SEAT)
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_closes_the_offer_list() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, store) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let (_, data_path) = make_test_store();
+    let offers = call_with_config(
+        store,
+        data_path,
+        b"GET /api/championships/c1/offers HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    let v = body_json(&offers);
+    assert_eq!(v["open"], false);
+    assert_eq!(v["signed"]["team"], OPEN_SEAT);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_release_tears_up_an_unraced_contract() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, store) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let (_, data_path) = make_test_store();
+    let gone = call_with_config(
+        store.clone(),
+        data_path,
+        b"DELETE /api/championships/c1/sign HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    assert!(status_line(&gone).contains("200"), "{gone}");
+
+    let data = store.read().unwrap();
+    assert!(data.contracts.is_empty(), "the deal is gone");
+    assert!(
+        data.championships[0].player_team.is_none(),
+        "and so is the seat it came with"
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_release_refused_once_the_season_has_started() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        let champ = Championship {
+            rounds: vec![Round {
+                session_ids: vec!["s1".into()],
+            }],
+            player_team: Some(OPEN_SEAT.into()),
+            ..rated_champ("c1")
+        };
+        data.championships.push(champ);
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: OPEN_SEAT.into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: None,
+            bought_for: 0,
+        });
+    }
+    let resp = call_with_config(
+        store.clone(),
+        data_path,
+        b"DELETE /api/championships/c1/sign HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert_eq!(store.read().unwrap().contracts.len(), 1, "the deal stands");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_release_without_a_contract_is_404() {
+    let (root, config) = make_offer_fixture(true);
+    let (resp, _) = sign_call(rated_champ("c1"), &config, "DELETE", "");
+    assert!(status_line(&resp).contains("404"), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_then_finances_reports_the_season() {
+    // End to end: signing writes the row the ledger reads, with the terms the grid gave.
+    let (root, config) = make_offer_fixture(true);
+    let (resp, store) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    let salary = body_json(&resp)["contract"]["salary"].as_i64().unwrap();
+
+    let (_, data_path) = make_test_store();
+    let fin = call_with_config(
+        store,
+        data_path,
+        b"GET /api/career/finances HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    let v = body_json(&fin);
+    assert_eq!(v["seasons"][0]["team"], OPEN_SEAT);
+    // Unfinished, so the wage is contracted but not yet credited.
+    assert_eq!(v["seasons"][0]["complete"], false);
+    assert_eq!(v["seasons"][0]["salary"], 0);
+    assert!(salary > 0, "the deal itself is worth something");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+// ── A save that cannot be read ────────────────────────────────────────────────
+
+#[test]
+fn test_route_activate_refuses_a_save_it_cannot_read() {
+    // Switching would put an empty career in front of the user under that save's name. The file
+    // itself is safe either way — persist guards it — but the switch is still the wrong answer.
+    let (store, path) = make_saves_dir("activate_broken");
+    let broken = path.parent().unwrap().join("corrupt.json");
+    std::fs::write(&broken, "{ not json").unwrap();
+
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/saves/activate",
+        br#"{"name":"corrupt"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("could not be read"), "{resp}");
+    // The career in memory is the one that was already active, untouched.
+    assert_eq!(store.read().unwrap().championships.len(), 1);
+    assert_eq!(
+        std::fs::read_to_string(&broken).unwrap(),
+        "{ not json",
+        "the damaged file must not be rewritten"
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_activate_accepts_a_save_with_a_byte_order_mark() {
+    let (store, path) = make_saves_dir("activate_bom");
+    let other = path.parent().unwrap().join("withbom.json");
+    std::fs::write(
+        &other,
+        "\u{feff}{\"sessions\":[],\"championships\":[]}",
+    )
+    .unwrap();
+
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/saves/activate",
+        br#"{"name":"withbom"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(store.read().unwrap().championships.is_empty());
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_saves_list_reports_an_unreadable_file() {
+    let (store, path) = make_saves_dir("list_broken");
+    std::fs::write(path.parent().unwrap().join("corrupt.json"), "nope").unwrap();
+
+    let v = body_json(&get(store, path.clone(), "/api/saves"));
+    let bad = v["saves"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "corrupt")
+        .expect("the broken save is still listed");
+    assert!(bad["error"].is_string(), "{bad}");
+    // A healthy save carries no error key at all, so the UI can test for its presence.
+    let good = v["saves"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "ams2_career")
+        .unwrap();
+    assert!(good.get("error").is_none(), "{good}");
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_mutation_reports_when_the_save_cannot_be_written() {
+    // The change reached memory but not the file. Answering 200 would tell the user their
+    // championship was saved when it was not — the exact silent failure the guard exists for.
+    let (store, path) = make_saves_dir("write_refused");
+    std::fs::write(&path, "{ corrupted while the server was running").unwrap();
+
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"New","points_system":[],"manufacturer_scoring":false}"#,
+    );
+    assert!(status_line(&resp).contains("500"), "{resp}");
+    assert!(resp.contains("refusing to overwrite"), "{resp}");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "{ corrupted while the server was running",
+        "the file must be byte-for-byte untouched"
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_patch_config_stores_the_economy_it_will_actually_use() {
+    // The bug this pins: per-field clamping cannot enforce a relationship *between* two fields,
+    // so PATCH stored a floor above its top. The Config tab then showed one economy while the
+    // grid ran on another.
+    let (store, path) = make_saves_dir("cfg_economy");
+    let body = format!(
+        r#"{{{},"contract_top_salary":100000,"contract_floor_salary":900000,
+             "champion_prize":500,"last_place_prize":9000}}"#,
+        r#""port":8080,"host":"127.0.0.1","poll_ms":200,"record_practice":true,
+           "record_qualify":true,"record_race":true,"show_track_map":true,
+           "track_map_max_points":5000"#
+    );
+    let resp = patch(store, path.clone(), "/api/config", body.as_bytes());
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let v = body_json(&resp);
+    assert_eq!(v["config"]["contract_top_salary"], 100_000);
+    assert_eq!(
+        v["config"]["contract_floor_salary"], 100_000,
+        "a floor above its top must not be stored: {resp}"
+    );
+    assert_eq!(v["config"]["last_place_prize"], 500);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_get_config_does_not_rewrite_the_file() {
+    // Reading the config used to rewrite it, from several call sites per request and more than
+    // one thread. That truncate-then-write window is what produced
+    // "could not parse config file (EOF while parsing a value at line 1 column 0)".
+    let (store, path) = make_saves_dir("cfg_readonly");
+    let config = path.parent().unwrap().join("config.json");
+    std::fs::write(&config, r#"{"port":9123}"#).unwrap();
+
+    for _ in 0..5 {
+        let resp = call_with_config(
+            store.clone(),
+            path.clone(),
+            b"GET /api/config HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+            Some(config.clone()),
+        );
+        assert!(status_line(&resp).contains("200"));
+    }
+    assert_eq!(
+        std::fs::read_to_string(&config).unwrap(),
+        r#"{"port":9123}"#,
+        "a read must leave the config byte-for-byte alone"
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_offers_does_not_renew_a_seat_held_in_another_series() {
+    // End to end on the rule that stops a 1967 Ferrari drive opening a 1990 Ferrari. The signed
+    // season here ran against a different Custom AI file, so its team is not held in this one.
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(rated_champ("c1"));
+
+        // A completed season, won under contract, in a different class entirely.
+        let mut past = make_champ("past");
+        past.custom_ai_file = Some("F-Vintage_Gen1.xml".into());
+        past.status = ChampionshipStatus::Final;
+        past.rounds = vec![Round {
+            session_ids: vec!["s1".into()],
+        }];
+        data.championships.push(past);
+        data.sessions.push(win_session("s1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "past".into(),
+            team: "Williams".into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: Some(5),
+            bought_for: 0,
+        });
+    }
+    let resp = call_with_config(
+        store,
+        data_path,
+        b"GET /api/championships/c1/offers HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    let v = body_json(&resp);
+
+    assert_eq!(v["class"], "F-Classic_Gen1", "{resp}");
+    assert_eq!(v["standing"]["incumbent"], "Williams");
+    assert_eq!(
+        v["standing"]["class"], "F-Vintage_Gen1",
+        "the payload says which series the seat was held in"
+    );
+    // Williams is locked on merit here and is not at the back, so with no renewal to carry it
+    // there is no offer from them at all.
+    // A renewal is a flag on an ordinary paid offer, not a kind of its own.
+    let renewals: Vec<&serde_json::Value> = v["offers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|o| o["renewal"] == true)
+        .collect();
+    assert!(renewals.is_empty(), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+// ── Career mode ───────────────────────────────────────────────────────────────
+
+use ams2_championship::data_store::CareerMode;
+
+fn mode_store(mode: CareerMode) -> (ams2_championship::data_store::SharedStore, PathBuf) {
+    let (store, path) = make_saves_dir("mode");
+    store.write().unwrap().mode = mode;
+    (store, path)
+}
+
+#[test]
+fn test_route_new_season_needs_a_roster_in_singleplayer() {
+    // A singleplayer season is defined by the grid it is raced on, so the roster is chosen when
+    // the season is created rather than patched in afterwards.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false}"#,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(resp.contains("Custom AI Drivers file"), "{resp}");
+    assert!(store.read().unwrap().championships.is_empty());
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_new_season_takes_the_roster_at_creation_in_singleplayer() {
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let data = store.read().unwrap();
+    assert_eq!(
+        data.championships[0].custom_ai_file.as_deref(),
+        Some("F-Classic_Gen1.xml")
+    );
+    // The seat is never set by creating — it comes from signing.
+    assert!(data.championships[0].player_team.is_none());
+    drop(data);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_new_season_refuses_a_roster_in_multiplayer() {
+    let (store, path) = mode_store(CareerMode::Multiplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"Friday night","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("races people"), "{resp}");
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_singleplayer_allows_only_one_season_at_a_time() {
+    // The next drive is offered on the strength of the last one, so the last one has to be over
+    // before there is anything to offer against.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    let body =
+        br#"{"name":"1987","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#;
+
+    let resp = post(store.clone(), path.clone(), "/api/championships", body);
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("finish the current season first"), "{resp}");
+
+    // Finish it, and the next one may be created.
+    store.write().unwrap().championships[0].status = ChampionshipStatus::Final;
+    let resp = post(store.clone(), path.clone(), "/api/championships", body);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(store.read().unwrap().championships.len(), 2);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_multiplayer_runs_as_many_seasons_as_it_likes() {
+    let (store, path) = mode_store(CareerMode::Multiplayer);
+    let body = br#"{"name":"Another","points_system":[],"manufacturer_scoring":false}"#;
+    for _ in 0..3 {
+        let resp = post(store.clone(), path.clone(), "/api/championships", body);
+        assert!(status_line(&resp).contains("200"), "{resp}");
+    }
+    assert_eq!(store.read().unwrap().championships.len(), 4);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_singleplayer_team_comes_from_a_contract_not_the_picker() {
+    // The gating that was deliberately left open when contracts were added: with the career
+    // kind deciding, setting a team directly is no longer a way around signing for it.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    // A team is only meaningful against a roster, so the season needs one for the change to be
+    // a change at all — without it the handler nulls the team and nothing has happened.
+    store.write().unwrap().championships[0].custom_ai_file = Some("F-Classic_Gen1.xml".into());
+
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"player_team":"Osella"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("sign for a team"), "{resp}");
+    assert!(store.read().unwrap().championships[0].player_team.is_none());
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_multiplayer_has_no_roster_and_no_team() {
+    let (store, path) = mode_store(CareerMode::Multiplayer);
+    // Hand-edited into a shape multiplayer would never produce, so both edits are real changes.
+    {
+        let mut data = store.write().unwrap();
+        data.championships[0].custom_ai_file = Some("F-Classic_Gen1.xml".into());
+    }
+    for body in [
+        &br#"{"player_team":"Osella"}"#[..],
+        &br#"{"custom_ai_file":null}"#[..],
+    ] {
+        let resp = patch(store.clone(), path.clone(), "/api/championships/c1", body);
+        assert!(status_line(&resp).contains("409"), "{resp}");
+        assert!(resp.contains("no roster and no team"), "{resp}");
+    }
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_a_finished_singleplayer_season_stays_finished() {
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships[0].status = ChampionshipStatus::Final;
+
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"status":"Progress"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("stays finished"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].status,
+        ChampionshipStatus::Final
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_an_unset_career_behaves_as_it_always_did() {
+    // Every rule above is off, so a save written before career modes keeps working untouched.
+    let (store, path) = mode_store(CareerMode::Unset);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"status":"Final"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/championships/c1",
+        br#"{"status":"Progress"}"#,
+    );
+    assert!(
+        status_line(&resp).contains("200"),
+        "reopening is fine: {resp}"
+    );
+    // And a second season may be created while the first runs.
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"Second","points_system":[],"manufacturer_scoring":false}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_career_mode_may_be_set_once_and_never_changed() {
+    let (store, path) = mode_store(CareerMode::Unset);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/career/mode",
+        br#"{"mode":"multiplayer"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(store.read().unwrap().mode, CareerMode::Multiplayer);
+
+    // Set once. There is no second time, in either direction.
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/career/mode",
+        br#"{"mode":"singleplayer"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("cannot be changed"), "{resp}");
+    assert_eq!(store.read().unwrap().mode, CareerMode::Multiplayer);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_career_mode_refuses_unset_as_an_answer() {
+    let (store, path) = mode_store(CareerMode::Unset);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        "/api/career/mode",
+        br#"{"mode":"unset"}"#,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert_eq!(store.read().unwrap().mode, CareerMode::Unset);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_new_career_must_name_its_kind() {
+    let (store, path) = make_saves_dir("mode_required");
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/saves",
+        br#"{"name":"Nameless"}"#,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(resp.contains("singleplayer or multiplayer"), "{resp}");
+    assert!(!path.parent().unwrap().join("Nameless.json").exists());
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_new_career_is_founded_with_the_configured_balance() {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_start_balance_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let config = dir.join("config.json");
+    std::fs::write(&config, r#"{"starting_balance":750000}"#).unwrap();
+
+    let (store, path) = make_saves_dir("start_balance");
+    let body = br#"{"name":"Rookie","mode":"singleplayer"}"#;
+    let mut req = format!(
+        "POST /api/saves HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body);
+    let resp = call_with_config(store.clone(), path.clone(), req, Some(config));
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    // Recorded on the save, not left to be read from config later.
+    assert_eq!(store.read().unwrap().starting_balance, 750_000);
+    let written = ams2_championship::data_store::load_data(
+        &path.parent().unwrap().join("Rookie.json"),
+    );
+    assert_eq!(written.starting_balance, 750_000);
+
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_finances_reports_what_the_career_started_with() {
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        data.mode = CareerMode::Singleplayer;
+        data.starting_balance = 1_000_000;
+    }
+    let v = body_json(&get(store, path.clone(), "/api/career/finances"));
+    assert_eq!(v["starting"], 1_000_000);
+    assert_eq!(v["balance"], 1_000_000);
+    assert_eq!(v["earned"], 0, "capital is not income");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_a_founding_balance_can_buy_a_seat_before_anything_is_earned() {
+    // End to end on why this exists: a rookie with no results can still take the one seat that
+    // does not need a rating, because the career was founded with enough to bring sponsorship.
+    let (root, config) = pay_driver_fixture(r#","contract_buy_in_per_point":1000"#);
+    let (store, data_path) = make_sp_store();
+    {
+        let mut data = store.write().unwrap();
+        data.starting_balance = 1_000_000;
+        data.championships.push(rated_champ("c1"));
+    }
+    let body = format!(r#"{{"team":"{PAY_SEAT}"}}"#);
+    let mut req = format!(
+        "POST /api/championships/c1/sign HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    let resp = call_with_config(store.clone(), data_path, req, Some(config));
+
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+    assert_eq!(v["contract"]["team"], PAY_SEAT);
+    assert!(
+        v["contract"]["bought_for"].as_i64().unwrap() > 0,
+        "the seat was bought with the founding money: {resp}"
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_changing_the_config_does_not_move_an_existing_careers_balance() {
+    // The reason the figure lives on the save: a career that was founded with a million still
+    // started with a million after someone edits the setting.
+    let (store, path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        data.mode = CareerMode::Singleplayer;
+        data.starting_balance = 1_000_000;
+    }
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_start_balance_cfg_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let config = dir.join("config.json");
+    std::fs::write(&config, r#"{"starting_balance":5}"#).unwrap();
+
+    let resp = call_with_config(
+        store,
+        path.clone(),
+        b"GET /api/career/finances HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    assert_eq!(body_json(&resp)["starting"], 1_000_000, "{resp}");
+
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_file(&path);
 }

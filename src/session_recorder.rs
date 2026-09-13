@@ -104,7 +104,9 @@ pub(crate) fn capture(
         let mut data = store.write().unwrap();
         data.sessions.push(recorded);
     }
-    persist(store, path);
+    // A refusal is already on the console with its reason, and there is no request to answer —
+    // the session stays in memory, so nothing is lost until the file is fixed.
+    let _ = persist(store, path);
 }
 
 /// Capture the current live session immediately, regardless of auto-record settings.

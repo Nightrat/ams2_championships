@@ -1,6 +1,7 @@
 pub mod ams2_shared_memory;
 pub mod championship_html;
 pub mod config;
+pub mod contracts;
 pub mod custom_ai;
 pub mod data_store;
 pub mod driver_rating;

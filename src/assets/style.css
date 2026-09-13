@@ -1116,3 +1116,52 @@ header h1 { flex: 1 1 100%; }
 .driverperf-rating { font-weight: 600; color: #6aa9ff; cursor: help; }
 .driverperf-rating-none { color: #777; font-weight: 400; }
 .carperf-status-note { color: #888; }
+
+/* ── Contracts: offers in the Manage tab, the ledger in the Career tab ─────── */
+.contract-box {
+  margin-top: 0.75rem; padding: 0.6rem 0.75rem;
+  background: #12121f; border: 1px solid #2a2a4a; border-radius: 4px;
+}
+.contract-box-signed { border-color: #c0392b; background: #16101a; }
+.contract-header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.contract-title {
+  font-weight: 600; color: #e74c3c; text-transform: uppercase;
+  font-size: 0.78rem; letter-spacing: 0.04em;
+}
+.contract-note { color: #888; font-size: 0.78rem; }
+.contract-header .manage-btn { margin-left: auto; }
+.contract-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+.contract-table td { padding: 0.28rem 0.5rem; border-top: 1px solid #22223a; vertical-align: middle; }
+.contract-table tr:first-child td { border-top: none; }
+/* The explanation belongs to the row above it, so the rule stays between offers, not inside one. */
+.contract-why-row td { border-top: none; padding-top: 0; padding-bottom: 0.45rem; }
+.contract-why { color: #7a7a8c; font-size: 0.74rem; line-height: 1.4; }
+.contract-team { font-weight: 600; }
+.contract-terms, .contract-price { color: #aaa; font-size: 0.82rem; }
+.contract-price { text-align: right; white-space: nowrap; }
+.contract-unaffordable { color: #b04a4a; }
+.contract-row-pay .contract-team { color: #a08a5a; }
+.contract-row-renewal .contract-team { color: #5aa06a; }
+.contract-kind {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  border-radius: 3px; padding: 0 4px; white-space: nowrap;
+  background: #1a2a1a; color: #6ab04c; border: 1px solid #2d5a2d;
+}
+.contract-kind-pay { background: #2a1f10; color: #c98a27; border-color: #6b4a1a; }
+.contract-kind-renewal { background: #102a20; color: #27c98a; border-color: #1a6b4a; }
+
+.ledger-totals { display: flex; gap: 1.5rem; align-items: baseline; margin-bottom: 0.4rem; }
+.ledger-total { color: #888; font-size: 0.85rem; }
+.ledger-total b { color: #e0e0e0; font-size: 1.15rem; }
+.ledger-table { width: 100%; border-collapse: collapse; margin-top: 0.6rem; }
+.ledger-table th {
+  text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid #2a2a4a;
+  color: #888; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.ledger-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #1c1c2e; }
+.ledger-table .num { text-align: right; white-space: nowrap; }
+.ledger-met td:nth-child(5) { color: #6ab04c; }
+.ledger-missed td:nth-child(5) { color: #e74c3c; }
+.career-empty { color: #888; padding: 1rem; }
+
+.saves-error { color: #e0a04a; font-size: 0.78rem; cursor: help; }

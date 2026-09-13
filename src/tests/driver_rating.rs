@@ -876,7 +876,8 @@ fn test_retirements_can_be_excluded_entirely() {
 
     sessions.push(sp_session("r1", 200, 5, 6, 2));
     sessions.push(sp_session("r2", 201, 5, 6, 2));
-    let with_dnf = compute_reputation_with(&sessions, &seats, &pace(), Some("Brabham"), &ignore_dnf);
+    let with_dnf =
+        compute_reputation_with(&sessions, &seats, &pace(), Some("Brabham"), &ignore_dnf);
 
     assert_eq!(with_dnf.sp_races, 6, "a skipped retirement is not a start");
     assert!((with_dnf.finish_rate - clean.finish_rate).abs() < 0.001);
@@ -896,7 +897,11 @@ fn test_retirement_threshold_is_configurable() {
     // 13 of 15 laps is under 90%, so lowering the threshold to 2 is what flips it.
     let r = result("x", 12, 13);
     assert!(!retired(&r, 15));
-    assert!(retired_with(&r, 15, &params(|p| p.retirement_min_laps_down = 2)));
+    assert!(retired_with(
+        &r,
+        15,
+        &params(|p| p.retirement_min_laps_down = 2)
+    ));
 
     // Raising it past the gap makes an obvious retirement read as a finish, which is the point
     // for long races: six laps down over 50 is a bad afternoon, not a DNF.
@@ -913,7 +918,10 @@ fn test_retirement_threshold_is_configurable() {
 fn test_zero_threshold_leaves_the_distance_test_to_decide() {
     // With no lap floor the 90% rule stands alone — and still protects a classified finisher.
     let no_floor = params(|p| p.retirement_min_laps_down = 0);
-    assert!(retired_with(&result("x", 20, 13), 15, &no_floor), "13/15 is under 90%");
+    assert!(
+        retired_with(&result("x", 20, 13), 15, &no_floor),
+        "13/15 is under 90%"
+    );
     assert!(
         !retired_with(&result("x", 12, 14), 15, &no_floor),
         "14/15 is over 90%, so never a retirement whatever the floor"
@@ -942,7 +950,11 @@ fn test_raising_the_threshold_reclassifies_a_dnf_as_a_finish() {
         &params(|p| p.retirement_min_laps_down = 5),
     );
 
-    assert_eq!((strict.sp_races, lenient.sp_races), (7, 7), "a start either way");
+    assert_eq!(
+        (strict.sp_races, lenient.sp_races),
+        (7, 7),
+        "a start either way"
+    );
     assert!(
         (strict.finish_rate - 6.0 / 7.0).abs() < 0.001,
         "the default calls it a retirement"
@@ -952,7 +964,10 @@ fn test_raising_the_threshold_reclassifies_a_dnf_as_a_finish() {
         "raising the floor makes it a classified finish"
     );
     // And as a finish it now contributes race pace, where a retirement contributed none.
-    assert!(lenient.pace < strict.pace, "a P6 finish drags the pace average down");
+    assert!(
+        lenient.pace < strict.pace,
+        "a P6 finish drags the pace average down"
+    );
 }
 
 #[test]
@@ -1028,5 +1043,88 @@ fn test_distance_threshold_feeds_through_to_the_rating() {
     assert!(
         (lenient.finish_rate - 1.0).abs() < 0.001,
         "73% clears a 70% bar, so it is a classified finish"
+    );
+}
+
+// ── The offer margin ─────────────────────────────────────────────────────────
+
+/// A three-team grid where the player sits 5 points under the middle team's bar.
+fn margin_grid() -> (HashMap<String, f32>, HashMap<String, f32>) {
+    let expected: HashMap<String, f32> = [("Fast", 1.5f32), ("Mid", 3.5), ("Slow", 5.5)]
+        .into_iter()
+        .map(|(t, p)| (t.to_string(), p))
+        .collect();
+    let skills: HashMap<String, f32> = [("Fast", 0.95f32), ("Mid", 0.60), ("Slow", 0.30)]
+        .into_iter()
+        .map(|(t, s)| (t.to_string(), s))
+        .collect();
+    (expected, skills)
+}
+
+fn tier_of(margin: f32, team: &str) -> Tier {
+    let (expected, skills) = margin_grid();
+    let params = RatingParams {
+        offer_margin: margin,
+        ..RatingParams::default()
+    };
+    // Mid's bar is max(grid 33.3, incumbent 55) = 55; the driver is 5 short of it.
+    team_eligibility_with(&params, 50.0, &expected, &skills)
+        .into_iter()
+        .find(|e| e.team == team)
+        .expect("team on the grid")
+        .tier
+}
+
+#[test]
+fn test_the_default_margin_reproduces_the_hard_coded_behaviour() {
+    assert_eq!(RatingParams::default().offer_margin, OFFER_MARGIN);
+}
+
+#[test]
+fn test_a_wider_margin_brings_a_locked_seat_within_reach() {
+    // Five points short of Mid's bar of 55.
+    assert_eq!(tier_of(10.0, "Mid"), Tier::OfferPossible);
+    assert_eq!(tier_of(4.0, "Mid"), Tier::Locked, "narrower than the gap");
+    assert_eq!(
+        tier_of(5.0, "Mid"),
+        Tier::OfferPossible,
+        "exactly the gap counts"
+    );
+}
+
+#[test]
+fn test_a_zero_margin_means_every_bar_must_be_cleared_outright() {
+    // The middle tier disappears: a seat is earned or it is locked, nothing between.
+    assert_eq!(tier_of(0.0, "Mid"), Tier::Locked);
+    // Slow's bar is max(grid 0, incumbent 25) = 25, which the driver clears, so it stays open —
+    // a zero margin removes the tier, it does not close the grid.
+    assert_eq!(tier_of(0.0, "Slow"), Tier::Available);
+}
+
+#[test]
+fn test_a_margin_wide_enough_reaches_the_whole_grid() {
+    // Fast asks 90; at a margin of 100 nothing on the grid is out of reach.
+    assert_eq!(tier_of(100.0, "Fast"), Tier::OfferPossible);
+    assert_eq!(tier_of(10.0, "Fast"), Tier::Locked);
+}
+
+#[test]
+fn test_the_margin_moves_how_far_short_is_looked_at_not_the_bar() {
+    // The difference from `strictness`: requirements are untouched, only the tier moves.
+    let (expected, skills) = margin_grid();
+    // Wide enough to cross a boundary: Fast asks 90 and the driver is 40 short of it.
+    let wide = RatingParams {
+        offer_margin: 45.0,
+        ..RatingParams::default()
+    };
+    let a = team_eligibility_with(&RatingParams::default(), 50.0, &expected, &skills);
+    let b = team_eligibility_with(&wide, 50.0, &expected, &skills);
+    for (x, y) in a.iter().zip(&b) {
+        assert_eq!(x.required, y.required, "{} moved its bar", x.team);
+    }
+    assert_ne!(
+        a.iter().map(|e| e.tier).collect::<Vec<_>>(),
+        b.iter().map(|e| e.tier).collect::<Vec<_>>(),
+        "but the tiers must have moved"
     );
 }
