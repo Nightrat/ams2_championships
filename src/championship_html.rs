@@ -32,6 +32,7 @@ fn generate_html() -> String {
       <button class="sub-tab-btn sub-tab-active" data-career-sub="champs">Championships</button>
       <button class="sub-tab-btn" data-career-sub="stats">Driver Stats</button>
       <button class="sub-tab-btn" data-career-sub="tracks">Track Stats</button>
+      <button class="sub-tab-btn" data-career-sub="contracts">Contracts</button>
       <button id="career-export-btn" class="career-export-btn">&#128229; Download HTML</button>
     </div>
     <div id="career-sub-champs" class="sub-tab-panel">
@@ -46,6 +47,9 @@ fn generate_html() -> String {
     </div>
     <div id="career-sub-tracks" class="sub-tab-panel sub-tab-panel-hidden">
       <div id="career-tracks-container"></div>
+    </div>
+    <div id="career-sub-contracts" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-contracts-container"></div>
     </div>
   </div>
   <div id="tab-live" class="tab-panel">
@@ -121,6 +125,9 @@ fn generate_html() -> String {
             <option value="custom">Custom&hellip;</option>
           </select>
           <input id="new-champ-custom" type="text" placeholder="e.g. 25,18,15,12,10" class="manage-input" style="display:none;flex:1">
+          <!-- Singleplayer only: manage.js fills and reveals it. A season is defined by the grid
+               it is raced on, so the roster is chosen here rather than after the fact. -->
+          <select id="new-champ-ai" class="manage-select" style="display:none" title="The grid this season is raced on"></select>
           <label class="manage-checkbox-label"><input type="checkbox" id="new-champ-manufacturer"> Constructor Scoring</label>
           <button id="new-champ-save" class="manage-btn manage-btn-primary">Create</button>
           <button id="new-champ-cancel" class="manage-btn">Cancel</button>
@@ -153,6 +160,9 @@ fn generate_html() -> String {
   <div id="tab-config" class="tab-panel tab-panel-hidden">
     <div class="config-panel config-panel-wide">
       <h2 class="config-heading">Career Save Files</h2>
+      <p class="config-note">A career is <strong>singleplayer</strong> (race the AI: pick a roster, sign for a team, one season at a time)
+         or <strong>multiplayer</strong> (race people: no roster, no team, no contracts, as many seasons at once as you like).
+         The kind is chosen when the career is created and kept — make a new career to race the other way.</p>
       <p class="config-note">Each save is a separate career — its own championships, sessions and stats.
          Saves are the <code>*.json</code> files in <code id="saves-dir-label">…</code>; recorded sessions
          always go into the active one. Track radar maps are shared by all saves.
@@ -160,6 +170,10 @@ fn generate_html() -> String {
       <ul id="saves-list" class="saves-list"></ul>
       <div class="config-actions">
         <input class="config-input" id="save-new-name" type="text" placeholder="New career name" maxlength="64" />
+        <select class="config-input" id="save-new-mode" title="A career keeps the kind it is created with">
+          <option value="singleplayer">Singleplayer</option>
+          <option value="multiplayer">Multiplayer</option>
+        </select>
         <button id="save-new-btn" class="manage-btn manage-btn-primary" type="button">&#10010; New career</button>
         <span id="saves-msg" class="config-save-msg"></span>
       </div>
@@ -217,6 +231,36 @@ fn generate_html() -> String {
           </label>
           <span class="config-hint">Leave off to list every team in the My Team picker with what it asks for, locked ones greyed out. On, teams you cannot claim are not shown at all.</span>
         </div>
+        <div class="config-group">
+          <label class="config-label">Contracts</label>
+          <span class="config-hint">Contracts are on for every singleplayer career and off for every multiplayer one — the career's kind decides, so there is nothing to switch here. The settings below tune the money they deal in. The ledger is on the Career tab under <em>Contracts</em>.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-contract-top-salary">Salary range</label>
+          <div class="config-check-group">
+            <input class="config-input" id="cfg-contract-top-salary" type="number" min="1" title="Per season, quickest car" />
+            <input class="config-input" id="cfg-contract-floor-salary" type="number" min="1" title="Per season, slowest car" />
+          </div>
+          <span class="config-hint">Per-season pay for the quickest and the slowest car on the grid. Everything between is interpolated by car pace, so the gap at the front is far larger than the gap at the back.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-champion-prize">Prize money</label>
+          <div class="config-check-group">
+            <input class="config-input" id="cfg-champion-prize" type="number" min="1" title="Winning the championship" />
+            <input class="config-input" id="cfg-last-place-prize" type="number" min="1" title="Last of the drivers who scored" />
+          </div>
+          <span class="config-hint">Paid on final championship position once a season is marked Final, scaled by the size of the field.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-starting-balance">Starting balance</label>
+          <input class="config-input" id="cfg-starting-balance" type="number" min="0" />
+          <span class="config-hint">Credits a <em>newly created</em> career begins with, before it has raced anything — by default enough to buy into at least two of the seats that ask for sponsorship, so there is a choice of way in rather than one take-it-or-leave-it. Lower it if money should not open a seat at all — or lower <em>Sponsorship required</em> instead, which is what makes a shortfall cost millions. Recorded on the save when the career is made, so changing this never moves the balance of a career that already exists.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-contract-buy-in">Sponsorship required</label>
+          <input class="config-input" id="cfg-contract-buy-in" type="number" min="0" />
+          <span class="config-hint">Credits per rating point short of a team's bar that a pay driver must bring. Only the slowest third of the grid sells a seat this way — a team short of money takes the sponsorship, a front-runner has no budget hole to plug and will not have you at any price. Set to 0 to switch pay-driver seats off entirely.</span>
+        </div>
         <details class="config-details">
           <summary class="config-details-summary">Driver rating tuning</summary>
           <div class="config-group">
@@ -228,6 +272,11 @@ fn generate_html() -> String {
             <label class="config-label" for="cfg-rating-strictness">Requirement offset</label>
             <input class="config-input" id="cfg-rating-strictness" name="rating_strictness" type="number" min="-50" max="50" step="1" />
             <span class="config-hint">Rating points added to every team's requirement (default 0). Negative opens the whole grid up; positive makes every seat harder. Unlike the starting rating this never fades.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-offer-margin">Offer margin</label>
+            <input class="config-input" id="cfg-offer-margin" name="offer_margin" type="number" min="0" max="100" step="1" />
+            <span class="config-hint">How far <em>below</em> a team's requirement you may sit and still be offered the seat on merit (default 10). A team asking 59 will take a 50 at its ordinary rate; drop more than this below and the seat locks, and only a back-of-the-grid team will then sell it for sponsorship. Set to 0 to make every bar one you must clear outright. This shifts how far short of a bar a team will look — the requirement offset above shifts the bars themselves.</span>
           </div>
           <div class="config-group">
             <label class="config-label" for="cfg-eligibility-gates">Requirement built from</label>
@@ -293,6 +342,7 @@ fn generate_html() -> String {
 <script>{js_live}</script>
 <script>{js_career}</script>
 <script>{js_manage}</script>
+<script>{js_contracts}</script>
 <script>{js_config}</script>
 <script>{js_saves}</script>
 <script>{js_carperf}</script>
@@ -307,6 +357,7 @@ fn generate_html() -> String {
         js_live = JS_LIVE,
         js_career = JS_CAREER,
         js_manage = JS_MANAGE,
+        js_contracts = JS_CONTRACTS,
         js_config = JS_CONFIG,
         js_saves = JS_SAVES,
         js_carperf = JS_CARPERF,
@@ -333,6 +384,7 @@ const JS_TRACK_MAP: &str = include_str!("assets/track_map.js");
 const JS_LIVE: &str = include_str!("assets/live.js");
 const JS_CAREER: &str = include_str!("assets/career.js");
 const JS_MANAGE: &str = include_str!("assets/manage.js");
+const JS_CONTRACTS: &str = include_str!("assets/contracts.js");
 const JS_CONFIG: &str = include_str!("assets/config.js");
 const JS_SAVES: &str = include_str!("assets/saves.js");
 const JS_CARPERF: &str = include_str!("assets/car_performance.js");

@@ -12,6 +12,22 @@ fn empty_telemetry() -> PlayerTelemetry {
         tyre_temp_center: [0.0; 4],
         tyre_temp_right: [0.0; 4],
         tyre_wear: [0.0; 4],
+        tyre_flags: [0; 4],
+        terrain: [0; 4],
+        tyre_y: [0.0; 4],
+        tyre_rps: [0.0; 4],
+        tyre_temp: [0.0; 4],
+        tyre_height_above_ground: [0.0; 4],
+        tyre_tread_temp: [0.0; 4],
+        tyre_layer_temp: [0.0; 4],
+        tyre_carcass_temp: [0.0; 4],
+        tyre_rim_temp: [0.0; 4],
+        tyre_internal_air_temp: [0.0; 4],
+        tyre_slip_speed: [0.0; 4],
+        tyre_grip: [0.0; 4],
+        tyre_lateral_stiffness: [0.0; 4],
+        suspension_velocity: [0.0; 4],
+        wheel_local_position_y: [0.0; 4],
         tyre_pressure: [0.0; 4],
         brake_temp: [0.0; 4],
         suspension_travel: [0.0; 4],
@@ -25,6 +41,13 @@ fn empty_telemetry() -> PlayerTelemetry {
         tyre_compound: [String::new(), String::new(), String::new(), String::new()],
         fuel_level: 0.0,
         fuel_capacity: 0.0,
+        crash_state: 0,
+        aero_damage: 0.0,
+        engine_damage: 0.0,
+        brake_damage: [0.0; 4],
+        suspension_damage: [0.0; 4],
+        last_collision_index: -1,
+        last_collision_magnitude: 0.0,
     }
 }
 
@@ -73,6 +96,7 @@ fn make_session(session_state: u32, participants: Vec<ParticipantData>) -> LiveS
         player_telemetry: empty_telemetry(),
         race_flag_colour: 0,
         race_flag_reason: 0,
+        pit_mode: 0,
     }
 }
 

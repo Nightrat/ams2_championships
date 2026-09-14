@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use ams2_championship::ams2_shared_memory::read_live_session;
 use ams2_championship::data_store::{
-    compute_career_full, persist, Championship, ChampionshipStatus, SavePath, SharedStore,
+    compute_career_full, persist, CareerData, CareerMode, Championship, ChampionshipStatus,
+    SavePath, SharedStore,
 };
 use ams2_championship::http::{
     json_err, json_ok, read_full_request, send_response, track_slug, url_decode,
@@ -379,6 +380,60 @@ fn champ_eligibility(
     Some((reputation, eligibility))
 }
 
+/// The car class a championship runs in — its Custom AI file's stem, empty when it has none.
+///
+/// A team name only identifies a team *within* a class, so this is what scopes an incumbency:
+/// "Ferrari" appears in seven of the eight shipped rosters, spanning thirty years.
+fn champ_class(champ: &Championship) -> String {
+    champ
+        .custom_ai_file
+        .as_deref()
+        .map(ams2_championship::custom_ai::class_of_file)
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// The career ledger and the negotiating position it leaves the driver in.
+///
+/// Both routes that deal in offers need both — the money to say what a seat can be bought with,
+/// the standing to say who is re-signing whom — and deriving them together keeps the two from
+/// ever disagreeing about which season was the last one completed.
+fn career_standing(
+    cfg: &ams2_championship::config::Config,
+    data: &ams2_championship::data_store::CareerData,
+) -> (
+    ams2_championship::contracts::Finances,
+    ams2_championship::contracts::Standing,
+) {
+    let ledger = ams2_championship::contracts::finances(
+        &data.contracts,
+        &data.championships,
+        &data.sessions,
+        None,
+        // The save's own figure, not the config's — see `CareerData::starting_balance`.
+        data.starting_balance.max(0),
+        &cfg.prize_params(),
+    );
+    let standing = ams2_championship::contracts::standing(&ledger);
+    (ledger, standing)
+}
+
+/// Persists the store, answering with a 500 instead of the caller's success body if the write
+/// was refused.
+///
+/// Returns false when the caller should stop. A change that reached memory but not the file is
+/// not a change the user may be told succeeded — that is precisely the silent failure the guard
+/// in [`persist`] exists to surface.
+fn persisted(store: &SharedStore, path: &PathBuf, stream: &mut std::net::TcpStream) -> bool {
+    match persist(store, path) {
+        Ok(()) => true,
+        Err(e) => {
+            json_err(stream, "500 Internal Server Error", &e.replace('"', "'"));
+            false
+        }
+    }
+}
+
 /// The currently active save file. Cloned out of the shared lock so the guard is never held
 /// across a file write.
 fn cur(data_path: &SavePath) -> PathBuf {
@@ -390,8 +445,7 @@ fn cur(data_path: &SavePath) -> PathBuf {
 fn store_active_save(config_path: &std::path::Path, file: &std::path::Path) -> Result<(), String> {
     let mut cfg = ams2_championship::config::load_or_create(config_path);
     cfg.data_file = Some(file.display().to_string());
-    let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(config_path, text).map_err(|e| e.to_string())
+    ams2_championship::config::save(config_path, &cfg)
 }
 
 /// `{ active, saves: [...] }` — the payload every /api/saves route answers with.
@@ -481,6 +535,77 @@ fn handle(
         let career = compute_career_full(&data.championships, &data.sessions, ai_dir.as_deref());
         let json = serde_json::to_vec(&career).unwrap_or_default();
         json_ok(&mut stream, &json);
+        return;
+    }
+
+    // GET /api/career/finances — every contracted season and what it paid. Derived in full on
+    // each call: only the agreed terms are stored, so salaries, prize money and the balance all
+    // follow the results as they stand right now.
+    if method == "GET" && path == "/api/career/finances" {
+        #[derive(serde::Serialize)]
+        struct Body {
+            /// False when the config switch is off — the figures are then advisory only.
+            enabled: bool,
+            /// The seat held and what was done with it, which is what next season's offers turn
+            /// on. Shown here so the ledger explains the renewals rather than only listing pay.
+            standing: ams2_championship::contracts::Standing,
+            #[serde(flatten)]
+            finances: ams2_championship::contracts::Finances,
+        }
+        let data = store.read().unwrap();
+        let cfg = ams2_championship::config::load_or_create(&config_path);
+        let (finances, standing) = career_standing(&cfg, &data);
+        let body = Body {
+            enabled: data.mode.uses_contracts(),
+            standing,
+            finances,
+        };
+        let json = serde_json::to_vec(&body).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // PATCH /api/career/mode — settle a career that predates career modes.
+    //
+    // The *only* transition there is. A mode is picked when a career is created and kept, because
+    // the two kinds allow different things: switching an established career would leave it
+    // holding seasons it could not have made. `Unset` is the exception because those saves were
+    // never asked, so the UI asks once and this records the answer.
+    if method == "PATCH" && path == "/api/career/mode" {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            mode: CareerMode,
+        }
+        let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
+            json_err(&mut stream, "400 Bad Request", "invalid body");
+            return;
+        };
+        if body.mode == CareerMode::Unset {
+            json_err(
+                &mut stream,
+                "400 Bad Request",
+                "choose singleplayer or multiplayer",
+            );
+            return;
+        }
+        {
+            let mut data = store.write().unwrap();
+            if data.mode != CareerMode::Unset {
+                let msg = format!(
+                    "this career is already {} and cannot be changed. \
+                     Create a new career to race the other way.",
+                    data.mode.label()
+                );
+                json_err(&mut stream, "409 Conflict", &msg);
+                return;
+            }
+            data.mode = body.mode;
+        }
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
+        let body = format!("{{\"mode\":\"{}\"}}", body.mode.label());
+        json_ok(&mut stream, body.as_bytes());
         return;
     }
 
@@ -610,11 +735,58 @@ fn handle(
             points_system: Vec<i32>,
             #[serde(default)]
             manufacturer_scoring: bool,
+            /// The roster this season runs against. Required in singleplayer — a season is
+            /// defined by the grid it is raced on — and refused in multiplayer.
+            #[serde(default)]
+            custom_ai_file: Option<String>,
         }
         let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
             json_err(&mut stream, "400 Bad Request", "invalid body");
             return;
         };
+
+        // ── What this career's mode allows ───────────────────────────────────
+        let mode = store.read().unwrap().mode;
+        let roster = body.custom_ai_file.filter(|f| !f.trim().is_empty());
+        if !mode.uses_roster() && roster.is_some() {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "a multiplayer career races people, not a Custom AI roster.",
+            );
+            return;
+        }
+        if mode == CareerMode::Singleplayer && roster.is_none() {
+            json_err(
+                &mut stream,
+                "400 Bad Request",
+                "choose a Custom AI Drivers file — a singleplayer season is defined by the \
+                 grid it is raced on.",
+            );
+            return;
+        }
+        // One season at a time: the next drive is offered on the strength of the last one, so
+        // the last one has to be over before there is anything to offer against.
+        if mode.one_season_at_a_time() {
+            let unfinished: Vec<String> = store
+                .read()
+                .unwrap()
+                .championships
+                .iter()
+                .filter(|c| c.status != ChampionshipStatus::Final)
+                .map(|c| c.name.clone())
+                .collect();
+            if !unfinished.is_empty() {
+                let msg = format!(
+                    "finish the current season first — {} is still running. \
+                     Mark it Final on the Manage tab.",
+                    unfinished.join(", ")
+                );
+                json_err(&mut stream, "409 Conflict", &msg.replace('"', "'"));
+                return;
+            }
+        }
+
         let id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -623,7 +795,7 @@ fn handle(
         let champ = Championship {
             id,
             name: body.name,
-            status: ChampionshipStatus::Progress,
+            status: mode.new_season_status(),
             points_system: if body.points_system.is_empty() {
                 vec![25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
             } else {
@@ -632,12 +804,15 @@ fn handle(
             manufacturer_scoring: body.manufacturer_scoring,
             rounds: vec![],
             session_ids: vec![],
-            custom_ai_file: None,
+            custom_ai_file: roster,
+            // The seat is taken by signing, never by creating — see POST .../sign.
             player_team: None,
         };
         let json = serde_json::to_vec(&champ).unwrap_or_default();
         store.write().unwrap().championships.push(champ);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         json_ok(&mut stream, &json);
         return;
     }
@@ -655,7 +830,9 @@ fn handle(
         data.sessions.retain(|s| assigned.contains(&s.id));
         let removed = before - data.sessions.len();
         drop(data);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         let body = format!("{{\"removed\":{removed}}}");
         json_ok(&mut stream, body.as_bytes());
         return;
@@ -736,6 +913,305 @@ fn handle(
         };
         let json = serde_json::to_vec(&body).unwrap_or_default();
         json_ok(&mut stream, &json);
+        return;
+    }
+
+    // GET /api/championships/:id/offers — the seats on the table for this season, with terms.
+    //
+    // Nothing here is stored: an offer is only what a team would say today, so it is rebuilt
+    // from the same eligibility the team picker uses. `open` is what the caller should act on —
+    // a season that already has a team, or that has been raced, is no longer taking offers.
+    if method == "GET"
+        && segs.len() == 4
+        && segs[0] == "api"
+        && segs[1] == "championships"
+        && segs[3] == "offers"
+    {
+        use ams2_championship::contracts;
+
+        #[derive(serde::Serialize)]
+        struct Body<'a> {
+            /// False when the config switch is off — the offers are then advisory only.
+            enabled: bool,
+            /// False when the championship has no Custom AI file to rate against.
+            rated: bool,
+            /// Whether a seat may still be taken for this season.
+            open: bool,
+            reputation: f32,
+            /// This season's car class. Shown so a client can explain why an incumbency did not
+            /// carry: a seat is only held inside the series it was held in.
+            class: String,
+            /// What the career is worth, so the client can tell which buy-ins are affordable
+            /// without a second request. The server checks it again on signing regardless.
+            balance: i64,
+            /// Teams on the grid, offering or not. `Offer::rank` is a position within this, so
+            /// without it a client can say "9th fastest" but not "9th of 21" — and the teams
+            /// that make no offer are exactly the ones missing from the list.
+            teams: usize,
+            /// The seat held going into this season, and what was done with it.
+            standing: contracts::Standing,
+            /// The deal already agreed for this season, if there is one.
+            signed: Option<&'a contracts::Contract>,
+            offers: Vec<contracts::Offer>,
+        }
+        let id = segs[2];
+        let data = store.read().unwrap();
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        let cfg = ams2_championship::config::load_or_create(&config_path);
+        let class = champ_class(champ);
+        let signed = contracts::for_championship(&data.contracts, id);
+        // A season stops taking offers once it is signed, or once it has been raced — the same
+        // first-session rule that locks the team picker. A `player_team` picked directly is not
+        // a commitment and does not close it: `POST .../sign` may still replace it, exactly as
+        // `PATCH` may before the first session.
+        let open = signed.is_none() && champ.rounds.iter().all(|r| r.session_ids.is_empty());
+
+        let (ledger, standing) = career_standing(&cfg, &data);
+        let rated = champ_eligibility(&config_path, champ, &data.championships, &data.sessions);
+        let body = match &rated {
+            Some((rep, eligibility)) => Body {
+                enabled: data.mode.uses_contracts(),
+                rated: true,
+                open,
+                reputation: rep.value,
+                balance: ledger.balance,
+                class: class.clone(),
+                teams: eligibility.len(),
+                offers: contracts::offers_for_with(
+                    id,
+                    &class,
+                    rep.value,
+                    ledger.balance,
+                    eligibility,
+                    &standing,
+                    &cfg.offer_params(),
+                ),
+                standing,
+                signed,
+            },
+            None => Body {
+                enabled: data.mode.uses_contracts(),
+                rated: false,
+                open,
+                reputation: 0.0,
+                balance: ledger.balance,
+                class,
+                teams: 0,
+                standing,
+                signed,
+                offers: vec![],
+            },
+        };
+        let json = serde_json::to_vec(&body).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // POST /api/championships/:id/sign — take one of the offers on the table.
+    //
+    // The client names only the team. Terms are regenerated server-side from the same inputs
+    // that produced the offer list, so a salary cannot be dictated by the caller, and the deal
+    // recorded is the one the grid would actually give today.
+    //
+    // This is the team picker plus a record of what was agreed: it applies the same locks
+    // `PATCH /api/championships/:id` does rather than working around them.
+    if method == "POST"
+        && segs.len() == 4
+        && segs[0] == "api"
+        && segs[1] == "championships"
+        && segs[3] == "sign"
+    {
+        use ams2_championship::contracts;
+
+        #[derive(serde::Deserialize)]
+        struct Body {
+            team: String,
+        }
+        let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
+            json_err(&mut stream, "400 Bad Request", "invalid body");
+            return;
+        };
+        let id = segs[2].to_string();
+        let mut data = store.write().unwrap();
+        let Some(current) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        let current = current.clone();
+
+        // Only a singleplayer career signs for seats. A multiplayer one races people, and an
+        // unset one predates the question — recording a deal in either would put a salary in a
+        // ledger the user never opted into.
+        if !data.mode.uses_contracts() {
+            let msg = format!(
+                "contracts belong to a singleplayer career; this one is {}.",
+                data.mode.label()
+            );
+            json_err(&mut stream, "409 Conflict", &msg);
+            return;
+        }
+        if contracts::for_championship(&data.contracts, &id).is_some() {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "This season is already signed. Tear up the contract first to change seat.",
+            );
+            return;
+        }
+        // The same first-session rule as the team lock: results already scored were measured
+        // against the seat they were scored in.
+        if current.rounds.iter().any(|r| !r.session_ids.is_empty()) {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "The season has already started. Remove its assigned sessions first.",
+            );
+            return;
+        }
+        if current.custom_ai_file.is_none() {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "Assign a Custom AI Drivers file first — without a roster there are no teams \
+                 to sign for.",
+            );
+            return;
+        }
+
+        let Some((reputation, eligibility)) =
+            champ_eligibility(&config_path, &current, &data.championships, &data.sessions)
+        else {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "No car performance data for this roster, so no terms can be offered.",
+            );
+            return;
+        };
+        let cfg = ams2_championship::config::load_or_create(&config_path);
+        let (ledger, standing) = career_standing(&cfg, &data);
+        let offers = contracts::offers_for_with(
+            &id,
+            &champ_class(&current),
+            reputation.value,
+            ledger.balance,
+            &eligibility,
+            &standing,
+            &cfg.offer_params(),
+        );
+        let wanted = body.team.trim();
+        let Some(offer) = offers.iter().find(|o| o.team.eq_ignore_ascii_case(wanted)) else {
+            // No offer means the team is out of reach, or is not on this grid at all. The
+            // requirement is the useful half of the answer, so it is quoted when there is one.
+            let reason = match eligibility
+                .iter()
+                .find(|e| e.team.eq_ignore_ascii_case(wanted))
+            {
+                Some(e) => format!(
+                    "{wanted} is not offering a seat: they want a driver rating of {:.0} and \
+                     yours is {:.0}. Race for a slower team first.",
+                    e.required, reputation.value
+                ),
+                None => format!("{wanted} is not a team on this grid."),
+            };
+            json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));
+            return;
+        };
+
+        // ── Paying for a seat the rating has not earned ──────────────────────
+        // The price is the server's, and so is the check: the balance is derived from results,
+        // so a client cannot talk its way into a car by naming its own figure.
+        if offer.buy_in > 0 && ledger.balance < offer.buy_in {
+            let reason = format!(
+                "{} wants {} in sponsorship to take you, and the career is worth {}. \
+                 Win some prize money first, or race for a team that will have you.",
+                offer.team, offer.buy_in, ledger.balance
+            );
+            json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));
+            return;
+        }
+
+        let signed_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let mut contract = contracts::Contract::from_offer(&id, offer, signed_at);
+        contract.bought_for = offer.buy_in;
+
+        if let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) {
+            champ.player_team = Some(contract.team.clone());
+        }
+        data.contracts.push(contract.clone());
+
+        #[derive(serde::Serialize)]
+        struct Signed<'a> {
+            contract: &'a contracts::Contract,
+            championship: &'a Championship,
+        }
+        let json = data
+            .championships
+            .iter()
+            .find(|c| c.id == id)
+            .map(|champ| {
+                serde_json::to_vec(&Signed {
+                    contract: &contract,
+                    championship: champ,
+                })
+                .unwrap_or_default()
+            })
+            .unwrap_or_default();
+        drop(data);
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // DELETE /api/championships/:id/sign — tear up an unraced contract.
+    //
+    // Without this a mis-click would be permanent: a signed season stops taking offers, so there
+    // would be no way back to the list. Allowed on exactly the same terms as changing the team —
+    // until the season's first session.
+    if method == "DELETE"
+        && segs.len() == 4
+        && segs[0] == "api"
+        && segs[1] == "championships"
+        && segs[3] == "sign"
+    {
+        let id = segs[2].to_string();
+        let mut data = store.write().unwrap();
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        if champ.rounds.iter().any(|r| !r.session_ids.is_empty()) {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "The season has already started, so its contract stands. Remove its assigned \
+                 sessions first.",
+            );
+            return;
+        }
+        if !data.contracts.iter().any(|c| c.champ_id == id) {
+            json_err(&mut stream, "404 Not Found", "no contract for this season");
+            return;
+        }
+        data.contracts.retain(|c| c.champ_id != id);
+        // The seat went with the deal. Clearing it puts the season back exactly where signing
+        // found it, so the offer list opens again.
+        if let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) {
+            champ.player_team = None;
+        }
+        drop(data);
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
+        json_ok(&mut stream, b"{\"released\":true}");
         return;
     }
 
@@ -851,6 +1327,56 @@ fn handle(
         // Whether the championship is under way. The first assigned session commits both the
         // roster and the seat: the results already scored were measured against that grid.
         let started = current.rounds.iter().any(|r| !r.session_ids.is_empty());
+        let mode = data.mode;
+
+        // ── What this career's mode allows ───────────────────────────────────
+        if !mode.uses_roster()
+            && (prospective.custom_ai_file != current.custom_ai_file
+                || prospective.player_team != current.player_team)
+        {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "a multiplayer career has no roster and no team.",
+            );
+            return;
+        }
+        // In singleplayer the seat comes from a signed contract and nowhere else, so the team
+        // picker is closed. `POST .../sign` is the way in; `DELETE .../sign` is the way out.
+        if mode.uses_contracts() && prospective.player_team != current.player_team {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "sign for a team instead — a singleplayer seat comes from a contract.",
+            );
+            return;
+        }
+        // `Progress` distinguishes an unfinished season from *the* current one, and singleplayer
+        // never has two to tell apart. Its whole state machine is the season being raced, then
+        // the season being over.
+        if !mode.uses_progress_state()
+            && body.status.as_ref() == Some(&ChampionshipStatus::Progress)
+        {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "a singleplayer season is either the one being raced or finished.",
+            );
+            return;
+        }
+        // A finished singleplayer season has paid out, and the next one was created on the
+        // strength of it being over. Reopening it would unpick both.
+        if mode.final_is_terminal()
+            && current.status == ChampionshipStatus::Final
+            && body.status.as_ref().is_some_and(|s| *s != ChampionshipStatus::Final)
+        {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "a finished season stays finished.",
+            );
+            return;
+        }
 
         // ── The Custom AI file is committed once the championship is under way ─
         // Every expected position, team requirement and rating figure is relative to this
@@ -961,7 +1487,9 @@ fn handle(
         }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         json_ok(&mut stream, &json);
         return;
     }
@@ -977,7 +1505,9 @@ fn handle(
             return;
         }
         drop(data);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         json_ok(&mut stream, b"{}");
         return;
     }
@@ -1000,7 +1530,9 @@ fn handle(
             .push(ams2_championship::data_store::Round::default());
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         json_ok(&mut stream, &json);
         return;
     }
@@ -1025,7 +1557,9 @@ fn handle(
         champ.rounds.remove(ridx);
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         json_ok(&mut stream, &json);
         return;
     }
@@ -1096,7 +1630,9 @@ fn handle(
         }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         json_ok(&mut stream, &json);
         return;
     }
@@ -1126,7 +1662,9 @@ fn handle(
         champ.rounds[ridx].session_ids.retain(|s| s != sid);
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         json_ok(&mut stream, &json);
         return;
     }
@@ -1165,6 +1703,9 @@ fn handle(
             name: String,
             #[serde(default)]
             new_name: String,
+            /// Required when creating: a career picks its kind up front and keeps it.
+            #[serde(default)]
+            mode: CareerMode,
         }
         let body: SaveReq = match serde_json::from_slice(&req.body) {
             Ok(v) => v,
@@ -1216,10 +1757,27 @@ fn handle(
                 );
                 return;
             }
-            if let Err(e) = std::fs::write(
-                &target,
-                "{\n  \"sessions\": [],\n  \"championships\": []\n}",
-            ) {
+            // A new career must say which kind it is: every rule below turns on it, and `Unset`
+            // exists only to describe saves written before the question was asked.
+            if body.mode == CareerMode::Unset {
+                json_err(
+                    &mut stream,
+                    "400 Bad Request",
+                    "choose singleplayer or multiplayer for the new career",
+                );
+                return;
+            }
+            // The balance is recorded on the save now and never re-read from config, so a
+            // career keeps what it was founded with however the setting moves afterwards.
+            let fresh = CareerData {
+                mode: body.mode,
+                starting_balance: ams2_championship::config::load_or_create(&config_path)
+                    .starting_balance
+                    .max(0),
+                ..CareerData::default()
+            };
+            let text = serde_json::to_string_pretty(&fresh).unwrap_or_default();
+            if let Err(e) = std::fs::write(&target, text) {
                 json_err(&mut stream, "500 Internal Server Error", &e.to_string());
                 return;
             }
@@ -1228,12 +1786,30 @@ fn handle(
             return;
         }
 
+        // Read the incoming career *before* touching anything. Switching to a save that cannot
+        // be parsed would put an empty career in front of the user under that save's name; the
+        // file itself is protected by `persist`, but the switch is still the wrong answer.
+        let incoming = match ams2_championship::data_store::try_load_data(&target) {
+            Ok(data) => data,
+            Err(e) => {
+                let msg = format!(
+                    "{} could not be read ({e}). It has not been changed, and the current \
+                     career is still active.",
+                    target.display()
+                );
+                json_err(&mut stream, "409 Conflict", &msg.replace('"', "'"));
+                return;
+            }
+        };
+
         // Flush the outgoing career before repointing, then swap the store's *contents* —
         // never the Arc itself, which the recorder thread also holds.
-        persist(&store, &cur(&data_path));
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
         {
             let mut active = data_path.write().unwrap();
-            *store.write().unwrap() = ams2_championship::data_store::load_data(&target);
+            *store.write().unwrap() = incoming;
             *active = target.clone();
         }
         if let Err(e) = store_active_save(&config_path, &target) {
@@ -1284,8 +1860,10 @@ fn handle(
         // Flush first: an active save with unwritten changes would otherwise be renamed out
         // from under the next persist().
         let was_active = cur(&data_path) == from;
-        if was_active {
-            persist(&store, &from);
+        if was_active && !persisted(&store, &from, &mut stream) {
+            // Refused: the file could not be read, so it must not be renamed either — moving it
+            // would leave the unreadable career under a name the switcher offers as this one.
+            return;
         }
         if let Err(e) = std::fs::rename(&from, &to) {
             json_err(&mut stream, "500 Internal Server Error", &e.to_string());
@@ -1362,6 +1940,23 @@ fn handle(
             enforce_team_eligibility: bool,
             #[serde(default)]
             hide_locked_teams: bool,
+            // Optional so a form that omits one carries the stored value through rather than
+            // resetting it behind the user — the same reason the spotter fields are not in this
+            // body at all. The consequence here would be worse: an omitted salary would zero the
+            // whole economy.
+            // salary would reset the whole economy to zero rather than leave it alone.
+            #[serde(default)]
+            contract_top_salary: Option<i64>,
+            #[serde(default)]
+            contract_floor_salary: Option<i64>,
+            #[serde(default)]
+            contract_buy_in_per_point: Option<i64>,
+            #[serde(default)]
+            champion_prize: Option<i64>,
+            #[serde(default)]
+            last_place_prize: Option<i64>,
+            #[serde(default)]
+            starting_balance: Option<i64>,
             // Rating tuning. Each falls back to the default rather than to zero, so a form that
             // predates these fields — or one that fails to send them — leaves the rating alone
             // instead of silently resetting every driver to a rating of 0.
@@ -1379,6 +1974,8 @@ fn handle(
             retirement_min_laps_down: u32,
             #[serde(default = "default_retire_distance")]
             retirement_distance_pct: f32,
+            #[serde(default = "default_margin")]
+            offer_margin: f32,
         }
         fn yes() -> bool {
             true
@@ -1394,6 +1991,9 @@ fn handle(
         }
         fn default_retire_distance() -> f32 {
             ams2_championship::driver_rating::RatingParams::default().retirement_distance * 100.0
+        }
+        fn default_margin() -> f32 {
+            ams2_championship::driver_rating::RatingParams::default().offer_margin
         }
         let req_body: PatchConfig = match serde_json::from_slice(&req.body) {
             Ok(v) => v,
@@ -1461,6 +2061,29 @@ fn handle(
             custom_ai_dir: req_body.custom_ai_dir,
             enforce_team_eligibility: req_body.enforce_team_eligibility,
             hide_locked_teams: req_body.hide_locked_teams,
+            // Taken raw here and clamped by `normalize_economy` below, which reads the bounds off
+            // `Config::offer_params` / `prize_params`. Clamping each field on its own could not
+            // enforce the relationship *between* a pair: a floor above its top would be stored
+            // and shown by the Config tab while the economy quietly ran on something else.
+            contract_top_salary: req_body
+                .contract_top_salary
+                .unwrap_or(old_cfg.contract_top_salary),
+            contract_floor_salary: req_body
+                .contract_floor_salary
+                .unwrap_or(old_cfg.contract_floor_salary),
+            contract_buy_in_per_point: req_body
+                .contract_buy_in_per_point
+                .unwrap_or(old_cfg.contract_buy_in_per_point),
+            champion_prize: req_body.champion_prize.unwrap_or(old_cfg.champion_prize),
+            last_place_prize: req_body
+                .last_place_prize
+                .unwrap_or(old_cfg.last_place_prize),
+            // Only the default for the *next* career — existing saves carry their own figure,
+            // so moving this never changes a balance that has already been founded.
+            starting_balance: req_body
+                .starting_balance
+                .unwrap_or(old_cfg.starting_balance)
+                .clamp(0, 1_000_000_000),
             starting_rating: req_body.starting_rating.clamp(0.0, 100.0),
             rating_strictness: req_body.rating_strictness.clamp(-50.0, 50.0),
             eligibility_gates: req_body.eligibility_gates,
@@ -1468,18 +2091,16 @@ fn handle(
             count_retirements: req_body.count_retirements,
             retirement_min_laps_down: req_body.retirement_min_laps_down.min(50),
             retirement_distance_pct: req_body.retirement_distance_pct.clamp(0.0, 100.0),
+            offer_margin: req_body.offer_margin.clamp(0.0, 100.0),
         };
-        match serde_json::to_string_pretty(&new_cfg) {
-            Ok(text) => {
-                if let Err(e) = std::fs::write(config_path.as_ref(), text) {
-                    json_err(&mut stream, "500 Internal Server Error", &e.to_string());
-                    return;
-                }
-            }
-            Err(e) => {
-                json_err(&mut stream, "500 Internal Server Error", &e.to_string());
-                return;
-            }
+        // Store what the economy will actually run on, so the form cannot show one thing while
+        // the grid uses another.
+        let mut new_cfg = new_cfg;
+        new_cfg.normalize_economy();
+
+        if let Err(e) = ams2_championship::config::save(config_path.as_ref(), &new_cfg) {
+            json_err(&mut stream, "500 Internal Server Error", &e.replace('"', "'"));
+            return;
         }
 
         #[derive(serde::Serialize)]
@@ -1592,9 +2213,8 @@ fn handle(
             file_cfg.spotter_enabled = s_enabled;
             file_cfg.spotter_voice = s_voice;
             file_cfg.spotter_name = s_name;
-            if let Ok(text) = serde_json::to_string_pretty(&file_cfg) {
-                let _ = std::fs::write(config_path.as_ref(), text);
-            }
+            // Guarded and atomic: never writes defaults over a config that could not be read.
+            let _ = ams2_championship::config::save(config_path.as_ref(), &file_cfg);
             json_ok(&mut stream, body.as_bytes());
         } else {
             json_err(&mut stream, "400 Bad Request", "invalid JSON");
@@ -1621,7 +2241,9 @@ fn main() {
         .unwrap_or_else(|| PathBuf::from("."));
 
     let config_path = exe_dir.join("config.json");
-    let cfg = ams2_championship::config::load_or_create(&config_path);
+    // The one place the config file is rewritten to pick up fields added since the last run.
+    // Doing that on every read is what left the file momentarily empty for other threads.
+    let cfg = ams2_championship::config::load_and_upgrade(&config_path);
 
     // The saves folder is configurable, so it has to be resolved before anything under it.
     let champ_dir = ams2_championship::saves::resolve_dir(&exe_dir, cfg.saves_dir.as_deref());

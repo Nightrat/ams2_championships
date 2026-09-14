@@ -35,17 +35,40 @@ function renderChampList() {
   function statusColourClass(status) {
     return status === 'Final' ? 'status-final' : status === 'Progress' ? 'status-progress' : 'status-active';
   }
+  // A singleplayer career has one unfinished season at a time, so "Progress" — started, but not
+  // the current one — has nothing to distinguish. Its whole state machine is the season being
+  // raced and then the season being over, which is one button, not a three-way choice.
+  var sp = careerMode === 'singleplayer';
   el.innerHTML = manageState.champs.map(function (c) {
     var sel = c.id === manageState.selectedId ? ' selected' : '';
-    var opts = ['Active', 'Progress', 'Final'].map(function (s) {
-      return '<option' + (s === c.status ? ' selected' : '') + '>' + s + '</option>';
-    }).join('');
+    var control;
+    if (sp) {
+      control = c.status === 'Final'
+        ? '<span class="champ-list-status status-final">Finished</span>'
+        : '<button class="champ-list-finish" data-cid="' + esc(c.id) + '"' +
+          ' title="Close the season: it pays out, and the next one can be created">Finish</button>';
+    } else {
+      var opts = ['Active', 'Progress', 'Final'].map(function (s) {
+        return '<option' + (s === c.status ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+      control = '<select class="champ-list-status ' + statusColourClass(c.status) +
+        '" data-cid="' + esc(c.id) + '">' + opts + '</select>';
+    }
     return '<div class="champ-list-item' + sel + '" data-id="' + esc(c.id) + '">' +
       '<span class="champ-list-name">' + esc(c.name) + '</span>' +
       '<button class="champ-rename-btn" data-cid="' + esc(c.id) + '" title="Rename">&#9998;</button>' +
-      '<select class="champ-list-status ' + statusColourClass(c.status) + '" data-cid="' + esc(c.id) + '">' + opts + '</select>' +
+      control +
       '</div>';
   }).join('');
+  el.querySelectorAll('.champ-list-finish').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      // Final is terminal in singleplayer, so this is the one irreversible thing the Manage tab
+      // does — and it is what pays the season out.
+      if (!confirm('Finish this season? It pays out and cannot be reopened.')) return;
+      patchChamp(btn.dataset.cid, { status: 'Final' });
+    });
+  });
   el.querySelectorAll('.champ-list-item').forEach(function (item) {
     item.addEventListener('click', function () {
       manageState.selectedId = item.dataset.id;
@@ -123,7 +146,14 @@ function renderChampDetail(id) {
       var label = f === champ.custom_ai_file && aiUnread ? f + ' (not read by AMS2)' : f;
       return '<option value="' + esc(f) + '"' + (f === champ.custom_ai_file ? ' selected' : '') + '>' + esc(label) + '</option>';
     }).join('');
-  var aiHint = started
+  // The roster is chosen when a singleplayer season is created and kept: every result is scored
+  // against that grid. Multiplayer has no roster at all.
+  var aiLocked = careerMode !== 'unset' || started;
+  var aiHint = careerMode === 'multiplayer'
+    ? 'A multiplayer career races people — there is no Custom AI roster.'
+    : careerMode === 'singleplayer'
+    ? 'Chosen when the season was created. A season is defined by the grid it is raced on.'
+    : started
     ? 'Locked in: the championship has started. Remove its assigned sessions to change the roster.'
     : manageState.customAiFiles.length
       ? 'Only files named after a car class AMS2 knows are listed — the game ignores any other name. Driver names matching a <name> entry show its livery/team name instead of the AMS2 car class.'
@@ -132,12 +162,20 @@ function renderChampDetail(id) {
   // field is disabled and the server keeps player_team null — that is also what switches
   // session enforcement off.
   var hasAi = !!champ.custom_ai_file;
-  var teamLocked = !hasAi || started;
-  var playerTeamHint = !hasAi
-    ? 'Assign a Custom AI Drivers file first — its roster is what your seat is checked against.'
-    : started
-      ? 'Locked in: the championship has started. Remove its assigned sessions to change teams.'
-      : 'AMS2 exposes no livery field. Your seat is inferred from the car you drove plus which roster drivers are on the grid, and sessions that contradict it are rejected.';
+  // Multiplayer has no roster and no team; singleplayer has both, but the seat comes from a
+  // signed contract rather than this picker. Only an unset career still picks a team by hand.
+  var mpCareer = careerMode === 'multiplayer';
+  var spCareer = careerMode === 'singleplayer';
+  var teamLocked = mpCareer || spCareer || !hasAi || started;
+  var playerTeamHint = mpCareer
+    ? 'A multiplayer career races people — there is no roster and no team.'
+    : spCareer
+      ? 'Your seat comes from the contract you sign, below.'
+      : !hasAi
+        ? 'Assign a Custom AI Drivers file first — its roster is what your seat is checked against.'
+        : started
+          ? 'Locked in: the championship has started. Remove its assigned sessions to change teams.'
+          : 'AMS2 exposes no livery field. Your seat is inferred from the car you drove plus which roster drivers are on the grid, and sessions that contradict it are rejected.';
 
   var roundsHtml = rounds.length === 0
     ? '<div class="manage-empty">No rounds yet. Click \u201c+ Add Round\u201d to create one.</div>'
@@ -181,12 +219,16 @@ function renderChampDetail(id) {
     '<div class="champ-detail-meta">' +
       '<label>Points&nbsp;<input class="manage-input champ-points-input" value="' + esc(champ.points_system.join(',')) + '" data-id="' + esc(champ.id) + '" size="32" title="Comma-separated points per finishing position"></label>' +
       '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
+      // A multiplayer career has no roster and no team, so both pickers are left out rather
+      // than shown disabled — a dead control that explains why it is dead is still dead.
+      (mpCareer ? '' :
       '<label title="' + esc(aiHint) + '">Custom AI Drivers&nbsp;' +
-        '<select class="manage-select champ-custom-ai-select"' + (started ? ' disabled' : '') + '>' + aiOptions + '</select>' +
-      '</label>' +
+        '<select class="manage-select champ-custom-ai-select"' + (aiLocked ? ' disabled' : '') + '>' + aiOptions + '</select>' +
+      '</label>') +
       // Teams are picked, never typed: a free-text seat could name a team that is not in the
       // roster at all, which the rating cannot judge and so would silently never be enforced.
       // Options arrive from loadPlayerTeamOptions; until then only the current value is listed.
+      (mpCareer ? '' :
       '<label title="' + esc(playerTeamHint) + '">My Team&nbsp;' +
         '<select class="manage-select champ-player-team-select"' + (teamLocked ? ' disabled' : '') + '>' +
           '<option value="">' + (hasAi ? '(none)' : 'needs a Custom AI file') + '</option>' +
@@ -195,8 +237,11 @@ function renderChampDetail(id) {
             : '') +
         '</select>' +
       '</label>' +
-      '<span class="config-hint" id="player-team-rating"></span>' +
+      '<span class="config-hint" id="player-team-rating"></span>') +
     '</div>' +
+    // Filled by loadOffers when contracts are switched on; empty otherwise, so the team picker
+    // above stays the whole story for anyone not using them.
+    '<div id="champ-contract-panel"></div>' +
     '<div class="champ-rounds-header">' +
       '<span>Rounds&nbsp;(' + rounds.length + ')</span>' +
       '<button class="manage-btn manage-btn-primary add-round-btn" data-cid="' + esc(champ.id) + '">+ Add Round</button>' +
@@ -216,7 +261,9 @@ function renderChampDetail(id) {
   right.querySelector('.champ-manufacturer-check').addEventListener('change', function () {
     patchChamp(champ.id, { manufacturer_scoring: this.checked });
   });
-  right.querySelector('.champ-custom-ai-select').addEventListener('change', function () {
+  // Both pickers are absent in a multiplayer career, so neither is assumed to be there.
+  var aiSelect = right.querySelector('.champ-custom-ai-select');
+  if (aiSelect) aiSelect.addEventListener('change', function () {
     var select = this;
     patchChamp(champ.id, { custom_ai_file: this.value || null }, function (err) {
       // 409 = the championship has started and its roster is locked in.
@@ -224,7 +271,8 @@ function renderChampDetail(id) {
       select.value = champ.custom_ai_file || '';
     });
   });
-  right.querySelector('.champ-player-team-select').addEventListener('change', function () {
+  var teamSelect = right.querySelector('.champ-player-team-select');
+  if (teamSelect) teamSelect.addEventListener('change', function () {
     var val = this.value;
     if (val === (champ.player_team || '')) return;
     var select = this;
@@ -235,6 +283,7 @@ function renderChampDetail(id) {
     });
   });
   loadPlayerTeamOptions(champ.id);
+  loadOffers(champ.id);
   right.querySelector('.champ-delete-btn').addEventListener('click', function () {
     if (!confirm('Delete "' + champ.name + '"?')) return;
     fetch('/api/championships/' + champ.id, { method: 'DELETE' }).then(function () {
@@ -419,6 +468,17 @@ var newForm = document.getElementById('manage-new-form');
 if (addChampBtn && newForm) {
   addChampBtn.addEventListener('click', function () {
     newForm.style.display = '';
+    var ai = document.getElementById('new-champ-ai');
+    if (ai) {
+      var sp = careerMode === 'singleplayer';
+      ai.style.display = sp ? '' : 'none';
+      ai.innerHTML = sp
+        ? '<option value="">Custom AI file&hellip;</option>' +
+          manageState.customAiFiles.map(function (f) {
+            return '<option value="' + esc(f) + '">' + esc(f) + '</option>';
+          }).join('')
+        : '';
+    }
     document.getElementById('new-champ-name').focus();
   });
   document.getElementById('new-champ-cancel').addEventListener('click', function () {
@@ -439,11 +499,20 @@ if (addChampBtn && newForm) {
       .map(function (v) { return parseInt(v.trim(), 10); })
       .filter(function (n) { return !isNaN(n); });
     var manufacturerScoring = document.getElementById('new-champ-manufacturer').checked;
+    // A singleplayer season is defined by the grid it is raced on, so the roster is chosen here
+    // rather than afterwards. A multiplayer one has no roster at all.
+    var aiEl = document.getElementById('new-champ-ai');
+    var body = { name: name, points_system: pts, manufacturer_scoring: manufacturerScoring };
+    if (careerMode === 'singleplayer') {
+      if (!aiEl || !aiEl.value) { alert('Choose a Custom AI Drivers file for the season.'); return; }
+      body.custom_ai_file = aiEl.value;
+    }
     fetch('/api/championships', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, points_system: pts, manufacturer_scoring: manufacturerScoring })
-    }).then(function () {
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      if (!r.ok) { return r.json().then(function (b) { alert(b.error || 'Could not create the season.'); }); }
       newForm.style.display = 'none';
       document.getElementById('new-champ-name').value = '';
       loadManage();

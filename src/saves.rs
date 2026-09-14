@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::data_store::load_data;
+use crate::data_store::{try_load_data, CareerData, CareerMode};
 
 /// One career save file found in the saves directory.
 #[derive(Serialize, Debug, Clone, PartialEq)]
@@ -14,6 +14,14 @@ pub struct SaveInfo {
     pub sessions: usize,
     pub championships: usize,
     pub active: bool,
+    /// Which kind of career it is. `Unset` for a save written before careers had a mode; the
+    /// UI asks once and `PATCH /api/career/mode` settles it.
+    pub mode: CareerMode,
+    /// Why the file could not be read, when it could not be. A broken save still appears in the
+    /// list — showing it as an empty career would be a lie, and hiding it would leave the user
+    /// wondering where their season went.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 fn is_json(path: &Path) -> bool {
@@ -26,13 +34,18 @@ fn is_json(path: &Path) -> bool {
 /// Build a `SaveInfo` by reading and counting the career file at `path`.
 fn info_for(path: &Path, active: &Path) -> Option<SaveInfo> {
     let name = path.file_stem().and_then(|n| n.to_str())?.to_string();
-    let data = load_data(path);
+    let (data, error) = match try_load_data(path) {
+        Ok(data) => (data, None),
+        Err(e) => (CareerData::default(), Some(e)),
+    };
     Some(SaveInfo {
         name,
         file: path.display().to_string(),
         sessions: data.sessions.len(),
         championships: data.championships.len(),
         active: path == active,
+        mode: data.mode,
+        error,
     })
 }
 

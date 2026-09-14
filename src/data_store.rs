@@ -105,11 +105,112 @@ pub struct Championship {
     pub player_team: Option<String>,
 }
 
+/// Which kind of career a save holds, and therefore which rules its seasons follow.
+///
+/// Chosen when the career is created and **never changed afterwards** — the two modes allow
+/// different things, so switching would leave a career holding seasons it could not have made.
+/// The one exception is [`Self::Unset`], which every save written before careers had a mode
+/// deserializes to: it may be set once, and that is the only transition there is.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CareerMode {
+    /// A save from before this existed. Behaves exactly as the app did then: rosters and teams
+    /// may be set by hand, seasons run in parallel, and contracts are dormant.
+    #[default]
+    Unset,
+    /// Racing the AI. A season names a Custom AI roster, the seat is taken by signing a
+    /// contract, and only one season runs at a time.
+    Singleplayer,
+    /// Racing people. No roster, no team, no contracts, and as many seasons at once as the
+    /// user likes.
+    Multiplayer,
+}
+
+impl CareerMode {
+    /// Whether a seat is taken by signing a contract rather than picking a team.
+    ///
+    /// The single source of truth for whether the whole contracts feature is live. It replaced a
+    /// `contracts_enabled` config switch: the mode already answers the question, and two ways to
+    /// say it could disagree.
+    pub fn uses_contracts(self) -> bool {
+        self == CareerMode::Singleplayer
+    }
+
+    /// Whether a season may name a Custom AI roster and a player team at all.
+    pub fn uses_roster(self) -> bool {
+        self != CareerMode::Multiplayer
+    }
+
+    /// Whether a new season may only be created once every existing one is finished.
+    pub fn one_season_at_a_time(self) -> bool {
+        self == CareerMode::Singleplayer
+    }
+
+    /// Whether [`ChampionshipStatus::Final`] is the end of the road for a season.
+    ///
+    /// Only in singleplayer, where a finished season has paid out and the next one was created
+    /// on the strength of it. Elsewhere a status is just a label.
+    pub fn final_is_terminal(self) -> bool {
+        self == CareerMode::Singleplayer
+    }
+
+    /// Whether a season may sit in [`ChampionshipStatus::Progress`].
+    ///
+    /// `Progress` means "started, but not the current one". A singleplayer career never has a
+    /// second unfinished season for it to distinguish from, so the state cannot mean anything
+    /// there — it has only the season being raced and the seasons that are over.
+    pub fn uses_progress_state(self) -> bool {
+        self != CareerMode::Singleplayer
+    }
+
+    /// What a newly created season starts as.
+    ///
+    /// A singleplayer season is the current one the moment it exists, because it is the only
+    /// unfinished season a career may have. Creating it as `Progress` left a fresh career with
+    /// *nothing* marked `Active`, which is what `/api/live-teams` looks for — so the live timing
+    /// grid showed no team names until the user found the dropdown.
+    pub fn new_season_status(self) -> ChampionshipStatus {
+        match self {
+            CareerMode::Singleplayer => ChampionshipStatus::Active,
+            _ => ChampionshipStatus::Progress,
+        }
+    }
+
+    /// Human-readable, for refusal messages.
+    pub fn label(self) -> &'static str {
+        match self {
+            CareerMode::Unset => "unset",
+            CareerMode::Singleplayer => "singleplayer",
+            CareerMode::Multiplayer => "multiplayer",
+        }
+    }
+}
+
 /// Root data structure persisted to ams2_career.json.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct CareerData {
     pub sessions: Vec<RecordedSession>,
     pub championships: Vec<Championship>,
+    /// Which kind of career this save holds. See [`CareerMode`].
+    #[serde(default)]
+    pub mode: CareerMode,
+    /// Credits the career began with, before it had raced anything.
+    ///
+    /// Set from `config.starting_balance` when the career is created and then **kept**, rather
+    /// than read from config on every request. A career that started with a million still
+    /// started with a million after the setting is changed — the same reason a contract stores
+    /// the terms that were agreed instead of re-deriving them.
+    ///
+    /// Zero for a save written before this existed, which is what it had.
+    #[serde(default)]
+    pub starting_balance: i64,
+    /// Terms the player agreed for a championship, keyed to it by `champ_id`. Absent from every
+    /// save written before contracts existed, and from every save where the player never signed
+    /// anything, which is why it defaults rather than being required.
+    ///
+    /// This is the *only* persisted part of the contracts feature — see [`crate::contracts`].
+    #[serde(default)]
+    pub contracts: Vec<crate::contracts::Contract>,
 }
 
 pub type SharedStore = Arc<RwLock<CareerData>>;
@@ -119,13 +220,26 @@ pub type SharedStore = Arc<RwLock<CareerData>>;
 pub type SavePath = Arc<RwLock<PathBuf>>;
 
 /// Read one career save file from disk. A missing or unparsable file yields an empty career.
-pub fn load_data(path: &Path) -> CareerData {
-    let mut data: CareerData = if path.exists() {
-        let content = fs::read_to_string(path).unwrap_or_default();
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        CareerData::default()
-    };
+/// Byte-order mark Windows editors put at the front of a UTF-8 file.
+///
+/// Notepad and PowerShell both write one by default, and a save file is plain JSON sitting in a
+/// folder users are invited to open. `serde_json` rejects it outright, so it is stripped rather
+/// than allowed to read as a corrupt career.
+const BOM: &str = "\u{feff}";
+
+/// Reads one career save, distinguishing "not there yet" from "there but unreadable".
+///
+/// A missing file is an empty career — that is how a new save begins. A file that exists but
+/// cannot be read or parsed is an error and must stay one: defaulting there would present an
+/// empty career as if it were real, and the next [`persist`] would write that emptiness over
+/// whatever was actually in the file.
+pub fn try_load_data(path: &Path) -> Result<CareerData, String> {
+    if !path.exists() {
+        return Ok(CareerData::default());
+    }
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let mut data: CareerData = serde_json::from_str(content.strip_prefix(BOM).unwrap_or(&content))
+        .map_err(|e| e.to_string())?;
     // Migrate legacy flat session_ids → one round per session.
     for champ in &mut data.championships {
         if champ.rounds.is_empty() && !champ.session_ids.is_empty() {
@@ -138,7 +252,28 @@ pub fn load_data(path: &Path) -> CareerData {
                 .collect();
         }
     }
-    data
+    Ok(data)
+}
+
+/// [`try_load_data`], reporting a damaged save to the console and yielding an empty career.
+///
+/// Only for callers that have to produce *something* — the startup path, which must still serve
+/// the UI so the problem can be seen and fixed. It is safe to return an empty career here only
+/// because [`persist`] independently refuses to overwrite a file it cannot read.
+pub fn load_data(path: &Path) -> CareerData {
+    match try_load_data(path) {
+        Ok(data) => data,
+        Err(e) => {
+            eprintln!(
+                "ERROR: career save {} could not be read: {e}\n\
+                 It will NOT be written to, so nothing in it is lost. Fix or move the file, \
+                 then restart. (A leading byte-order mark is handled automatically; this is \
+                 something else.)",
+                path.display()
+            );
+            CareerData::default()
+        }
+    }
 }
 
 pub fn load_store(path: &Path) -> SharedStore {
@@ -253,7 +388,9 @@ fn resolve_sessions<'a>(
         .collect()
 }
 
-fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<StandingsEntry> {
+/// Championship standings, best first. Races only — points come from `champ.points_system`,
+/// and a retirement scores nothing.
+pub fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<StandingsEntry> {
     let mut pts: HashMap<String, i32> = HashMap::new();
     let mut wins: HashMap<String, u32> = HashMap::new();
     for round in &champ.rounds {
@@ -661,12 +798,47 @@ pub fn compute_career_full(
     }
 }
 
-pub fn persist(store: &SharedStore, path: &PathBuf) {
+/// Whether `path` may be written over.
+///
+/// A file that exists but will not parse was never loaded, so whatever is in memory did not come
+/// from it — writing would destroy a career nobody has read. Checked here, at the point of
+/// danger, rather than remembered from load time: it is stateless, it cannot desync from a flag
+/// somebody forgot to set, and it also catches a file that was damaged *after* startup.
+///
+/// Only the shape is checked, not the content — `IgnoredAny` walks the JSON without building a
+/// `CareerData`, so guarding every write costs a parse and no allocation.
+fn safe_to_overwrite(path: &Path) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str::<serde::de::IgnoredAny>(content.strip_prefix(BOM).unwrap_or(&content))
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Writes the career to `path`, unless that would overwrite a save that could not be read.
+///
+/// Returns the reason it declined, so a route can report it rather than appearing to succeed.
+/// The console warning is unconditional: a background recorder has nowhere else to say it, and
+/// silently not saving is exactly the failure this guard exists to make loud.
+pub fn persist(store: &SharedStore, path: &PathBuf) -> Result<(), String> {
+    if let Err(e) = safe_to_overwrite(path) {
+        let msg = format!(
+            "refusing to overwrite {}: it exists but could not be read ({e}). \
+             Fix or move the file — nothing in it has been changed.",
+            path.display()
+        );
+        eprintln!("ERROR: {msg}");
+        return Err(msg);
+    }
     let data = store.read().unwrap();
     let content = serde_json::to_string_pretty(&*data).unwrap_or_default();
-    if let Err(e) = fs::write(path, content) {
-        eprintln!("Failed to save career data: {e}");
-    }
+    fs::write(path, content).map_err(|e| {
+        let msg = format!("failed to save career data: {e}");
+        eprintln!("ERROR: {msg}");
+        msg
+    })
 }
 
 #[cfg(test)]

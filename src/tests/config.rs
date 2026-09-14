@@ -68,11 +68,11 @@ fn test_load_or_create_invalid_json_returns_defaults() {
 }
 
 #[test]
-fn test_load_or_create_rewrites_file_with_all_fields() {
+fn test_load_and_upgrade_rewrites_file_with_all_fields() {
     let path = tmp_path();
-    // Write a minimal config — on load it should be rewritten with all fields present
+    // Write a minimal config — the startup upgrade fills in every field added since.
     fs::write(&path, r#"{"port":9000}"#).unwrap();
-    load_or_create(&path);
+    load_and_upgrade(&path);
     let written = fs::read_to_string(&path).unwrap();
     let v: serde_json::Value = serde_json::from_str(&written).unwrap();
     for key in &[
@@ -161,7 +161,8 @@ fn test_eligibility_gates_round_trip_through_the_file() {
     let path = tmp_path();
     fs::write(&path, r#"{"eligibility_gates":"incumbent"}"#).unwrap();
     assert_eq!(load_or_create(&path).eligibility_gates, Gates::Incumbent);
-    // load_or_create rewrites the file with every field filled in; the enum must survive that.
+    // The startup upgrade rewrites the file with every field filled in; the enum must survive it.
+    load_and_upgrade(&path);
     assert_eq!(load_or_create(&path).eligibility_gates, Gates::Incumbent);
     let _ = fs::remove_file(&path);
 }
@@ -182,5 +183,242 @@ fn test_retirement_distance_converts_percent_to_a_fraction() {
         "a share of the distance cannot exceed the whole, got {}",
         p.retirement_distance
     );
+    let _ = fs::remove_file(&path);
+}
+
+// ── Contract economy ─────────────────────────────────────────────────────────
+
+#[test]
+fn test_economy_defaults_match_the_module() {
+    let path = tmp_path();
+    fs::write(&path, "{}").unwrap();
+    let cfg = load_or_create(&path);
+    assert_eq!(cfg.offer_params(), crate::contracts::OfferParams::default());
+    assert_eq!(cfg.prize_params(), crate::contracts::PrizeParams::default());
+    // Contracts are decided by the career mode now, not by config — nothing to assert here.
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_an_inverted_salary_pair_holds_the_floor_below_the_top() {
+    // config.json is hand-edited. A floor above the top would pay the back of the grid more than
+    // the front, which no UI could explain; the floor is held down rather than the pair swapped,
+    // because silently reordering someone's numbers is worse than ignoring one of them.
+    let path = tmp_path();
+    fs::write(
+        &path,
+        r#"{"contract_top_salary":100,"contract_floor_salary":900}"#,
+    )
+    .unwrap();
+    let p = load_or_create(&path).offer_params();
+    assert_eq!(p.top_salary, 100);
+    assert_eq!(p.floor_salary, 100);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_an_inverted_prize_pair_is_clamped_the_same_way() {
+    let path = tmp_path();
+    fs::write(&path, r#"{"champion_prize":500,"last_place_prize":9000}"#).unwrap();
+    let p = load_or_create(&path).prize_params();
+    assert_eq!((p.champion_prize, p.floor_prize), (500, 500));
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_zero_or_negative_salary_cannot_reach_the_economy() {
+    // Zero would divide the geometric curve by nothing; negative would pay a driver to race.
+    let path = tmp_path();
+    fs::write(
+        &path,
+        r#"{"contract_top_salary":0,"contract_floor_salary":-5,"champion_prize":-1}"#,
+    )
+    .unwrap();
+    let cfg = load_or_create(&path);
+    assert_eq!(cfg.offer_params().top_salary, 1);
+    assert_eq!(cfg.offer_params().floor_salary, 1);
+    assert_eq!(cfg.prize_params().champion_prize, 1);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_zero_buy_in_is_allowed_because_it_means_off() {
+    // Unlike the salaries, zero here is a setting rather than a mistake: it switches pay-driver
+    // seats off entirely.
+    let path = tmp_path();
+    fs::write(&path, r#"{"contract_buy_in_per_point":0}"#).unwrap();
+    assert_eq!(load_or_create(&path).offer_params().buy_in_per_point, 0);
+
+    fs::write(&path, r#"{"contract_buy_in_per_point":-50}"#).unwrap();
+    assert_eq!(load_or_create(&path).offer_params().buy_in_per_point, 0);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_objective_slack_is_not_config_driven_yet() {
+    // A feel knob rather than money, so it stays on the module default; a config that mentions
+    // it must not appear to change anything. `contract_max_seasons` is here too because deals
+    // are single-season now — a config carrying it from before must be inert, not an error.
+    let path = tmp_path();
+    fs::write(
+        &path,
+        r#"{"contract_max_seasons":99,"contract_objective_slack":99}"#,
+    )
+    .unwrap();
+    let p = load_or_create(&path).offer_params();
+    assert_eq!(
+        p.objective_slack,
+        crate::contracts::OfferParams::default().objective_slack
+    );
+    let _ = fs::remove_file(&path);
+}
+
+// ── A read must never write ──────────────────────────────────────────────────
+
+#[test]
+fn test_load_or_create_does_not_touch_an_existing_file() {
+    // The whole cause of "EOF while parsing a value at line 1 column 0": this is called several
+    // times per request from more than one thread, and `fs::write` truncates before it writes.
+    // A reader landing in that window saw an empty file and fell back to defaults — which the
+    // next call would then persist over the user's real settings.
+    let path = tmp_path();
+    let original = r#"{"port":9000}"#;
+    fs::write(&path, original).unwrap();
+
+    let before = fs::metadata(&path).unwrap().modified().unwrap();
+    for _ in 0..5 {
+        assert_eq!(load_or_create(&path).port, 9000);
+    }
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        original,
+        "a read must leave the file byte-for-byte alone"
+    );
+    assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(), before);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_damaged_config_is_never_written_over() {
+    // Same rule as career saves: defaults let the server start, but writing them back would
+    // destroy the settings nobody managed to read.
+    let path = tmp_path();
+    let broken = "{ not json at all";
+    fs::write(&path, broken).unwrap();
+
+    let cfg = load_or_create(&path);
+    assert_eq!(
+        cfg.port, 8080,
+        "falls back to defaults so the server starts"
+    );
+    let err = save(&path, &cfg).expect_err("writing defaults over it must be refused");
+    assert!(err.contains("refusing to overwrite"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), broken);
+
+    // And the startup upgrade must not sneak past the same guard.
+    load_and_upgrade(&path);
+    assert_eq!(fs::read_to_string(&path).unwrap(), broken);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_config_with_a_byte_order_mark_still_loads() {
+    let path = tmp_path();
+    fs::write(&path, "\u{feff}{\"port\":9100}").unwrap();
+    assert_eq!(load_or_create(&path).port, 9100);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_save_leaves_no_temp_file_behind() {
+    // The write goes via a sibling temp file so a concurrent reader never sees a half-written
+    // config; it must not survive the rename.
+    let path = tmp_path();
+    save(&path, &Config::default()).unwrap();
+    assert!(!path.with_extension("json.tmp").exists());
+    assert_eq!(load_or_create(&path).port, 8080);
+    let _ = fs::remove_file(&path);
+}
+
+// ── The economy stored is the economy used ───────────────────────────────────
+
+#[test]
+fn test_normalize_economy_makes_the_stored_pair_the_effective_one() {
+    // Clamping only on the way out cannot enforce a relationship *between* two fields: an
+    // inverted pair would be stored, shown by the Config tab, and quietly ignored by the grid.
+    let mut cfg = Config {
+        contract_top_salary: 100_000,
+        contract_floor_salary: 900_000,
+        champion_prize: 500,
+        last_place_prize: 9_000,
+        ..Config::default()
+    };
+    cfg.normalize_economy();
+
+    assert_eq!(cfg.contract_floor_salary, 100_000, "floor held below top");
+    assert_eq!(cfg.last_place_prize, 500, "last place held below champion");
+    // Stored and effective now agree, which is the whole point.
+    assert_eq!(cfg.contract_floor_salary, cfg.offer_params().floor_salary);
+    assert_eq!(cfg.last_place_prize, cfg.prize_params().floor_prize);
+}
+
+#[test]
+fn test_normalize_economy_is_idempotent_and_leaves_a_sane_config_alone() {
+    let mut cfg = Config::default();
+    let (top, floor) = (cfg.contract_top_salary, cfg.contract_floor_salary);
+    cfg.normalize_economy();
+    assert_eq!(
+        (cfg.contract_top_salary, cfg.contract_floor_salary),
+        (top, floor)
+    );
+    cfg.normalize_economy();
+    assert_eq!(
+        (cfg.contract_top_salary, cfg.contract_floor_salary),
+        (top, floor)
+    );
+}
+
+#[test]
+fn test_normalize_economy_pulls_nonsense_into_range() {
+    let mut cfg = Config {
+        contract_top_salary: -5,
+        contract_floor_salary: 0,
+        contract_buy_in_per_point: -1,
+        champion_prize: i64::MAX,
+        ..Config::default()
+    };
+    cfg.normalize_economy();
+    assert_eq!(cfg.contract_top_salary, 1);
+    assert_eq!(cfg.contract_floor_salary, 1);
+    assert_eq!(
+        cfg.contract_buy_in_per_point, 0,
+        "zero means pay-drivers off"
+    );
+    assert!(cfg.champion_prize <= 1_000_000_000);
+}
+
+#[test]
+fn test_a_career_starts_with_enough_to_choose_a_way_in() {
+    // What the figure is *for* lives in `contracts`, where it can be measured against the real
+    // rosters: see `test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid`. All this
+    // asserts is the shape — a career starts with real money, on the order of a season's pay
+    // rather than a rounding error.
+    let path = tmp_path();
+    fs::write(&path, "{}").unwrap();
+    let cfg = load_or_create(&path);
+    assert!(cfg.starting_balance > cfg.offer_params().floor_salary);
+    assert!(cfg.starting_balance >= cfg.offer_params().buy_in_per_point);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_hand_set_starting_balance_survives_and_is_clamped() {
+    let path = tmp_path();
+    fs::write(&path, r#"{"starting_balance":250000}"#).unwrap();
+    assert_eq!(load_or_create(&path).starting_balance, 250_000);
+
+    // Negative is meaningless; a career cannot be founded in debt.
+    fs::write(&path, r#"{"starting_balance":-5}"#).unwrap();
+    assert!(load_or_create(&path).starting_balance.max(0) == 0);
     let _ = fs::remove_file(&path);
 }
