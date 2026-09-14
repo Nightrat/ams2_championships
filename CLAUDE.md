@@ -116,6 +116,9 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - Always read all fields from `ptr` **before** calling `UnmapViewOfFile` — reading after unmap is an access violation.
 - `ParticipantInfo` stride is 100 bytes; `mCurrentSector` (i32) at +96 is `-1` when the car is in the pit lane or garage (`in_pits` field).
 - AMS2-specific fields (tyre compound, tyre temps, ride height) live at offsets above 19000 and are not in the original PCars2 header.
+- **Offsets are derived by counting the header's declaration order forward from a verified anchor, then checked against a live session.** A float read at a wrong offset still returns a plausible-looking number, so neither step alone is enough. The flags/pit/car-state block (`mHighestFlagColour` 6800 → `mFuelCapacity` 6844) was previously placed after `mLastLapTimes` at 9460+ — a guess that compiles, runs, and silently reads noise: flag colour came back as 65537 and fuel as 0.0, which quietly disabled the spotter's flag and fuel calls rather than making them misfire. Counting back from `mSpeed` (6848) puts every field on a value that reads as its own unit, which is the check worth doing: oil ~98 °C, water ~68 °C, a 250 litre tank.
+- **`mFuelLevel` is a fraction (0..1), not litres.** The reader multiplies it by `mFuelCapacity` so `fuel_level` matches its name and `fuel_level / fuel_capacity` means what it reads as. Without that conversion the spotter's percentage check divides a fraction by a litre count and calls fuel critical on a full tank.
+- Damage lives in two runs: per-corner `mBrakeDamage` (7152) and `mSuspensionDamage` (7168) sit between `mTyreWear` and `mBrakeTempCelsius`; `mCrashState` / `mAeroDamage` / `mEngineDamage` (7280–7288) follow the five tyre-temperature arrays. `mLastOpponentCollisionIndex` (6892) and its magnitude register a tap that causes no damage at all, which none of the 0–1 values do.
 
 ### Driver rating (`src/driver_rating.rs`)
 
@@ -199,4 +202,10 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 
 ### Telemetry tab freeze behaviour
 
-`telemetry.js` only pushes samples into `telBuf` when `viewed.in_pits === false`. When the player enters the pit lane/garage the panel freezes on the last on-track data. The buffer clears only on WebSocket disconnect.
+The tab shows the player car's **damage** (crash state, aero, engine, per-corner brake/suspension, last car-to-car contact) followed by **every tyre field the shared memory carries**, as a card per wheel. Values are rendered raw: no rolling average and no rolling buffer, so a wrong offset shows up as a wrong number instead of being smoothed into something plausible.
+
+- `mTyreSlipSpeed`, `mTyreGrip` and `mTyreLateralStiffness` are marked OBSOLETE in the header ("kept for backward compatibility only"). They are read and shown dimmed at the foot of the panel rather than dropped, so whether AMS2 still fills them is answered on screen instead of being re-investigated each time someone wants slip or grip data.
+- The five structure temperatures (`mTyreTreadTemp`, `mTyreLayerTemp`, `mTyreCarcassTemp`, `mTyreRimTemp`, `mTyreInternalAirTemp`) are **Kelvin** in the header while every other temperature in the struct is Celsius. `kelvin4` converts them on read and holds unset (0.0) at zero — a plain subtraction would report an unset wheel as −273 °C, which reads as a bad offset rather than as no data.
+- It freezes on the last on-track reading (`dmgLastOnTrack`) whenever the car is not out on track, and resumes when it is. **Two signals are needed**, and neither is sufficient alone: `in_pits` (`mCurrentSector < 0`) flips at the pit entry, but ESC → "Return to pits" teleports the car into the garage without it ever driving down a pit lane — only `mPitMode` catches that. On track is `!in_pits && pit_mode == 0`.
+- The held panel is not repainted each poll. `dmgFrozenLabel` stores the reason currently painted rather than a boolean, so the label still updates as the car moves through the pit modes, while an unchanged panel keeps any text selection the user made in it.
+- With no on-track reading yet it says so, rather than painting zeroes that look like an undamaged car.

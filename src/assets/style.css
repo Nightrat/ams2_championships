@@ -619,6 +619,7 @@ table { border-collapse: collapse; width: 100%; }
 .dmg-state-ok  { background: #1e8449; color: #fff; }
 .dmg-state-bad { background: #7b241c; color: #fff; }
 .dmg-head-meta { font-size: 0.7rem; color: #555; font-family: monospace; }
+.dmg-frozen { font-size: 0.72rem; color: #f39c12; font-style: italic; margin-left: auto; }
 .dmg-cols { display: flex; gap: 1.6rem; align-items: flex-start; flex-wrap: wrap; }
 .dmg-block { min-width: 240px; }
 .dmg-block h4 { font-size: 0.72rem; font-weight: 700; color: #9b59b6; letter-spacing: 0.06em;
@@ -1164,3 +1165,28 @@ header h1 { flex: 1 1 100%; }
 .career-empty { color: #888; padding: 1rem; }
 
 .saves-error { color: #e0a04a; font-size: 0.78rem; cursor: help; }
+
+/* Telemetry — tyres */
+.tel-section { font-size: 0.82rem; font-weight: 700; color: #bdc3c7; letter-spacing: 0.04em;
+  margin: 1.1rem 0 0.5rem; padding-bottom: 0.3rem; border-bottom: 1px solid #2a2a3e; }
+.tel-section:first-child { margin-top: 0; }
+.tel-grid { display: flex; flex-direction: column; gap: 0.4rem; }
+.tel-row-pair { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.tel-card { flex: 1; min-width: 210px; background: #1a1a2e; border: 1px solid #2a2a3e;
+  border-radius: 6px; padding: 0.45rem 0.6rem; }
+.tel-card-head { display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 0.3rem; padding-bottom: 0.25rem; border-bottom: 1px solid #2a2a3e; }
+.tel-card-name { font-size: 0.78rem; font-weight: 700; color: #9b59b6; letter-spacing: 0.06em; }
+.tel-card-compound { font-size: 0.7rem; color: #7f8c8d; }
+.tel-group { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: #566; margin: 0.4rem 0 0.15rem; }
+.tel-row { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.72rem;
+  line-height: 1.5; }
+.tel-row-lbl { color: #7f8c8d; }
+.tel-row-val { color: #bdc3c7; font-weight: 600; font-variant-numeric: tabular-nums;
+  text-align: right; white-space: nowrap; }
+.tel-unset { color: #444; font-weight: 400; }
+.tel-obsolete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.9rem;
+  margin-top: 0.7rem; padding-top: 0.5rem; border-top: 1px solid #2a2a3e; font-size: 0.68rem; color: #555; }
+.tel-obs-lbl { font-style: italic; }
+.tel-obs-item b { color: #6b6b7d; font-weight: 600; }

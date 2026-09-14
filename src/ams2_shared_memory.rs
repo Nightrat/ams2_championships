@@ -48,6 +48,40 @@ pub struct PlayerTelemetry {
     pub tyre_temp_right: [f32; 4],
     /// Tyre wear 0–1 (0 = new, 1 = fully worn).
     pub tyre_wear: [f32; 4],
+    /// Tyre state bits (mTyreFlags): 1 = attached, 2 = inflated, 4 = on the ground.
+    pub tyre_flags: [u32; 4],
+    /// Terrain material under each wheel (mTerrain) — see `TERRAIN_NAMES` in the UI.
+    pub terrain: [u32; 4],
+    /// Tyre position, local-space Y (mTyreY).
+    pub tyre_y: [f32; 4],
+    /// Wheel rotation in revolutions per second (mTyreRPS). Negative under reverse.
+    pub tyre_rps: [f32; 4],
+    /// Tyre surface temperature, °C. 0 means unset, per the header.
+    pub tyre_temp: [f32; 4],
+    /// Height of the tyre above the ground, local-space Y (mTyreHeightAboveGround).
+    pub tyre_height_above_ground: [f32; 4],
+    /// Tread temperature, °C. Converted from the Kelvin the header specifies.
+    pub tyre_tread_temp: [f32; 4],
+    /// Layer temperature, °C (from Kelvin).
+    pub tyre_layer_temp: [f32; 4],
+    /// Carcass temperature, °C (from Kelvin).
+    pub tyre_carcass_temp: [f32; 4],
+    /// Rim temperature, °C (from Kelvin).
+    pub tyre_rim_temp: [f32; 4],
+    /// Internal air temperature, °C (from Kelvin).
+    pub tyre_internal_air_temp: [f32; 4],
+    /// Marked OBSOLETE in the PCars2 header — "kept for backward compatibility
+    /// only". Read anyway so the panel can show they are dead rather than leaving
+    /// it an open question every time someone wants slip or grip data.
+    pub tyre_slip_speed: [f32; 4],
+    /// Obsolete, see `tyre_slip_speed`.
+    pub tyre_grip: [f32; 4],
+    /// Obsolete, see `tyre_slip_speed`.
+    pub tyre_lateral_stiffness: [f32; 4],
+    /// Suspension velocity, m/s (mSuspensionVelocity).
+    pub suspension_velocity: [f32; 4],
+    /// Wheel position, local-space Y (mWheelLocalPositionY).
+    pub wheel_local_position_y: [f32; 4],
     /// Tyre air pressure, PSI.
     pub tyre_pressure: [f32; 4],
     /// Brake disc temperature, °C.
@@ -114,6 +148,11 @@ pub struct LiveSessionData {
     pub race_flag_colour: u32,
     /// mHighestFlagReason: 0=none,1=solo crash,2=stopped,3=oil,4=gravel,5=recovery,6=SC deployed,7=SC returning
     pub race_flag_reason: u32,
+    /// mPitMode: 0=none, 1=driving into pits, 2=in pit, 3=driving out of pits,
+    /// 4=in garage, 5=driving out of garage. Anything but 0 means off the track —
+    /// and unlike `ParticipantData::in_pits` it catches ESC → "Return to pits",
+    /// which teleports the car to the garage without it ever entering a pit lane.
+    pub pit_mode: u32,
 }
 
 fn disconnected() -> LiveSessionData {
@@ -132,11 +171,28 @@ fn disconnected() -> LiveSessionData {
         participants: vec![],
         race_flag_colour: 0,
         race_flag_reason: 0,
+        pit_mode: 0,
         player_telemetry: PlayerTelemetry {
             tyre_temp_left: [0.0; 4],
             tyre_temp_center: [0.0; 4],
             tyre_temp_right: [0.0; 4],
             tyre_wear: [0.0; 4],
+            tyre_flags: [0; 4],
+            terrain: [0; 4],
+            tyre_y: [0.0; 4],
+            tyre_rps: [0.0; 4],
+            tyre_temp: [0.0; 4],
+            tyre_height_above_ground: [0.0; 4],
+            tyre_tread_temp: [0.0; 4],
+            tyre_layer_temp: [0.0; 4],
+            tyre_carcass_temp: [0.0; 4],
+            tyre_rim_temp: [0.0; 4],
+            tyre_internal_air_temp: [0.0; 4],
+            tyre_slip_speed: [0.0; 4],
+            tyre_grip: [0.0; 4],
+            tyre_lateral_stiffness: [0.0; 4],
+            suspension_velocity: [0.0; 4],
+            wheel_local_position_y: [0.0; 4],
             tyre_pressure: [0.0; 4],
             brake_temp: [0.0; 4],
             suspension_travel: [0.0; 4],
@@ -231,18 +287,36 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_THROTTLE: usize = 6864; // float mThrottle (filtered)
     const OFF_STEERING: usize = 6872; // float mSteering (filtered)
     const OFF_GEAR: usize = 6876; // int mGear
+    // ── Wheels / tyres, one float[4] or u32[4] per row, FL FR RL RR ───────────
+    const OFF_TYRE_FLAGS: usize = 6992; // unsigned int mTyreFlags[4]
+    const OFF_TERRAIN: usize = 7008; // unsigned int mTerrain[4]
+    const OFF_TYRE_Y: usize = 7024; // float mTyreY[4]
+    const OFF_TYRE_RPS: usize = 7040; // float mTyreRPS[4]
+    const OFF_TYRE_SLIP_SPEED: usize = 7056; // float mTyreSlipSpeed[4]  (OBSOLETE)
+    const OFF_TYRE_TEMP: usize = 7072; // float mTyreTemp[4] (°C, 0 = unset)
+    const OFF_TYRE_GRIP: usize = 7088; // float mTyreGrip[4]  (OBSOLETE)
+    const OFF_TYRE_HEIGHT_ABOVE_GROUND: usize = 7104; // float mTyreHeightAboveGround[4]
+    const OFF_TYRE_LATERAL_STIFFNESS: usize = 7120; // float mTyreLateralStiffness[4] (OBSOLETE)
     const OFF_TYRE_WEAR: usize = 7136; // float mTyreWear[4]
     const OFF_BRAKE_DAMAGE: usize = 7152; // float mBrakeDamage[4]
     const OFF_SUSPENSION_DAMAGE: usize = 7168; // float mSuspensionDamage[4]
     const OFF_BRAKE_TEMP: usize = 7184; // float mBrakeTempCelsius[4]
-    // mTyreTreadTemp / LayerTemp / CarcassTemp / RimTemp / InternalAirTemp: 7200..7280
+    // The five carcass-side temperatures are KELVIN in the header, unlike every
+    // other temperature in the struct. They are converted on read — see kelvin4.
+    const OFF_TYRE_TREAD_TEMP: usize = 7200; // float mTyreTreadTemp[4] (K)
+    const OFF_TYRE_LAYER_TEMP: usize = 7216; // float mTyreLayerTemp[4] (K)
+    const OFF_TYRE_CARCASS_TEMP: usize = 7232; // float mTyreCarcassTemp[4] (K)
+    const OFF_TYRE_RIM_TEMP: usize = 7248; // float mTyreRimTemp[4] (K)
+    const OFF_TYRE_INTERNAL_AIR_TEMP: usize = 7264; // float mTyreInternalAirTemp[4] (K)
     const OFF_CRASH_STATE: usize = 7280; // unsigned int mCrashState
     const OFF_AERO_DAMAGE: usize = 7284; // float mAeroDamage
     const OFF_ENGINE_DAMAGE: usize = 7288; // float mEngineDamage
     // mAntiLockActive (bool) at 6888 pads to 4, so the collision pair starts at 6892.
     const OFF_LAST_COLLISION_INDEX: usize = 6892; // int mLastOpponentCollisionIndex (-1 = none)
     const OFF_LAST_COLLISION_MAG: usize = 6896; // float mLastOpponentCollisionMagnitude
+    const OFF_WHEEL_LOCAL_POSITION_Y: usize = 7324; // float mWheelLocalPositionY[4]
     const OFF_SUSPENSION_TRAVEL: usize = 7340; // float mSuspensionTravel[4] (metres)
+    const OFF_SUSPENSION_VELOCITY: usize = 7356; // float mSuspensionVelocity[4] (m/s)
     const OFF_TYRE_PRESSURE: usize = 7372; // float mAirPressure[4] (PSI)
                                            // AMS2-specific additions (not in original PC2 header):
     const OFF_TYRE_COMPOUND: usize = 19388; // char mTyreCompound[4][40]
@@ -258,11 +332,16 @@ pub fn read_live_session() -> LiveSessionData {
     const OFF_BEST_S3: usize = 8688;
     const OFF_FASTEST_LAP_TIMES: usize = 8944;
     const OFF_LAST_LAP_TIMES: usize = 9200;
-    // After mLastLapTimes[64] (9200 + 256 = 9456):
-    const OFF_FUEL_LEVEL: usize = 9460; // float mFuelLevel (litres)
-    const OFF_FUEL_CAPACITY: usize = 9464; // float mFuelCapacity (litres)
-    const OFF_HIGHEST_FLAG_COLOUR: usize = 9468; // unsigned int mHighestFlagColour
-    const OFF_HIGHEST_FLAG_REASON: usize = 9472; // unsigned int mHighestFlagReason
+    // ── Flags, pit info and car state ─────────────────────────────────────────
+    // These do NOT follow mLastLapTimes. They sit between the single-value sector
+    // times and mSpeed, which anchors them: counting back field by field from
+    // mSpeed (6848) lands mHighestFlagColour on 6800, and every value in between
+    // reads as its own unit — oil ~98 °C, water ~68 °C, a 250 litre tank.
+    const OFF_HIGHEST_FLAG_COLOUR: usize = 6800; // unsigned int mHighestFlagColour
+    const OFF_HIGHEST_FLAG_REASON: usize = 6804; // unsigned int mHighestFlagReason
+    const OFF_PIT_MODE: usize = 6808; // unsigned int mPitMode
+    const OFF_FUEL_LEVEL: usize = 6840; // float mFuelLevel — a FRACTION, 0..1
+    const OFF_FUEL_CAPACITY: usize = 6844; // float mFuelCapacity (litres)
 
     // ── ParticipantInfo layout (100 bytes each) ───────────────────────────────
     // bool mIsActive;              // +  0  (1)
@@ -296,6 +375,21 @@ pub fn read_live_session() -> LiveSessionData {
             rf32(b, off + 8),
             rf32(b, off + 12),
         ]
+    }
+    unsafe fn ru32x4(b: *const u8, off: usize) -> [u32; 4] {
+        [
+            ru32(b, off),
+            ru32(b, off + 4),
+            ru32(b, off + 8),
+            ru32(b, off + 12),
+        ]
+    }
+    /// Kelvin to Celsius, holding "unset" at zero. The header marks 0.0 as unset
+    /// for these temperatures, and a straight subtraction would report an unset
+    /// wheel as −273 °C — a number that looks like a bad offset rather than no
+    /// data, which is exactly the confusion this panel exists to avoid.
+    unsafe fn kelvin4(b: *const u8, off: usize) -> [f32; 4] {
+        rf32x4(b, off).map(|k| if k <= 0.0 { 0.0 } else { k - 273.15 })
     }
     unsafe fn ru8(b: *const u8, off: usize) -> u8 {
         *b.add(off)
@@ -333,6 +427,22 @@ pub fn read_live_session() -> LiveSessionData {
             tyre_temp_center: rf32x4(ptr, OFF_TYRE_TEMP_CENTER),
             tyre_temp_right: rf32x4(ptr, OFF_TYRE_TEMP_RIGHT),
             tyre_wear: rf32x4(ptr, OFF_TYRE_WEAR),
+            tyre_flags: ru32x4(ptr, OFF_TYRE_FLAGS),
+            terrain: ru32x4(ptr, OFF_TERRAIN),
+            tyre_y: rf32x4(ptr, OFF_TYRE_Y),
+            tyre_rps: rf32x4(ptr, OFF_TYRE_RPS),
+            tyre_temp: rf32x4(ptr, OFF_TYRE_TEMP),
+            tyre_height_above_ground: rf32x4(ptr, OFF_TYRE_HEIGHT_ABOVE_GROUND),
+            tyre_tread_temp: kelvin4(ptr, OFF_TYRE_TREAD_TEMP),
+            tyre_layer_temp: kelvin4(ptr, OFF_TYRE_LAYER_TEMP),
+            tyre_carcass_temp: kelvin4(ptr, OFF_TYRE_CARCASS_TEMP),
+            tyre_rim_temp: kelvin4(ptr, OFF_TYRE_RIM_TEMP),
+            tyre_internal_air_temp: kelvin4(ptr, OFF_TYRE_INTERNAL_AIR_TEMP),
+            tyre_slip_speed: rf32x4(ptr, OFF_TYRE_SLIP_SPEED),
+            tyre_grip: rf32x4(ptr, OFF_TYRE_GRIP),
+            tyre_lateral_stiffness: rf32x4(ptr, OFF_TYRE_LATERAL_STIFFNESS),
+            suspension_velocity: rf32x4(ptr, OFF_SUSPENSION_VELOCITY),
+            wheel_local_position_y: rf32x4(ptr, OFF_WHEEL_LOCAL_POSITION_Y),
             tyre_pressure: rf32x4(ptr, OFF_TYRE_PRESSURE),
             brake_temp: rf32x4(ptr, OFF_BRAKE_TEMP),
             suspension_travel: rf32x4(ptr, OFF_SUSPENSION_TRAVEL),
@@ -349,7 +459,10 @@ pub fn read_live_session() -> LiveSessionData {
                 rstr(ptr, OFF_TYRE_COMPOUND + 80, 40),
                 rstr(ptr, OFF_TYRE_COMPOUND + 120, 40),
             ],
-            fuel_level: rf32(ptr, OFF_FUEL_LEVEL),
+            // mFuelLevel is a fraction of the tank, not a volume. It is converted
+            // here so `fuel_level / fuel_capacity` means what it reads as
+            // everywhere downstream.
+            fuel_level: rf32(ptr, OFF_FUEL_LEVEL) * rf32(ptr, OFF_FUEL_CAPACITY),
             fuel_capacity: rf32(ptr, OFF_FUEL_CAPACITY),
             crash_state: ru32(ptr, OFF_CRASH_STATE),
             aero_damage: rf32(ptr, OFF_AERO_DAMAGE),
@@ -462,6 +575,7 @@ pub fn read_live_session() -> LiveSessionData {
 
         let race_flag_colour = ru32(ptr, OFF_HIGHEST_FLAG_COLOUR);
         let race_flag_reason = ru32(ptr, OFF_HIGHEST_FLAG_REASON);
+        let pit_mode = ru32(ptr, OFF_PIT_MODE);
 
         UnmapViewOfFile(mapped);
         CloseHandle(handle);
@@ -482,6 +596,7 @@ pub fn read_live_session() -> LiveSessionData {
             player_telemetry,
             race_flag_colour,
             race_flag_reason,
+            pit_mode,
         }
     }
 }

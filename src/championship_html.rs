@@ -107,7 +107,7 @@ fn generate_html() -> String {
       </div>
       <div id="live-sub-setup" class="live-subpanel live-subpanel-hidden">
         <div id="setup-panel" class="setup-panel">
-          <div class="setup-no-data">Connect to AMS2 to see damage.</div>
+          <div class="setup-no-data">Connect to AMS2 to see telemetry.</div>
         </div>
       </div>
     </section>

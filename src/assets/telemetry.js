@@ -1,7 +1,9 @@
 // ── Damage panel ──────────────────────────────────────────────────────────────
 // Everything here is raw shared-memory state for the player's car, shown as it
-// is read. No smoothing, no rolling buffer: the point of this panel is to say
-// what AMS2 reports right now, so a wrong offset shows up as a wrong number.
+// is read. No smoothing, no rolling average: the point of this panel is to say
+// what AMS2 reports, so a wrong offset shows up as a wrong number. The one thing
+// it does hold on to is the last on-track reading, kept while the car is in the
+// box (see dmgLastOnTrack).
 
 var CRASH_STATES = [
   'None',
@@ -12,6 +14,27 @@ var CRASH_STATES = [
 ];
 
 var DMG_WHEELS = ['FL', 'FR', 'RL', 'RR'];
+
+// mPitMode, as a reason to hold the panel. Index 0 is only ever reached via
+// in_pits, which flips at the pit entry a moment before mPitMode does.
+var PIT_MODES = [
+  'In pits',
+  'Entering pits',
+  'In the pit box',
+  'Leaving the pits',
+  'In the garage',
+  'Leaving the garage'
+];
+
+// Last reading taken while the car was out on track. The panel holds this while
+// the player is in the pit lane or the garage, so a damage figure cannot quietly
+// change under a repair — and it is what the player wants to read in the box.
+var dmgLastOnTrack = null;
+// The held-reason currently painted, or null while the panel is live. A held
+// panel has nothing new to say each poll, and rewriting innerHTML anyway would
+// drop any text selection — but the reason itself changes on the way in, so it
+// is the label rather than a flag that decides whether to repaint.
+var dmgFrozenLabel = null;
 
 function dmgColor(v) {
   if (v <= 0.001) return '#27ae60';
@@ -30,7 +53,7 @@ function dmgBar(label, v) {
     '</div>';
 }
 
-function buildDamagePanel(tel) {
+function buildDamagePanel(tel, frozen) {
   var crash = tel.crash_state || 0;
   var crashTxt = CRASH_STATES[crash] || ('Unknown (' + crash + ')');
   var crashCls = crash === 0 ? 'dmg-state-ok' : 'dmg-state-bad';
@@ -41,9 +64,11 @@ function buildDamagePanel(tel) {
   // the number the game gives rather than resolved to a name.
   var hitIdx = tel.last_collision_index;
 
-  return '<div class="dmg-head">' +
+  return '<h3 class="tel-section">Damage</h3>' +
+    '<div class="dmg-head">' +
       '<span class="dmg-state ' + crashCls + '">' + esc(crashTxt) + '</span>' +
       '<span class="dmg-head-meta">mCrashState = ' + crash + '</span>' +
+      (frozen ? '<span class="dmg-frozen">' + esc(frozen) + ' — last on-track reading</span>' : '') +
     '</div>' +
     '<div class="dmg-cols">' +
       '<div class="dmg-block">' +
@@ -74,13 +99,139 @@ function updateSetupPanel(d) {
 
   var tel = d.player_telemetry;
   if (!d.connected || !tel) {
-    panel.innerHTML = '<div class="setup-no-data">Connect to AMS2 to see damage.</div>';
+    panel.innerHTML = '<div class="setup-no-data">Connect to AMS2 to see telemetry.</div>';
+    dmgLastOnTrack = null;
+    dmgFrozenLabel = null;
     return;
   }
 
-  // Skip DOM update when the sub-tab is hidden.
+  // Freeze whenever the player is not out on track. Two signals, because
+  // neither alone catches every way off it:
+  //   pit_mode (mPitMode)  — 0 is the only value that means "out on track". This
+  //     is what catches ESC -> "Return to pits", which teleports the car into
+  //     the garage without it ever driving down a pit lane.
+  //   in_pits (mCurrentSector < 0) — the participant-level view, kept because it
+  //     flips as soon as the car crosses the pit entry.
+  // A viewed driver that cannot be found at all is the garage too.
+  var viewed = null;
+  for (var pi = 0; pi < d.participants.length; pi++) {
+    if (d.participants[pi].is_player) { viewed = d.participants[pi]; break; }
+  }
+  var onTrack = !!viewed && !viewed.in_pits && (d.pit_mode || 0) === 0;
+  var frozenWhy = onTrack ? null : (PIT_MODES[d.pit_mode || 0] || 'In pits');
+  if (onTrack) dmgLastOnTrack = tel;
+
+  // Nothing has been read on track yet, so there is no reading to hold.
+  var shown = onTrack ? tel : dmgLastOnTrack;
+  if (!shown) {
+    panel.innerHTML = '<div class="setup-no-data">Waiting for the car to go out on track&hellip;</div>';
+    return;
+  }
+
+  // Skip DOM update when the sub-tab is hidden, or when the held reading is
+  // already on screen.
   var subPanel = document.getElementById('live-sub-setup');
   if (subPanel && subPanel.classList.contains('live-subpanel-hidden')) return;
+  if (frozenWhy && frozenWhy === dmgFrozenLabel) return;
 
-  panel.innerHTML = buildDamagePanel(tel);
+  panel.innerHTML = buildDamagePanel(shown, frozenWhy) + buildTyrePanel(shown);
+  dmgFrozenLabel = frozenWhy;
+}
+
+// ── Tyres ─────────────────────────────────────────────────────────────────────
+
+// mTerrain. The list is the header's, in order, so the index is the value.
+var TERRAIN_NAMES = [
+  'Road', 'Low-grip road', 'Bumpy road 1', 'Bumpy road 2', 'Bumpy road 3',
+  'Marbles', 'Grassy berms', 'Grass', 'Gravel', 'Bumpy gravel',
+  'Rumble strips', 'Drains', 'Tyre walls', 'Cement walls', 'Guard rails',
+  'Sand', 'Bumpy sand', 'Dirt', 'Bumpy dirt', 'Dirt road',
+  'Bumpy dirt road', 'Pavement', 'Dirt bank', 'Wood', 'Dry verge',
+  'Exit rumble strips', 'Grasscrete', 'Long grass', 'Slope grass', 'Cobbles',
+  'Sand road', 'Baked clay', 'Astroturf', 'Snow (half)', 'Snow (full)',
+  'Damaged road', 'Train track road', 'Bumpy cobbles', 'Aries only', 'Orion only',
+  'B1 rumbles', 'B2 rumbles', 'Rough sand (medium)', 'Rough sand (heavy)', 'Snow walls',
+  'Ice road', 'Runoff road', 'Illegal strip', 'Painted concrete',
+  'Painted concrete (illegal)', 'Rally tarmac'
+];
+
+// mTyreFlags is a bitfield, not an enum.
+function tyreFlagText(f) {
+  var on = [];
+  if (f & 1) on.push('attached');
+  if (f & 2) on.push('inflated');
+  if (f & 4) on.push('on ground');
+  return on.length ? on.join(', ') : 'none';
+}
+
+// A labelled value line. `unset` blanks the reading rather than printing a zero
+// that reads as a measurement.
+function telRow(label, txt, unset) {
+  return '<div class="tel-row">' +
+    '<span class="tel-row-lbl">' + esc(label) + '</span>' +
+    '<span class="tel-row-val' + (unset ? ' tel-unset' : '') + '">' + (unset ? '—' : txt) + '</span>' +
+    '</div>';
+}
+
+function degRow(label, v) {
+  return telRow(label, Math.round(v) + '°C', !(v > 0));
+}
+
+function tyreCard(tel, i) {
+  var compound = tel.tyre_compound[i];
+  return '<div class="tel-card">' +
+    '<div class="tel-card-head">' +
+      '<span class="tel-card-name">' + DMG_WHEELS[i] + '</span>' +
+      '<span class="tel-card-compound">' + (compound ? esc(compound) : '—') + '</span>' +
+    '</div>' +
+
+    '<div class="tel-group">Surface temperature</div>' +
+    degRow('Left', tel.tyre_temp_left[i]) +
+    degRow('Centre', tel.tyre_temp_center[i]) +
+    degRow('Right', tel.tyre_temp_right[i]) +
+    degRow('Overall', tel.tyre_temp[i]) +
+
+    '<div class="tel-group">Structure temperature</div>' +
+    degRow('Tread', tel.tyre_tread_temp[i]) +
+    degRow('Layer', tel.tyre_layer_temp[i]) +
+    degRow('Carcass', tel.tyre_carcass_temp[i]) +
+    degRow('Rim', tel.tyre_rim_temp[i]) +
+    degRow('Internal air', tel.tyre_internal_air_temp[i]) +
+
+    '<div class="tel-group">Condition</div>' +
+    telRow('Wear', (tel.tyre_wear[i] * 100).toFixed(1) + '%', false) +
+    telRow('Pressure', tel.tyre_pressure[i].toFixed(2) + ' PSI', !(tel.tyre_pressure[i] > 0)) +
+    telRow('Rotation', tel.tyre_rps[i].toFixed(2) + ' rev/s', false) +
+
+    '<div class="tel-group">Contact</div>' +
+    telRow('Terrain', esc(TERRAIN_NAMES[tel.terrain[i]] || ('#' + tel.terrain[i])), false) +
+    telRow('State', tyreFlagText(tel.tyre_flags[i]), false) +
+    telRow('Height above ground', tel.tyre_height_above_ground[i].toFixed(4), false) +
+    telRow('Tyre Y', tel.tyre_y[i].toFixed(4), false) +
+
+    '<div class="tel-group">Corner</div>' +
+    telRow('Brake temp', Math.round(tel.brake_temp[i]) + '°C', !(tel.brake_temp[i] > 0)) +
+    telRow('Ride height', (tel.ride_height[i]).toFixed(2) + ' cm', false) +
+    telRow('Susp. travel', (tel.suspension_travel[i] * 1000).toFixed(1) + ' mm', false) +
+    telRow('Susp. velocity', tel.suspension_velocity[i].toFixed(3) + ' m/s', false) +
+    telRow('Wheel Y', tel.wheel_local_position_y[i].toFixed(4), false) +
+    '</div>';
+}
+
+function buildTyrePanel(tel) {
+  var cards = [0, 1, 2, 3].map(function (i) { return tyreCard(tel, i); });
+  // The header marks these three "kept for backward compatibility only". They are
+  // shown so that the question of whether AMS2 still fills them is answered here
+  // rather than re-investigated every time someone wants slip or grip data.
+  var obsolete = ['tyre_slip_speed', 'tyre_grip', 'tyre_lateral_stiffness'].map(function (f) {
+    return '<span class="tel-obs-item"><b>' + f.replace(/^tyre_/, '') + '</b> ' +
+      tel[f].map(function (v) { return v.toFixed(3); }).join(' / ') + '</span>';
+  }).join('');
+  return '<h3 class="tel-section">Tyres</h3>' +
+    '<div class="tel-grid">' +
+      '<div class="tel-row-pair">' + cards[0] + cards[1] + '</div>' +
+      '<div class="tel-row-pair">' + cards[2] + cards[3] + '</div>' +
+    '</div>' +
+    '<div class="tel-obsolete"><span class="tel-obs-lbl">Obsolete in the PCars2 header (FL / FR / RL / RR)</span>' +
+      obsolete + '</div>';
 }
