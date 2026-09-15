@@ -66,7 +66,11 @@ function renderSaves(data) {
   if (dirLabel) dirLabel.textContent = data.dir || '';
 
   var sel = document.getElementById('save-select');
-  if (sel) {
+  if (sel && !saves.length) {
+    // No careers at all — the app does not invent one, so say so rather than showing an empty
+    // dropdown that looks broken.
+    sel.innerHTML = '<option disabled selected>No careers yet</option>';
+  } else if (sel) {
     sel.innerHTML = saves.map(function (s) {
       // A save that will not parse stays listed but cannot be switched to — the server refuses
       // it anyway, and an unselectable row is a clearer answer than a silently missing one.
@@ -78,6 +82,12 @@ function renderSaves(data) {
 
   var list = document.getElementById('saves-list');
   if (!list) return;
+  if (!saves.length) {
+    list.innerHTML = '<li class="saves-item"><span class="saves-counts">' +
+      'No careers yet — create one below. Sessions are not recorded until you do.' +
+      '</span></li>';
+    return;
+  }
   list.innerHTML = saves.map(function (s) {
     var name = esc(s.name);
     return '<li class="saves-item' + (s.active ? ' saves-item-active' : '') + '">' +

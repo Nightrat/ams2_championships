@@ -22,7 +22,7 @@ fn test_load_or_create_missing_file_writes_defaults_and_creates_file() {
     assert!(cfg.record_race);
     assert!(!cfg.show_track_map);
     assert_eq!(cfg.track_map_max_points, 5000);
-    assert!(cfg.data_file.is_none());
+    assert!(cfg.active_career.is_none());
     assert!(path.exists(), "config file should be created");
     let _ = fs::remove_file(&path);
 }
@@ -103,7 +103,7 @@ fn test_config_default_values() {
     assert!(cfg.record_race);
     assert!(!cfg.show_track_map);
     assert_eq!(cfg.track_map_max_points, 5000);
-    assert!(cfg.data_file.is_none());
+    assert!(cfg.active_career.is_none());
     assert!(cfg.enforce_team_eligibility);
 }
 
@@ -117,11 +117,56 @@ fn test_enforce_team_eligibility_defaults_on_for_existing_configs() {
 }
 
 #[test]
-fn test_load_or_create_data_file_some() {
+fn test_load_or_create_active_career_some() {
     let path = tmp_path();
-    fs::write(&path, r#"{"data_file":"/some/path/career.json"}"#).unwrap();
+    fs::write(&path, r#"{"active_career":"GT3 Career"}"#).unwrap();
     let cfg = load_or_create(&path);
-    assert_eq!(cfg.data_file, Some("/some/path/career.json".into()));
+    assert_eq!(cfg.active_career.as_deref(), Some("GT3 Career"));
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_legacy_data_file_path_still_names_the_active_career() {
+    // Upgrading must not drop the career the user was on. The old setting held a full path; the
+    // name is taken from it, in either save layout.
+    let path = tmp_path();
+    fs::write(&path, r#"{"data_file":"F:/champs/sp.json"}"#).unwrap();
+    assert_eq!(load_or_create(&path).active_career.as_deref(), Some("sp"));
+
+    fs::write(&path, r#"{"data_file":"F:/champs/sp/career.json"}"#).unwrap();
+    assert_eq!(load_or_create(&path).active_career.as_deref(), Some("sp"));
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_active_career_wins_over_a_legacy_data_file() {
+    // Both present only while a config written by an older build has not been rewritten yet.
+    let path = tmp_path();
+    fs::write(
+        &path,
+        r#"{"active_career":"current","data_file":"F:/champs/old.json"}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        load_or_create(&path).active_career.as_deref(),
+        Some("current")
+    );
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_the_legacy_data_file_field_is_dropped_on_the_next_write() {
+    let path = tmp_path();
+    fs::write(&path, r#"{"data_file":"F:/champs/sp.json"}"#).unwrap();
+    let cfg = load_and_upgrade(&path);
+    assert_eq!(cfg.active_career.as_deref(), Some("sp"));
+
+    let written = fs::read_to_string(&path).unwrap();
+    assert!(
+        !written.contains("data_file"),
+        "the old spelling is not written back: {written}"
+    );
+    assert!(written.contains("active_career"));
     let _ = fs::remove_file(&path);
 }
 

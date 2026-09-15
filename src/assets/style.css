@@ -955,7 +955,10 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
 .carperf-note { font-size: 0.82rem; color: #999; margin: 0 0 1.25rem; }
 .carperf-class { margin-bottom: 2rem; }
 .carperf-class-hidden { display: none; }
-.carperf-heading { font-size: 1.05rem; color: #e0e0e0; margin: 0 0 0.5rem; }
+.carperf-heading { font-size: 1.05rem; color: #e0e0e0; margin: 0 0 0.5rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+/* Pushed to the trailing edge so the class name still reads as the heading. */
+.carperf-baseline { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; font-weight: normal; }
+.carperf-baseline .carperf-note { margin: 0; }
 .carperf-year { color: #999; font-weight: 400; font-size: 0.9em; }
 .carperf-fastest { color: #4caf50; font-weight: 600; }
 .carperf-ratings {

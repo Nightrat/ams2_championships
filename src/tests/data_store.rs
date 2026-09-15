@@ -1376,6 +1376,15 @@ fn test_persist_refuses_to_overwrite_a_save_it_could_not_read() {
 }
 
 #[test]
+fn test_persist_refuses_when_there_is_no_active_career() {
+    // The saves folder was empty at startup, so `resolve_active` found nothing and the app runs
+    // without a career rather than inventing one. There is nowhere for this to go.
+    let store = load_store(&PathBuf::new());
+    let err = persist(&store, &PathBuf::new()).expect_err("there is nothing to write to");
+    assert!(err.contains("no active career"), "{err}");
+}
+
+#[test]
 fn test_persist_writes_a_save_it_can_read() {
     let path = load_tmp("ok");
     fs::write(&path, ONE_CHAMP).unwrap();

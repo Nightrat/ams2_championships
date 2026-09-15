@@ -62,6 +62,24 @@ const SALARY_JITTER: f32 = 0.08;
 /// entirely, and a locked team then makes no offer at all.
 const BUY_IN_PER_POINT: i64 = 150_000;
 
+/// Rating points clear of a back-marker's bar a driver must be before it *pays* them rather than
+/// selling them the seat.
+///
+/// Merely clearing the bar is not enough at the back of the grid. A team there has a budget hole
+/// — that is why its seat is for sale at all — so it takes sponsorship from anyone it does not
+/// actively want, and only opens its wallet for a driver clearly better than the one already in
+/// the car. Osella, AGS and Coloni paid nobody; they took money from everyone bar the occasional
+/// talent.
+///
+/// Without this the slowest team is free to anyone who clears its bar, and that bar is set by its
+/// *incumbent* rather than by the grid — the grid gate is zero at the back. A roster whose last
+/// team runs a weak driver therefore hands out its seat to an unproven rookie, on any tuning.
+///
+/// Zero restores the previous behaviour: clearing the bar is enough anywhere on the grid.
+///
+/// Default for [`OfferParams::pay_driver_margin`].
+const PAY_DRIVER_MARGIN: f32 = 10.0;
+
 /// Share of the grid, counted from the back, whose teams will take a driver's sponsorship in
 /// exchange for a seat.
 ///
@@ -203,6 +221,9 @@ pub struct OfferParams {
     /// Share of the grid, from the back, that will sell a seat for sponsorship. Zero has the
     /// same effect as a zero rate — nobody sells.
     pub pay_driver_share: f32,
+    /// Rating points clear of a selling team's bar before it pays the driver instead of charging
+    /// them. Zero means clearing the bar is enough, anywhere on the grid.
+    pub pay_driver_margin: f32,
     /// Pay rise a renewal carries once the driver has delivered, as a fraction of the rate.
     pub loyalty_bonus: f32,
 }
@@ -215,6 +236,7 @@ impl Default for OfferParams {
             objective_slack: OBJECTIVE_SLACK,
             buy_in_per_point: BUY_IN_PER_POINT,
             pay_driver_share: PAY_DRIVER_SHARE,
+            pay_driver_margin: PAY_DRIVER_MARGIN,
             loyalty_bonus: LOYALTY_BONUS,
         }
     }
@@ -431,24 +453,30 @@ pub fn offers_for_with(
             let held = same_series && standing.incumbent.as_deref() == Some(e.team.as_str());
             let renewing = held && standing.delivered != Some(false);
 
+            // What a team at the back would have to see before it pays rather than charges. Above
+            // this it wants the driver; below it, the seat is merchandise. See
+            // [`PAY_DRIVER_MARGIN`].
+            let sells = params.buy_in_per_point > 0 && sells_seat(rank, total, params);
+            let wanted = reputation >= e.required + params.pay_driver_margin.max(0.0);
+
             let kind = if renewing {
                 // Delivering keeps the seat, whatever the rating now says. That is what having
                 // met the target is *for*; re-earning it every winter would make the objective
-                // decorative.
+                // decorative — and a team that sells seats does not start charging a driver who
+                // just delivered for it.
                 OfferKind::Paid
             } else {
                 match e.tier {
+                    // A back-marker sells to anyone it does not actively want, whether or not the
+                    // rating clears its bar. Clearing the bar of the slowest car on the grid is a
+                    // low hurdle — at the back the grid gate is zero, so the bar is whatever its
+                    // incumbent happens to be — and it used to make that seat a free gift.
+                    _ if sells && !wanted => OfferKind::Pay,
                     // Above the bar or within reach of it are the same kind of deal. What
                     // separates them is the leverage below, which slides to nothing at the bar
                     // — a gradient rather than the cliff a separate "trial" kind made of it.
                     Tier::Available | Tier::OfferPossible => OfferKind::Paid,
-                    // Only a team that needs the money will take it, and only the back of the
-                    // grid does. Anything quicker that the rating cannot reach stays shut.
-                    Tier::Locked
-                        if params.buy_in_per_point > 0 && sells_seat(rank, total, params) =>
-                    {
-                        OfferKind::Pay
-                    }
+                    // Anything quicker than the sellers that the rating cannot reach stays shut.
                     Tier::Locked => return None,
                 }
             };
@@ -479,7 +507,13 @@ pub fn offers_for_with(
                 salary: salary.max(1),
                 objective: objective(e.expected_position, field, params.objective_slack, kind),
                 buy_in: match kind {
-                    OfferKind::Pay => buy_in(e.required - reputation, params),
+                    // Priced on the distance to the point where the team would want the driver,
+                    // not to its bar — so the price slides continuously to zero exactly where the
+                    // seat flips to `Paid`, rather than stepping off a cliff there.
+                    OfferKind::Pay => buy_in(
+                        e.required + params.pay_driver_margin.max(0.0) - reputation,
+                        params,
+                    ),
                     OfferKind::Paid => 0,
                 },
                 rank,

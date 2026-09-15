@@ -44,16 +44,27 @@ fn call_with_config(
     request_bytes: Vec<u8>,
     config: Option<std::path::PathBuf>,
 ) -> String {
+    // Saves live alongside the career file, as they do under championships/ in production.
+    let saves_dir = data_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(std::env::temp_dir);
+    call_full(store, data_path, saves_dir, request_bytes, config)
+}
+
+/// [`call_with_config`] with the saves folder given explicitly — needed when there is no active
+/// career, since then there is no career path to derive it from.
+fn call_full(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    saves_dir: std::path::PathBuf,
+    request_bytes: Vec<u8>,
+    config: Option<std::path::PathBuf>,
+) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let html = Arc::new(b"<html/>".to_vec());
-    // Saves live alongside the career file, as they do under championships/ in production.
-    let saves_dir = Arc::new(
-        data_path
-            .parent()
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(std::env::temp_dir),
-    );
+    let saves_dir = Arc::new(saves_dir);
     let dp: ams2_championship::data_store::SavePath = Arc::new(RwLock::new(data_path));
     let ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1256,7 +1267,8 @@ fn test_route_post_saves_creates_empty_and_activates() {
     assert_eq!(v["saves"].as_array().unwrap().len(), 2);
     // The in-memory store was swapped to the new, empty career.
     assert!(store.read().unwrap().championships.is_empty());
-    assert!(path.parent().unwrap().join("GT3 Career.json").exists());
+    // A new career is created in the folder layout: <saves>/GT3 Career/career.json
+    assert!(ams2_championship::saves::save_path(path.parent().unwrap(), "GT3 Career").exists());
     // The kind is recorded at creation and is what every rule below turns on.
     assert_eq!(store.read().unwrap().mode, ams2_championship::data_store::CareerMode::Multiplayer);
     // The previous career is untouched on disk.
@@ -1347,8 +1359,11 @@ fn test_route_duplicate_copies_without_switching() {
     assert!(status_line(&resp).contains("200"));
     let v = body_json(&resp);
     assert_eq!(v["active"], "ams2_career", "duplicating does not switch");
-    let copy = path.parent().unwrap().join("backup.json");
+    // The source here is a legacy flat save; the copy is a new save, so it is written the way
+    // new saves are written.
+    let copy = ams2_championship::saves::save_path(path.parent().unwrap(), "backup");
     assert!(copy.exists());
+    assert!(path.exists(), "the original stays where it was");
     assert_eq!(
         ams2_championship::data_store::load_data(&copy)
             .championships
@@ -1417,6 +1432,111 @@ fn test_route_delete_active_save_rejected() {
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
 
+/// Put a file in a subfolder of a save, standing in for whatever a career comes to own beside
+/// its sessions — the reason the folder layout exists.
+fn seed_nested(career: &std::path::Path) -> std::path::PathBuf {
+    let dir = ams2_championship::saves::career_dir(career).unwrap().join("extra");
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("notes.txt");
+    std::fs::write(&file, "nested").unwrap();
+    file
+}
+
+#[test]
+fn test_route_rename_folder_save_carries_everything_in_it() {
+    let (store, path) = make_saves_dir("rename_folder");
+    let dir = path.parent().unwrap().to_path_buf();
+    // A folder save beside the legacy active one.
+    let career = ams2_championship::saves::save_path(&dir, "Project");
+    ams2_championship::saves::prepare_save_dir(&career).unwrap();
+    std::fs::copy(&path, &career).unwrap();
+    seed_nested(&career);
+
+    let resp = patch(
+        store,
+        path.clone(),
+        "/api/saves/Project",
+        br#"{"new_name":"Renamed"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(!dir.join("Project").exists(), "the old folder is gone");
+    let moved = ams2_championship::saves::save_path(&dir, "Renamed");
+    assert!(moved.exists());
+    assert!(
+        ams2_championship::saves::career_dir(&moved)
+            .unwrap()
+            .join("extra")
+            .join("notes.txt")
+            .is_file(),
+        "what the career owned is part of it, so it moves with it"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_delete_folder_save_removes_everything_in_it() {
+    let (store, path) = make_saves_dir("delete_folder");
+    let dir = path.parent().unwrap().to_path_buf();
+    let career = ams2_championship::saves::save_path(&dir, "Scratch");
+    ams2_championship::saves::prepare_save_dir(&career).unwrap();
+    std::fs::copy(&path, &career).unwrap();
+    seed_nested(&career);
+
+    let resp = delete(store, path.clone(), "/api/saves/Scratch");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(!dir.join("Scratch").exists());
+    assert!(path.exists(), "active save untouched");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_post_saves_creates_the_first_career_when_none_is_active() {
+    // An empty saves folder leaves the app with no active career, carried as an empty path.
+    // Creating one is the route it must still serve — and it used to fail, because the switch
+    // flushes the outgoing career first and flushing "" is refused.
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_saves_route_none_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let store = Arc::new(RwLock::new(CareerData::default()));
+
+    let body = br#"{"name":"First","mode":"singleplayer"}"#;
+    let mut req = format!(
+        "POST /api/saves HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body);
+    // No active career: an empty path, exactly as startup leaves it for an empty saves folder.
+    let resp = call_full(store.clone(), std::path::PathBuf::new(), dir.clone(), req, None);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(body_json(&resp)["active"], "First");
+    assert!(ams2_championship::saves::save_path(&dir, "First").exists());
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_post_saves_refuses_a_name_a_legacy_file_already_holds() {
+    // The fixture's own save is a flat ams2_career.json. Creating a folder save of that name
+    // would shadow it, so the name counts as taken in either layout.
+    let (store, path) = make_saves_dir("clash");
+    let resp = post(
+        store,
+        path.clone(),
+        "/api/saves",
+        br#"{"name":"ams2_career","mode":"singleplayer"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(
+        !path.parent().unwrap().join("ams2_career").exists(),
+        "no folder was created beside the legacy file"
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
 // ── PATCH /api/config — saves folder ──────────────────────────────────────────
 
 fn config_body(saves_dir: &str) -> Vec<u8> {
@@ -1428,14 +1548,46 @@ fn config_body(saves_dir: &str) -> Vec<u8> {
     .into_bytes()
 }
 
+/// A config file that already remembers an active career, so clearing it can be told apart from
+/// it never having been set.
+fn config_remembering(tag: &str, career: &str) -> std::path::PathBuf {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let file = std::env::temp_dir().join(format!("ams2_cfg_{tag}_{ns}.json"));
+    std::fs::write(
+        &file,
+        format!(r#"{{"port":8080,"active_career":"{career}"}}"#),
+    )
+    .unwrap();
+    file
+}
+
+fn patch_config_with(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    body: &[u8],
+    config: std::path::PathBuf,
+) -> String {
+    let mut req = format!(
+        "PATCH /api/config HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body);
+    call_with_config(store, data_path, req, Some(config))
+}
+
 #[test]
-fn test_route_patch_config_saves_dir_requires_restart_and_clears_data_file() {
+fn test_route_patch_config_saves_dir_requires_restart_and_clears_the_active_career() {
     let (store, path) = make_saves_dir("cfg_saves_dir");
     let new_dir = path.parent().unwrap().join("elsewhere");
+    let config = config_remembering("saves_dir", "ams2_career");
 
     let body = config_body(&serde_json::Value::String(new_dir.display().to_string()).to_string());
-    let resp = patch(store, path.clone(), "/api/config", &body);
-    assert!(status_line(&resp).contains("200"));
+    let resp = patch_config_with(store, path.clone(), &body, config.clone());
+    assert!(status_line(&resp).contains("200"), "{resp}");
     let v = body_json(&resp);
     assert_eq!(v["config"]["saves_dir"], new_dir.display().to_string());
     assert!(
@@ -1446,19 +1598,22 @@ fn test_route_patch_config_saves_dir_requires_restart_and_clears_data_file() {
         "moving the saves folder only takes effect on restart"
     );
     assert!(
-        v["config"]["data_file"].is_null(),
-        "the remembered save lived in the old folder, so it is dropped"
+        v["config"]["active_career"].is_null(),
+        "the remembered career lived in the old folder, so it is dropped"
     );
     assert!(new_dir.is_dir(), "the folder is created eagerly");
 
+    let _ = std::fs::remove_file(&config);
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
 
 #[test]
-fn test_route_patch_config_unchanged_saves_dir_keeps_data_file() {
+fn test_route_patch_config_unchanged_saves_dir_keeps_the_active_career() {
     let (store, path) = make_saves_dir("cfg_saves_same");
-    let resp = patch(store, path.clone(), "/api/config", &config_body("null"));
-    assert!(status_line(&resp).contains("200"));
+    let config = config_remembering("saves_same", "ams2_career");
+
+    let resp = patch_config_with(store, path.clone(), &config_body("null"), config.clone());
+    assert!(status_line(&resp).contains("200"), "{resp}");
     let v = body_json(&resp);
     assert!(
         !v["restart_required"]
@@ -1467,7 +1622,12 @@ fn test_route_patch_config_unchanged_saves_dir_keeps_data_file() {
             .contains(&serde_json::json!("saves_dir")),
         "null == unset, so nothing changed"
     );
+    assert_eq!(
+        v["config"]["active_career"], "ams2_career",
+        "the form does not carry the active career, so it must be carried through"
+    );
 
+    let _ = std::fs::remove_file(&config);
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
 
@@ -1522,6 +1682,17 @@ fn patch_perf(body: &str, config: &std::path::Path) -> String {
     call_with_config(store, data_path, req, Some(config.to_path_buf()))
 }
 
+fn post_perf(path: &str, body: &str, config: &std::path::Path) -> String {
+    let (store, data_path) = make_test_store();
+    let mut req = format!(
+        "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    call_with_config(store, data_path, req, Some(config.to_path_buf()))
+}
+
 #[test]
 fn test_route_patch_car_performance_writes_the_xml_and_returns_the_new_table() {
     let (dir, config) = make_perf_fixture();
@@ -1547,6 +1718,120 @@ fn test_route_patch_car_performance_writes_the_xml_and_returns_the_new_table() {
     assert!(body.contains("\"pace_delta_pct\":0.0"), "{body}");
     assert_eq!(body.matches("\"pace_delta_pct\":0.0").count(), 2, "{body}");
 
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_car_performance_says_whether_a_class_has_a_baseline() {
+    // A baseline is taken on the first edit, so a class nobody has touched has nothing to reset
+    // to and the table needs to know before offering the button.
+    let (dir, config) = make_perf_fixture();
+    let (store, data_path) = make_test_store();
+    let before = body_json(&call_with_config(
+        store,
+        data_path,
+        b"GET /api/car-performance HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config.clone()),
+    ));
+    assert_eq!(before["classes"][0]["has_baseline"], false);
+
+    patch_perf(
+        r#"{"class":"F-Test","team":"AGS","power_scalar":1.10,"weight_scalar":0.97,"drag_scalar":0.95}"#,
+        &config,
+    );
+    let after = body_json(&patch_perf(
+        r#"{"class":"F-Test","team":"AGS","power_scalar":1.09,"weight_scalar":0.97,"drag_scalar":0.95}"#,
+        &config,
+    ));
+    assert_eq!(after["classes"][0]["has_baseline"], true);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_reset_restores_the_class_from_its_baseline() {
+    let (dir, config) = make_perf_fixture();
+    patch_perf(
+        r#"{"class":"F-Test","team":"AGS","power_scalar":1.10,"weight_scalar":0.97,"drag_scalar":0.95}"#,
+        &config,
+    );
+    assert_ne!(
+        std::fs::read_to_string(dir.join("F-Test.xml")).unwrap(),
+        PERF_XML,
+        "the edit landed"
+    );
+
+    let resp = post_perf("/api/car-performance/reset", r#"{"class":"F-Test"}"#, &config);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("F-Test.xml")).unwrap(),
+        PERF_XML,
+        "the file is back to its baseline"
+    );
+    // Answers with the whole table: a reset moves every scalar in the class.
+    assert!(body_json(&resp)["classes"][0]["cars"].is_array());
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_reset_without_a_baseline_is_refused() {
+    let (dir, config) = make_perf_fixture();
+    let resp = post_perf("/api/car-performance/reset", r#"{"class":"F-Test"}"#, &config);
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("F-Test.xml")).unwrap(),
+        PERF_XML,
+        "nothing was emptied"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_set_baseline_adopts_the_file_as_it_stands() {
+    let (dir, config) = make_perf_fixture();
+    patch_perf(
+        r#"{"class":"F-Test","team":"AGS","power_scalar":1.10,"weight_scalar":0.97,"drag_scalar":0.95}"#,
+        &config,
+    );
+    let tuned = std::fs::read_to_string(dir.join("F-Test.xml")).unwrap();
+
+    let resp = post_perf(
+        "/api/car-performance/baseline",
+        r#"{"class":"F-Test"}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("F-Test.xml.bak")).unwrap(),
+        tuned,
+        "the baseline is now the tuned file, not the shipped one"
+    );
+
+    // And a later reset comes back here rather than to what shipped.
+    patch_perf(
+        r#"{"class":"F-Test","team":"Williams","power_scalar":0.95,"weight_scalar":1.0,"drag_scalar":1.0}"#,
+        &config,
+    );
+    post_perf("/api/car-performance/reset", r#"{"class":"F-Test"}"#, &config);
+    assert_eq!(std::fs::read_to_string(dir.join("F-Test.xml")).unwrap(), tuned);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_baseline_rejects_an_unknown_class() {
+    let (dir, config) = make_perf_fixture();
+    for route in [
+        "/api/car-performance/baseline",
+        "/api/car-performance/reset",
+    ] {
+        let resp = post_perf(route, r#"{"class":"F-Nope"}"#, &config);
+        assert!(
+            !status_line(&resp).contains("200"),
+            "{route} accepted a class that does not exist: {resp}"
+        );
+    }
     std::fs::remove_dir_all(&dir).ok();
 }
 
@@ -2146,12 +2431,12 @@ fn test_route_offers_lists_terms_for_a_rated_season() {
         let kind = o["kind"].as_str().unwrap();
         assert!(["paid", "pay"].contains(&kind), "{o}");
         assert!(o["renewal"].is_boolean(), "{o}");
-        // Only a bought seat is priced, and it always is.
-        assert_eq!(
-            o["buy_in"].as_i64().unwrap() > 0,
-            kind == "pay",
-            "{o}"
-        );
+        // A seat the rating earned is never priced. A bought one is — unless the lockout
+        // guarantee has discounted it to what the career holds, which on this fresh career is
+        // nothing.
+        if kind == "paid" {
+            assert_eq!(o["buy_in"].as_i64().unwrap(), 0, "{o}");
+        }
     }
     // A fresh career has no seat behind it and nothing banked.
     assert!(v["standing"]["incumbent"].is_null());
@@ -3257,7 +3542,7 @@ fn test_route_new_career_is_founded_with_the_configured_balance() {
     // Recorded on the save, not left to be read from config later.
     assert_eq!(store.read().unwrap().starting_balance, 750_000);
     let written = ams2_championship::data_store::load_data(
-        &path.parent().unwrap().join("Rookie.json"),
+        &ams2_championship::saves::save_path(path.parent().unwrap(), "Rookie"),
     );
     assert_eq!(written.starting_balance, 750_000);
 

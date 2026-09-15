@@ -55,7 +55,13 @@ function offerWhy(o, data) {
 
   var asks = Math.round(o.required);
   var you = Math.round(data.reputation);
-  if (o.kind === 'pay') {
+  if (o.kind === 'pay' && you >= asks) {
+    // Clearing the bar of a team this far back is not the same as being wanted by it. Without
+    // this the row reads as a bug: a team asking 49 charging a driver rated 50.
+    bits.push('you clear their bar of ' + asks +
+      ', but not by enough for a team this far back to pay you — they want sponsorship' +
+      (o.buy_in ? '' : ', and will take whatever the career has'));
+  } else if (o.kind === 'pay') {
     bits.push('wants a rating of ' + asks + ' and you have ' + you +
       ' — they will take sponsorship instead, which only teams this far back do');
   } else if (o.renewal) {

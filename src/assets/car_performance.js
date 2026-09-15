@@ -117,10 +117,24 @@ function renderCarPerformanceClass(cls, idx, best) {
       '</tr>';
   }).join('');
   return '<section class="carperf-class" data-carperf-class="' + esc(cls.class) + '">' +
-    '<h3 class="carperf-heading">' + carPerfClassLabel(cls) + '</h3>' +
+    '<h3 class="carperf-heading">' + carPerfClassLabel(cls) +
+      carPerfBaselineHtml(cls) +
+    '</h3>' +
     '<table class="stats-table sortable" id="' + tableId + '">' +
     '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table>' +
     '</section>';
+}
+
+// Reset is offered only when there is a baseline to go back to — one is recorded on the first
+// edit, so an untouched class has none. Adopt is always available: it is how a roster tuned by
+// hand *after* the baseline was taken becomes the thing a reset returns to.
+function carPerfBaselineHtml(cls) {
+  return '<span class="carperf-baseline">' +
+    (cls.has_baseline
+      ? '<button class="manage-btn" data-carperf-reset="' + esc(cls.class) + '">Reset to baseline</button>'
+      : '<span class="carperf-note">no baseline yet — the first edit records one</span>') +
+    '<button class="manage-btn" data-carperf-baseline="' + esc(cls.class) + '">Set current as baseline</button>' +
+    '</span>';
 }
 
 // The tab opens on whatever the user is actually racing; with nothing in progress the server
@@ -193,9 +207,44 @@ function carPerfApplyData(data) {
         req.className = carPerfReqClass(c.required_rating, best);
       }
     });
+    // The first edit of a class creates its baseline, so the Reset button has to appear without
+    // a reload. Safe to replace wholesale because the click handler is delegated.
+    var baseline = section.querySelector('.carperf-baseline');
+    if (baseline) baseline.outerHTML = carPerfBaselineHtml(cls);
   });
   var slot = document.getElementById('carperf-ratings-slot');
   if (slot) slot.innerHTML = carPerfPlayersHtml(players);
+}
+
+// Both baseline actions rewrite a whole file, so both confirm first — and they discard different
+// things, which is why the wording is not shared.
+function carPerfBaselineAction(cls, reset) {
+  var ask = reset
+    ? 'Reset ' + cls + ' to its baseline?\n\n' +
+      'Every scalar edit made to this class since the baseline was recorded is discarded.'
+    : 'Make the current ' + cls + ' file the baseline?\n\n' +
+      'The file it replaces cannot be recovered, and "Reset to baseline" will come back to ' +
+      'this one from now on.';
+  if (!confirm(ask)) return;
+  carPerfStatus(reset ? 'Resetting ' + cls + '…' : 'Recording baseline for ' + cls + '…');
+  fetch('/api/car-performance/' + (reset ? 'reset' : 'baseline'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ class: cls })
+  }).then(function (r) {
+    return r.json().then(function (d) { return { ok: r.ok, data: d }; });
+  }).then(function (res) {
+    if (!res.ok) {
+      carPerfStatus((res.data && res.data.error) || 'Failed.', true);
+      return;
+    }
+    carPerfApplyData(res.data);
+    carPerfStatus(reset
+      ? cls + '.xml restored from its baseline'
+      : cls + '.xml.bak now holds the current file');
+  }).catch(function () {
+    carPerfStatus('Failed — is the server still running?', true);
+  });
 }
 
 function carPerfSaveRow(tr) {
@@ -270,8 +319,11 @@ function renderCarPerformance(data) {
     'line-up can ask more than a quicker one. Ratings shown are performance at the AI difficulty ' +
     'actually raced, not an absolute skill measure. ' +
     'Power, Weight and Drag are editable: change one and it is written straight back into that ' +
-    'class’s Custom AI Drivers XML, for every driver on the team. The original file is kept ' +
-    'once as <code>.xml.bak</code>. AMS2 reads the file when a session loads, so restart the ' +
+    'class’s Custom AI Drivers XML, for every driver on the team. The first edit of a class keeps ' +
+    'the file as it was then as <code>.xml.bak</code> — its baseline — and Reset to baseline ' +
+    'restores it. Tuned a roster by hand after that? Set current as baseline adopts it, so a ' +
+    'later reset comes back to your version instead of the one the app happened to catch. ' +
+    'AMS2 reads the file when a session loads, so restart the ' +
     'session for an edit to take effect. Reiza documents the scalars as 0.900–1.100, where ' +
     '1.000 means no change, and edits outside that are refused.</p>';
   var best = carPerfBestRating(players);
@@ -297,6 +349,16 @@ function renderCarPerformance(data) {
     // 'change' rather than 'input': one save per committed edit, not one per keystroke.
     input.addEventListener('change', function () { carPerfSaveRow(input.closest('tr')); });
   });
+  // Delegated, so the buttons survive `carPerfApplyData` replacing them after an edit.
+  var classesEl = document.getElementById('carperf-classes');
+  if (classesEl) {
+    classesEl.addEventListener('click', function (ev) {
+      var reset = ev.target.getAttribute && ev.target.getAttribute('data-carperf-reset');
+      var adopt = ev.target.getAttribute && ev.target.getAttribute('data-carperf-baseline');
+      if (reset) carPerfBaselineAction(reset, true);
+      else if (adopt) carPerfBaselineAction(adopt, false);
+    });
+  }
   document.querySelectorAll('.carperf-filter-input').forEach(function (input) {
     input.addEventListener('change', carPerfApplyFilter);
   });

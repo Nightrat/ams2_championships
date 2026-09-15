@@ -59,6 +59,19 @@ fn params() -> OfferParams {
     OfferParams::default()
 }
 
+/// [`params`] with pay-driver seats switched off, for tests about terms that have nothing to do
+/// with a team selling its seat.
+///
+/// On the small hand-built grids below the back third is most of the grid — often all of it — so
+/// a selling team would otherwise stand in for every team, and a test about the salary curve or
+/// about renewals would be reading pay-driver terms instead.
+fn no_sellers() -> OfferParams {
+    OfferParams {
+        pay_driver_share: 0.0,
+        ..params()
+    }
+}
+
 fn offer<'a>(offers: &'a [Offer], team: &str) -> &'a Offer {
     offers
         .iter()
@@ -174,7 +187,9 @@ fn test_salary_falls_down_the_grid() {
 #[test]
 fn test_the_ends_of_the_grid_sit_on_the_configured_rates() {
     // Reputation exactly on the bar, so nothing but jitter separates the offer from the rate.
-    let p = params();
+    // Nobody sells here: this is about where the salary curve puts each rank, and a back-marker
+    // selling its seat would pay the reduced pay-driver rate instead of the floor.
+    let p = no_sellers();
     let offers = offers_for("c1", REQ, &open_grid(6), &p);
     let within =
         |got: i64, want: i64| (got as f32 - want as f32).abs() <= SALARY_JITTER * want as f32 + 1.0;
@@ -193,7 +208,7 @@ fn test_the_ends_of_the_grid_sit_on_the_configured_rates() {
 #[test]
 fn test_a_one_team_grid_pays_the_top_rate() {
     // There is nothing to rank a lone team against, so it must not land on the floor rate.
-    let p = params();
+    let p = no_sellers();
     let offers = offers_for("c1", REQ, &open_grid(1), &p);
     assert!(offers[0].salary as f32 > 0.9 * p.top_salary as f32);
 }
@@ -223,7 +238,9 @@ fn test_clearing_the_bar_and_coming_within_reach_are_the_same_deal() {
     // There is no separate "trial" any more. At the same rating, a team whose bar has just been
     // cleared and one still just out of reach offer identical terms — what separates a good
     // driver from a marginal one is the leverage below, not a different class of contract.
-    let p = params();
+    // Away from the selling end of the grid — a back-marker charges both of them alike, which
+    // is the same answer but for a different reason.
+    let p = no_sellers();
     let over = vec![elig("Brabham", Tier::Available, REQ, 3.5)];
     let under = vec![elig("Brabham", Tier::OfferPossible, REQ, 3.5)];
 
@@ -231,6 +248,96 @@ fn test_clearing_the_bar_and_coming_within_reach_are_the_same_deal() {
     let b = &offers_for("c1", REQ, &under, &p)[0];
     assert_eq!(a, b);
     assert_eq!(a.kind, OfferKind::Paid);
+}
+
+#[test]
+fn test_a_backmarker_sells_to_a_driver_it_does_not_want() {
+    // Clearing the bar of the slowest car on the grid is a low hurdle — the grid gate is zero at
+    // the back, so the bar is whatever its incumbent happens to be, and a roster with a weak last
+    // driver used to hand its seat to an unproven rookie for nothing. A team there has a budget
+    // hole; that is *why* its seat is for sale. So it sells to anyone it does not actively want.
+    let p = params();
+    let g = vec![
+        elig("Front", Tier::Available, 20.0, 1.5),
+        elig("Back", Tier::Available, 20.0, 5.5),
+    ];
+
+    // One point clear of the bar: earned, but not wanted.
+    let scraped = offers_for("c1", 21.0, &g, &p);
+    assert_eq!(offer(&scraped, "Front").kind, OfferKind::Paid);
+    assert_eq!(offer(&scraped, "Back").kind, OfferKind::Pay);
+    assert_eq!(
+        offer(&scraped, "Back").buy_in,
+        ((20.0 + p.pay_driver_margin - 21.0) * p.buy_in_per_point as f32) as i64
+    );
+}
+
+#[test]
+fn test_a_backmarker_pays_a_driver_it_wants() {
+    // The other half, and why this is not simply "the back of the grid always charges": a driver
+    // clearly better than the car gets paid to drive it. Even Osella would have paid Senna.
+    let p = params();
+    let g = vec![
+        elig("Front", Tier::Available, 20.0, 1.5),
+        elig("Back", Tier::Available, 20.0, 5.5),
+    ];
+    let good = offers_for("c1", 20.0 + p.pay_driver_margin, &g, &p);
+    assert_eq!(offer(&good, "Back").kind, OfferKind::Paid);
+    assert_eq!(offer(&good, "Back").buy_in, 0);
+}
+
+#[test]
+fn test_the_price_of_a_back_seat_falls_to_nothing_at_the_margin() {
+    // The price is the distance to the point where the team would want the driver, so it slides
+    // continuously to zero exactly where the seat flips to a paid one — no cliff at the boundary.
+    let p = params();
+    let g = vec![
+        elig("Front", Tier::Available, 20.0, 1.5),
+        elig("Back", Tier::Available, 20.0, 5.5),
+    ];
+    let price = |rep: f32| offer(&offers_for("c1", rep, &g, &p), "Back").buy_in;
+
+    let far = price(20.0);
+    let near = price(20.0 + p.pay_driver_margin - 1.0);
+    assert!(far > near, "{far} should beat {near}");
+    assert_eq!(near, p.buy_in_per_point, "one point short, one point's price");
+}
+
+#[test]
+fn test_a_zero_margin_restores_clearing_the_bar_being_enough() {
+    // The escape hatch. A career that wants the old behaviour sets the margin to zero and a
+    // back-marker hires anyone who clears its bar, exactly as before.
+    let p = OfferParams {
+        pay_driver_margin: 0.0,
+        ..params()
+    };
+    let g = vec![
+        elig("Front", Tier::Available, 20.0, 1.5),
+        elig("Back", Tier::Available, 20.0, 5.5),
+    ];
+    let offers = offers_for("c1", 20.0, &g, &p);
+    assert_eq!(offer(&offers, "Back").kind, OfferKind::Paid);
+    assert_eq!(offer(&offers, "Back").buy_in, 0);
+}
+
+#[test]
+fn test_a_renewal_at_a_backmarker_is_never_charged() {
+    // Delivering keeps the seat. A team that sells does not turn round and bill the driver who
+    // just met its target — that would make the objective worse than decorative.
+    let p = params();
+    let g = vec![elig("Back", Tier::Available, 20.0, 5.5)];
+    let o = offers_for_with(
+        "c1",
+        CLASS,
+        21.0,
+        0,
+        &g,
+        &served("Back", Some(true), 1),
+        &p,
+    );
+    assert_eq!(o[0].kind, OfferKind::Paid);
+    assert_eq!(o[0].buy_in, 0);
+    assert!(o[0].renewal);
 }
 
 #[test]
@@ -486,31 +593,37 @@ fn test_reference_career_offers_snapshot() {
     assert!((rep - 57.16).abs() < 0.5, "rating {rep}");
 
     let offers = offers_for("1777758943816", rep, &eligibility, &params());
-    // Five of fourteen 1986 seats are available in any sense: four on merit, plus the one team
-    // behind them that is broke enough to sell. The front nine are simply shut.
+    // Five of fourteen 1986 seats are open in any sense. The front nine are simply shut — a
+    // mid-career rating must not open the whole grid.
     assert_eq!(
         offers.iter().map(|o| o.team.as_str()).collect::<Vec<_>>(),
         vec!["Lola", "Minardi", "Zakspeed", "Osella", "AGS"]
     );
-    let earned = offers.iter().filter(|o| o.kind != OfferKind::Pay);
-    assert_eq!(
-        earned.clone().count(),
-        4,
-        "a mid-career rating must not open the whole 1986 grid"
-    );
+    // And every one of them is for sale rather than offered. With a one-third share those five
+    // *are* the back of the grid, and 57 is not clear of any of their bars by the margin — so a
+    // driver at this stage buys a drive here or waits for a quicker car to come into reach. The
+    // two behind Zakspeed used to be free: Osella asks 57 and AGS 56, both of which this rating
+    // clears, and clearing the bar of a broke team used to be enough.
     assert!(
-        offers.iter().any(|o| o.kind == OfferKind::Paid),
-        "and must open something"
+        offers.iter().all(|o| o.kind == OfferKind::Pay),
+        "the back of the grid sells; it does not hire"
     );
-    // Nothing this career has earned carries a price, and everything it has not does.
-    for o in &offers {
-        assert_eq!(
-            o.buy_in > 0,
-            o.kind == OfferKind::Pay,
-            "{} price and kind disagree",
-            o.team
-        );
-    }
+
+    // Balance zero, so the lockout guarantee has fired: the cheapest seat is discounted to
+    // whatever the career holds, which is nothing. That is the only way a seat here is free.
+    let ags = offer(&offers, "AGS");
+    assert_eq!(ags.buy_in, 0, "a broke career is never locked out");
+    assert!(
+        offers.iter().filter(|o| o.buy_in == 0).count() == 1,
+        "and only the cheapest seat is discounted"
+    );
+
+    // Priced in rank order behind it: the quicker the car, the further this rating is from it.
+    let priced: Vec<i64> = offers.iter().map(|o| o.buy_in).collect();
+    assert!(
+        priced[0] > priced[1] && priced[1] > priced[3],
+        "Lola dearest, then Minardi, then Osella: {priced:?}"
+    );
 
     // Every offer is internally coherent, whatever the economy is tuned to.
     let p = params();
@@ -528,18 +641,16 @@ fn test_reference_career_offers_snapshot() {
     let ranks: Vec<usize> = offers.iter().map(|o| o.rank).collect();
     assert!(ranks.windows(2).all(|w| w[0] < w[1]), "ranks {ranks:?}");
 
-    // What the rating earns is a contiguous run from the slowest car up — nothing further
-    // forward may come within reach while a slower car is still out of it.
-    let merit: Vec<&str> = earned.map(|o| o.team.as_str()).collect();
-    assert_eq!(merit, vec!["Minardi", "Zakspeed", "Osella", "AGS"]);
+    // What is open is a contiguous run from the slowest car up — nothing further forward may be
+    // reachable while a slower car is still shut.
     assert_eq!(offers.last().unwrap().rank, eligibility.len() - 1);
 
-    // Minardi, the seat this career actually took in 1987, is the furthest forward of them, and
-    // the team pays for it like any other earned seat — there is no separate trial tier.
+    // Minardi, the seat this career actually took in 1987. Its bar is 62 against a rating of 57,
+    // so it was never earned — what changed is that coming close no longer gets it free.
     let minardi = offer(&offers, "Minardi");
-    assert_eq!(minardi.kind, OfferKind::Paid);
+    assert_eq!(minardi.kind, OfferKind::Pay);
     assert!(!minardi.renewal, "nothing was held going into this season");
-    assert_eq!(minardi.buy_in, 0);
+    assert!(minardi.buy_in > 0, "a seat the rating has not earned costs");
 
     // The front of the grid is not for sale at any price. This is the fix for a model that had
     // it backwards: a Williams seat used to carry a price tag, when in reality a front-running
@@ -554,17 +665,28 @@ fn test_reference_career_offers_snapshot() {
         );
     }
 
-    // Lola is the one seat money opens: the slowest car this rating cannot quite reach.
+    // Lola is the dearest seat money opens: the quickest car still at the selling end of the
+    // grid, and the one this rating is furthest from.
     let lola = offer(&offers, "Lola");
     assert_eq!(lola.kind, OfferKind::Pay);
     assert_eq!(lola.rank, 9);
-    // Sponsorship is the shortfall alone, so it stays in the range a season's prize money can
-    // eventually cover rather than several times the best salary on the grid.
+    // Sponsorship is the distance to the point where the team would want the driver, and nothing
+    // about the car — so it stays in the range a season's prize money can eventually cover rather
+    // than several times the best salary on the grid.
     assert_eq!(
         lola.buy_in,
-        ((lola.required - rep) * params().buy_in_per_point as f32) as i64
+        ((lola.required + params().pay_driver_margin - rep) * params().buy_in_per_point as f32)
+            as i64
     );
-    assert!(lola.buy_in < params().top_salary, "{}", lola.buy_in);
+    // Within reach of a season or so at the front. The margin adds a flat
+    // `pay_driver_margin * buy_in_per_point` to every price, which took the dearest seat just
+    // past a single top salary — the bound that matters is that it is not *several* times one,
+    // which is what pricing the car rather than the shortfall used to do.
+    assert!(
+        lola.buy_in < (params().top_salary as f32 * 1.5) as i64,
+        "{}",
+        lola.buy_in
+    );
 }
 
 #[test]
@@ -969,10 +1091,12 @@ fn test_the_price_is_the_shortfall_and_nothing_else() {
         offer(&offers, "SlowA").buy_in,
         offer(&offers, "SlowB").buy_in
     );
-    // And it is exactly the shortfall, at the configured rate.
+    // And it is exactly the distance to the point where the team would want the driver — its bar
+    // plus the margin — at the configured rate. Nothing about the car is priced in: every team
+    // that sells is at the back already.
     assert_eq!(
         offer(&offers, "SlowA").buy_in,
-        (30.0 * p.buy_in_per_point as f32) as i64
+        ((30.0 + p.pay_driver_margin) * p.buy_in_per_point as f32) as i64
     );
 }
 
@@ -1182,11 +1306,12 @@ fn test_missing_the_target_drops_the_driver_back_to_merit() {
 
 #[test]
 fn test_a_dropped_driver_keeps_a_seat_they_had_earned_anyway() {
-    // Being dropped is not a punishment on top of the rating — it just stops the seat being
-    // free. A team the driver clears on merit still offers.
+    // Being dropped is not a punishment on top of the rating — it just stops the renewal. What
+    // is left is exactly what the same rating would be offered by a team it has no history with,
+    // whatever that happens to be.
     let p = params();
     let g = vec![elig("Osella", Tier::Available, REQ, 5.5)];
-    let o = offers_for_with(
+    let dropped = &offers_for_with(
         "c1",
         CLASS,
         REQ,
@@ -1194,8 +1319,9 @@ fn test_a_dropped_driver_keeps_a_seat_they_had_earned_anyway() {
         &g,
         &served("Osella", Some(false), 2),
         &p,
-    );
-    assert_eq!(o[0].kind, OfferKind::Paid);
+    )[0];
+    let stranger = &offers_for("c1", REQ, &g, &p)[0];
+    assert_eq!(dropped, stranger, "dropped falls back to merit, not below it");
 }
 
 #[test]
@@ -1217,7 +1343,8 @@ fn test_a_deal_that_set_no_target_cannot_be_failed() {
 #[test]
 fn test_a_renewal_without_a_target_earns_no_loyalty_rise() {
     // Keeping the seat is not the same as having delivered in it; only a met target pays more.
-    let p = params();
+    // Nobody sells here, so both sides are paid deals and only the loyalty rise could differ.
+    let p = no_sellers();
     let g = vec![elig("Osella", Tier::Available, REQ, 5.5)];
     let plain = offers_for("c1", REQ, &g, &p)[0].salary;
     let kept = offers_for_with("c1", CLASS, REQ, 0, &g, &served("Osella", None, 3), &p)[0].salary;
@@ -1426,10 +1553,11 @@ fn test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid() {
     let rating = RatingParams::default().starting_rating;
     let dir = std::path::Path::new(AI_DIR);
 
-    // Two grids cannot offer a choice at any price: their back rows are reachable on merit, so
-    // there is nothing there to buy. Named rather than skipped silently — if a roster edit gives
-    // them pay seats, this list is what has to be revisited.
-    let no_choice = ["F-Vintage_Gen2", "F-Classic_Gen3"];
+    // Every shipped grid offers a choice. Two used to be exceptions — F-Vintage_Gen2 had one pay
+    // seat and F-Classic_Gen3 none — precisely because their back rows were reachable on merit
+    // and so were free rather than for sale. `pay_driver_margin` is what removed that: a team at
+    // the back now sells to anyone it does not actively want, so there is something to buy on
+    // every roster.
     let mut checked = 0;
 
     for perf in crate::custom_ai::class_performance(dir) {
@@ -1465,16 +1593,6 @@ fn test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid() {
             .collect();
         costs.sort();
 
-        if no_choice.contains(&perf.class.as_str()) {
-            assert!(
-                costs.len() < 2,
-                "{} now offers {} pay seats — it is no longer an exception",
-                perf.class,
-                costs.len()
-            );
-            continue;
-        }
-
         assert!(costs.len() >= 2, "{} should offer a choice", perf.class);
         assert!(
             costs[1] <= balance,
@@ -1485,7 +1603,7 @@ fn test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 6, "every shipped grid but the two exceptions");
+    assert_eq!(checked, 8, "every shipped grid");
 }
 
 #[test]

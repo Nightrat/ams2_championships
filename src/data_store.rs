@@ -29,7 +29,6 @@ pub struct SessionResult {
     #[serde(default)]
     pub is_player: bool,
 }
-
 /// A race session captured from the AMS2 shared memory.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RecordedSession {
@@ -823,6 +822,14 @@ fn safe_to_overwrite(path: &Path) -> Result<(), String> {
 /// The console warning is unconditional: a background recorder has nowhere else to say it, and
 /// silently not saving is exactly the failure this guard exists to make loud.
 pub fn persist(store: &SharedStore, path: &PathBuf) -> Result<(), String> {
+    // No active career — the saves folder was empty at startup and none has been created yet.
+    // There is nowhere for this to go, and writing it to a path of "" would be worse than
+    // saying so.
+    if path.as_os_str().is_empty() {
+        let msg = "no active career — create one before saving".to_string();
+        eprintln!("ERROR: {msg}");
+        return Err(msg);
+    }
     if let Err(e) = safe_to_overwrite(path) {
         let msg = format!(
             "refusing to overwrite {}: it exists but could not be read ({e}). \

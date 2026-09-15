@@ -46,6 +46,9 @@ fn default_floor_salary() -> i64 {
 fn default_buy_in() -> i64 {
     OfferParams::default().buy_in_per_point
 }
+fn default_pay_driver_margin() -> f32 {
+    OfferParams::default().pay_driver_margin
+}
 fn default_champion_prize() -> i64 {
     PrizeParams::default().champion_prize
 }
@@ -56,19 +59,21 @@ fn default_floor_prize() -> i64 {
 /// sponsorship — a choice of way in, rather than one take-it-or-leave-it.
 ///
 /// Measured, not guessed. Across the eight rosters in `docs/custom_ai_files_with_perf_scalars`
-/// the second-cheapest pay-driver seat for a driver on the starting rating runs to 3,449,998 at
+/// the second-cheapest pay-driver seat for a driver on the starting rating runs to 4,949,999 at
 /// worst (F-Retro_Gen3); this covers it with a little room.
 /// `test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid` re-measures it and fails
 /// if retuning the economy moves the costs out from under it.
 ///
-/// Two shipped classes cannot satisfy it whatever the balance: F-Vintage_Gen2 offers one pay seat
-/// and F-Classic_Gen3 none, because their back rows are reachable on merit.
+/// It applies to **every** shipped class now. Two used to be exceptions — F-Vintage_Gen2 offered
+/// one pay seat and F-Classic_Gen3 none — because their back rows were reachable on merit and so
+/// were free rather than for sale. [`OfferParams::pay_driver_margin`] closed that: a team at the
+/// back sells to anyone it does not actively want.
 ///
 /// Falling short of every seat is not a dead end — `contracts::offers_for_with` drops the
 /// cheapest to whatever the career holds. This figure is what stops that last resort being the
 /// *normal* way a career begins.
 fn default_starting_balance() -> i64 {
-    3_500_000
+    5_000_000
 }
 
 /// Upper bound on every configurable money figure. Not a rule about what a career should be
@@ -87,11 +92,21 @@ pub struct Config {
     /// Defaults to `championships` next to the executable.
     #[serde(default)]
     pub saves_dir: Option<String>,
-    /// Path to the *active* career save file. Set by the career switcher, not by hand.
-    /// When unset (or pointing at a file that no longer exists) the server picks a save
-    /// from `saves_dir` on startup.
+    /// Name of the *active* career — the folder name inside `saves_dir`, not a path. Set by the
+    /// career switcher, not by hand. When unset, or naming a career that is no longer there, the
+    /// server picks one from `saves_dir` on startup.
+    ///
+    /// A name rather than a path because that is how every other part of the app addresses a
+    /// save: the routes take names, `sanitize_name` gates names, and `saves::existing_save_path`
+    /// resolves one. A second setting holding a full path could contradict `saves_dir`, and used
+    /// to.
     #[serde(default)]
-    pub data_file: Option<String>,
+    pub active_career: Option<String>,
+    /// Pre-folders spelling of [`Self::active_career`]: the active save's full **path**. Read
+    /// once so a config written by an older build keeps the career it was on — [`read_config`]
+    /// folds it into `active_career` and it is dropped on the next write.
+    #[serde(default, rename = "data_file", skip_serializing)]
+    pub legacy_data_file: Option<String>,
     /// Shared memory poll interval in milliseconds (live view refresh rate).
     #[serde(default = "default_poll_ms")]
     pub poll_ms: u64,
@@ -142,6 +157,11 @@ pub struct Config {
     /// seats off, so a team out of reach simply makes no offer.
     #[serde(default = "default_buy_in")]
     pub contract_buy_in_per_point: i64,
+    /// Rating points clear of a back-marker's bar before it pays the driver instead of selling
+    /// them the seat. Zero means clearing the bar is enough anywhere on the grid, which leaves
+    /// the slowest team free to whoever can beat its incumbent.
+    #[serde(default = "default_pay_driver_margin")]
+    pub contract_pay_driver_margin: f32,
     /// Credits for winning a championship.
     #[serde(default = "default_champion_prize")]
     pub champion_prize: i64,
@@ -218,6 +238,11 @@ impl Config {
             top_salary: top,
             floor_salary: self.contract_floor_salary.clamp(1, top),
             buy_in_per_point: self.contract_buy_in_per_point.clamp(0, MONEY_MAX),
+            pay_driver_margin: if self.contract_pay_driver_margin.is_finite() {
+                self.contract_pay_driver_margin.clamp(0.0, 100.0)
+            } else {
+                default_pay_driver_margin()
+            },
             ..OfferParams::default()
         }
     }
@@ -243,6 +268,7 @@ impl Config {
         self.contract_top_salary = offers.top_salary;
         self.contract_floor_salary = offers.floor_salary;
         self.contract_buy_in_per_point = offers.buy_in_per_point;
+        self.contract_pay_driver_margin = offers.pay_driver_margin;
         self.champion_prize = prizes.champion_prize;
         self.last_place_prize = prizes.floor_prize;
     }
@@ -254,7 +280,8 @@ impl Default for Config {
             port: default_port(),
             host: default_host(),
             saves_dir: None,
-            data_file: None,
+            active_career: None,
+            legacy_data_file: None,
             poll_ms: default_poll_ms(),
             record_practice: default_true(),
             record_qualify: default_true(),
@@ -270,6 +297,7 @@ impl Default for Config {
             contract_top_salary: default_top_salary(),
             contract_floor_salary: default_floor_salary(),
             contract_buy_in_per_point: default_buy_in(),
+            contract_pay_driver_margin: default_pay_driver_margin(),
             champion_prize: default_champion_prize(),
             last_place_prize: default_floor_prize(),
             starting_balance: default_starting_balance(),
@@ -340,7 +368,21 @@ pub fn load_and_upgrade(path: &Path) -> Config {
 fn read_config(path: &Path) -> Result<Config, String> {
     let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
     // Notepad and PowerShell both write a BOM by default, exactly as for career saves.
-    serde_json::from_str(text.strip_prefix('\u{feff}').unwrap_or(&text)).map_err(|e| e.to_string())
+    let mut cfg: Config = serde_json::from_str(text.strip_prefix('\u{feff}').unwrap_or(&text))
+        .map_err(|e| e.to_string())?;
+    // Fold the pre-folders `data_file` path into `active_career`. Done here rather than in
+    // `load_and_upgrade` so that every reader sees the same answer, whether or not the one-time
+    // rewrite at startup has happened yet. A path that named a save outside `saves_dir` resolves
+    // to a name that is not in the folder, and startup falls through to picking one — which is
+    // the support for an active save outside the saves folder ending, deliberately.
+    if cfg.active_career.is_none() {
+        cfg.active_career = cfg
+            .legacy_data_file
+            .as_deref()
+            .map(Path::new)
+            .and_then(crate::saves::save_name_of);
+    }
+    Ok(cfg)
 }
 
 /// Writes the config, unless that would overwrite a file that exists but could not be read.

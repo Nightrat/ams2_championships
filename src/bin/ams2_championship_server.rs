@@ -27,6 +27,8 @@ struct ClassData {
     ctx: ams2_championship::driver_rating::RatingContext,
     /// Weaker incumbent's `race_skill` per team.
     skills: std::collections::HashMap<String, f32>,
+    /// Whether the class has a baseline recorded to reset back to.
+    has_baseline: bool,
 }
 
 /// Loads every readable car class from the configured Custom AI Drivers folder.
@@ -59,6 +61,7 @@ fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
             );
             ClassData {
                 skills: custom_ai::parse_team_skills(&path),
+                has_baseline: custom_ai::has_baseline(&path),
                 ctx,
                 perf,
             }
@@ -98,6 +101,9 @@ fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> V
     struct ClassRow {
         class: String,
         year: Option<u16>,
+        /// Whether this class has a baseline recorded, so the table knows if there is anything to
+        /// reset to. One is taken on the first edit, so a never-edited class has none.
+        has_baseline: bool,
         cars: Vec<CarRow>,
     }
     #[derive(serde::Serialize)]
@@ -139,6 +145,7 @@ fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> V
             ClassRow {
                 class: cd.perf.class.clone(),
                 year: cd.perf.year,
+                has_baseline: cd.has_baseline,
                 cars: cd
                     .perf
                     .cars
@@ -440,11 +447,12 @@ fn cur(data_path: &SavePath) -> PathBuf {
     data_path.read().map(|p| p.clone()).unwrap_or_default()
 }
 
-/// Persist `data_file` back to config.json so the active save survives a restart.
+/// Persist `active_career` back to config.json so the active career survives a restart.
 /// Mirrors the inline write used by `PATCH /api/spotter`.
 fn store_active_save(config_path: &std::path::Path, file: &std::path::Path) -> Result<(), String> {
     let mut cfg = ams2_championship::config::load_or_create(config_path);
-    cfg.data_file = Some(file.display().to_string());
+    // The name, not the path — `saves_dir` already says which folder it is in.
+    cfg.active_career = ams2_championship::saves::save_name_of(file);
     ams2_championship::config::save(config_path, &cfg)
 }
 
@@ -668,6 +676,48 @@ fn handle(
         return;
     }
 
+    // POST /api/car-performance/baseline — record the class's file as it stands now as its
+    // baseline, replacing whatever was there.
+    //
+    // For a roster tuned by hand *after* the app first recorded one: the baseline is otherwise
+    // taken once and never refreshed, so it would hold the older version forever and a reset
+    // would throw that tuning away. Deliberately destructive, which is why the client confirms.
+    //
+    // POST /api/car-performance/reset — restore the class's file from its baseline.
+    //
+    // Both answer with the whole recomputed table: either one moves every scalar in the class,
+    // and with them the pace deltas and the ratings derived from them.
+    if method == "POST"
+        && (path == "/api/car-performance/baseline" || path == "/api/car-performance/reset")
+    {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            class: String,
+        }
+        let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
+            json_err(&mut stream, "400 Bad Request", "invalid body");
+            return;
+        };
+        let file = match class_file(&config_path, &body.class) {
+            Ok(f) => f,
+            Err((status, msg)) => {
+                json_err(&mut stream, status, &msg);
+                return;
+            }
+        };
+        let done = if path.ends_with("/reset") {
+            ams2_championship::custom_ai::reset_from_baseline(&file)
+        } else {
+            ams2_championship::custom_ai::set_baseline(&file)
+        };
+        if let Err(e) = done {
+            json_err(&mut stream, "400 Bad Request", &e);
+            return;
+        }
+        json_ok(&mut stream, &car_performance_json(&config_path, &store));
+        return;
+    }
+
     // GET /api/driver-performance — every named driver entry per class with its AI attributes.
     if method == "GET" && path == "/api/driver-performance" {
         json_ok(&mut stream, &driver_performance_json(&config_path, &store));
@@ -808,6 +858,7 @@ fn handle(
             // The seat is taken by signing, never by creating — see POST .../sign.
             player_team: None,
         };
+
         let json = serde_json::to_vec(&champ).unwrap_or_default();
         store.write().unwrap().championships.push(champ);
         if !persisted(&store, &cur(&data_path), &mut stream) {
@@ -1446,6 +1497,7 @@ fn handle(
             }
         }
 
+
         // Only one championship may be Active at a time.
         if body.status == Some(ChampionshipStatus::Active) {
             for c in data.championships.iter_mut() {
@@ -1696,7 +1748,10 @@ fn handle(
     if method == "POST"
         && (path == "/api/saves" || path == "/api/saves/activate" || path == "/api/saves/duplicate")
     {
-        use ams2_championship::saves::{sanitize_name, save_path};
+        use ams2_championship::saves::{
+            duplicate_save, existing_save_path, name_taken, prepare_save_dir, sanitize_name,
+            save_path,
+        };
 
         #[derive(serde::Deserialize)]
         struct SaveReq {
@@ -1718,20 +1773,17 @@ fn handle(
             json_err(&mut stream, "400 Bad Request", "invalid save name");
             return;
         };
-        let target = save_path(&saves_dir, &name);
-
-        // Duplicate copies the file and leaves the active save alone.
+        // Duplicate copies the career and leaves the active save alone.
         if path == "/api/saves/duplicate" {
             let Some(new_name) = sanitize_name(&body.new_name) else {
                 json_err(&mut stream, "400 Bad Request", "invalid new save name");
                 return;
             };
-            let dest = save_path(&saves_dir, &new_name);
-            if !target.exists() {
+            if existing_save_path(&saves_dir, &name).is_none() {
                 json_err(&mut stream, "404 Not Found", "save not found");
                 return;
             }
-            if dest.exists() {
+            if name_taken(&saves_dir, &new_name) {
                 json_err(
                     &mut stream,
                     "409 Conflict",
@@ -1739,8 +1791,8 @@ fn handle(
                 );
                 return;
             }
-            if let Err(e) = std::fs::copy(&target, &dest) {
-                json_err(&mut stream, "500 Internal Server Error", &e.to_string());
+            if let Err(e) = duplicate_save(&saves_dir, &name, &new_name) {
+                json_err(&mut stream, "500 Internal Server Error", &e);
                 return;
             }
             let json = saves_payload(&saves_dir, &cur(&data_path));
@@ -1748,8 +1800,10 @@ fn handle(
             return;
         }
 
-        if path == "/api/saves" {
-            if target.exists() {
+        // A new career is created in the folder layout; an existing one is opened wherever it
+        // already lives, which for a save written before folders is a flat `<name>.json`.
+        let target = if path == "/api/saves" {
+            if name_taken(&saves_dir, &name) {
                 json_err(
                     &mut stream,
                     "409 Conflict",
@@ -1777,14 +1831,23 @@ fn handle(
                 ..CareerData::default()
             };
             let text = serde_json::to_string_pretty(&fresh).unwrap_or_default();
+            let target = save_path(&saves_dir, &name);
+            if let Err(e) = prepare_save_dir(&target) {
+                json_err(&mut stream, "500 Internal Server Error", &e);
+                return;
+            }
             if let Err(e) = std::fs::write(&target, text) {
                 json_err(&mut stream, "500 Internal Server Error", &e.to_string());
                 return;
             }
-        } else if !target.exists() {
-            json_err(&mut stream, "404 Not Found", "save not found");
-            return;
-        }
+            target
+        } else {
+            let Some(found) = existing_save_path(&saves_dir, &name) else {
+                json_err(&mut stream, "404 Not Found", "save not found");
+                return;
+            };
+            found
+        };
 
         // Read the incoming career *before* touching anything. Switching to a save that cannot
         // be parsed would put an empty career in front of the user under that save's name; the
@@ -1804,7 +1867,12 @@ fn handle(
 
         // Flush the outgoing career before repointing, then swap the store's *contents* —
         // never the Arc itself, which the recorder thread also holds.
-        if !persisted(&store, &cur(&data_path), &mut stream) {
+        //
+        // There may be no outgoing career: the saves folder was empty at startup, and this is the
+        // first one being created. Flushing then would fail and take the creation down with it,
+        // which is the one route a careerless app must still be able to serve.
+        let outgoing = cur(&data_path);
+        if !outgoing.as_os_str().is_empty() && !persisted(&store, &outgoing, &mut stream) {
             return;
         }
         {
@@ -1823,7 +1891,7 @@ fn handle(
 
     // PATCH /api/saves/:name — rename a save
     if method == "PATCH" && segs.len() == 3 && segs[0] == "api" && segs[1] == "saves" {
-        use ams2_championship::saves::{sanitize_name, save_path};
+        use ams2_championship::saves::{existing_save_path, name_taken, rename_save, sanitize_name};
 
         #[derive(serde::Deserialize)]
         struct RenameReq {
@@ -1843,13 +1911,11 @@ fn handle(
             json_err(&mut stream, "400 Bad Request", "invalid save name");
             return;
         };
-        let from = save_path(&saves_dir, &name);
-        let to = save_path(&saves_dir, &new_name);
-        if !from.exists() {
+        let Some(from) = existing_save_path(&saves_dir, &name) else {
             json_err(&mut stream, "404 Not Found", "save not found");
             return;
-        }
-        if to.exists() {
+        };
+        if name_taken(&saves_dir, &new_name) {
             json_err(
                 &mut stream,
                 "409 Conflict",
@@ -1865,10 +1931,14 @@ fn handle(
             // would leave the unreadable career under a name the switcher offers as this one.
             return;
         }
-        if let Err(e) = std::fs::rename(&from, &to) {
-            json_err(&mut stream, "500 Internal Server Error", &e.to_string());
-            return;
-        }
+        // A folder save moves its whole folder, so its seasons travel with it.
+        let to = match rename_save(&saves_dir, &name, &new_name) {
+            Ok(path) => path,
+            Err(e) => {
+                json_err(&mut stream, "500 Internal Server Error", &e);
+                return;
+            }
+        };
         if was_active {
             *data_path.write().unwrap() = to.clone();
             if let Err(e) = store_active_save(&config_path, &to) {
@@ -1883,17 +1953,16 @@ fn handle(
 
     // DELETE /api/saves/:name — delete a save (never the active one)
     if method == "DELETE" && segs.len() == 3 && segs[0] == "api" && segs[1] == "saves" {
-        use ams2_championship::saves::{sanitize_name, save_path};
+        use ams2_championship::saves::{delete_save, existing_save_path, sanitize_name};
 
         let Some(name) = sanitize_name(&url_decode(segs[2])) else {
             json_err(&mut stream, "400 Bad Request", "invalid save name");
             return;
         };
-        let target = save_path(&saves_dir, &name);
-        if !target.exists() {
+        let Some(target) = existing_save_path(&saves_dir, &name) else {
             json_err(&mut stream, "404 Not Found", "save not found");
             return;
-        }
+        };
         if cur(&data_path) == target {
             json_err(
                 &mut stream,
@@ -1902,8 +1971,10 @@ fn handle(
             );
             return;
         }
-        if let Err(e) = std::fs::remove_file(&target) {
-            json_err(&mut stream, "500 Internal Server Error", &e.to_string());
+        // A folder save takes its seasons with it — see `delete_save` for the guards on what is
+        // a recursive delete rather than the single file this used to be.
+        if let Err(e) = delete_save(&saves_dir, &name) {
+            json_err(&mut stream, "500 Internal Server Error", &e);
             return;
         }
         let json = saves_payload(&saves_dir, &cur(&data_path));
@@ -1921,7 +1992,7 @@ fn handle(
 
     // PATCH /api/config
     if method == "PATCH" && path == "/api/config" {
-        // `data_file` is deliberately absent — the active save is owned by /api/saves.
+        // `active_career` is deliberately absent — the active career is owned by /api/saves.
         #[derive(serde::Deserialize)]
         struct PatchConfig {
             port: u16,
@@ -1951,6 +2022,7 @@ fn handle(
             contract_floor_salary: Option<i64>,
             #[serde(default)]
             contract_buy_in_per_point: Option<i64>,
+            contract_pay_driver_margin: Option<f32>,
             #[serde(default)]
             champion_prize: Option<i64>,
             #[serde(default)]
@@ -2042,13 +2114,15 @@ fn handle(
             port: req_body.port,
             host: req_body.host,
             saves_dir: req_body.saves_dir,
-            // A remembered save in the old folder means nothing in the new one — drop it so the
-            // next startup picks a save from the folder itself.
-            data_file: if saves_dir_changed {
+            // A remembered career in the old folder means nothing in the new one — drop it so the
+            // next startup picks a career from the folder itself.
+            active_career: if saves_dir_changed {
                 None
             } else {
-                old_cfg.data_file
+                old_cfg.active_career
             },
+            // Folded into `active_career` on read and never written back.
+            legacy_data_file: None,
             poll_ms: req_body.poll_ms,
             record_practice: req_body.record_practice,
             record_qualify: req_body.record_qualify,
@@ -2074,6 +2148,9 @@ fn handle(
             contract_buy_in_per_point: req_body
                 .contract_buy_in_per_point
                 .unwrap_or(old_cfg.contract_buy_in_per_point),
+            contract_pay_driver_margin: req_body
+                .contract_pay_driver_margin
+                .unwrap_or(old_cfg.contract_pay_driver_margin),
             champion_prize: req_body.champion_prize.unwrap_or(old_cfg.champion_prize),
             last_place_prize: req_body
                 .last_place_prize
@@ -2261,11 +2338,16 @@ fn main() {
     }
     println!("Saves folder:   {}", champ_dir.display());
 
-    let career_path =
-        ams2_championship::saves::resolve_active(&champ_dir, cfg.data_file.as_deref());
+    // `None` when the folder holds no careers: the app runs without one rather than inventing a
+    // save the user never asked for, and the switcher asks them to create the first. Carried as
+    // an empty path, which `cur()` and the recorder already yield on a poisoned lock.
+    let career_path = ams2_championship::saves::resolve_active(&champ_dir, cfg.active_career.as_deref())
+        .unwrap_or_default();
 
     let store = ams2_championship::data_store::load_store(&career_path);
-    {
+    if career_path.as_os_str().is_empty() {
+        println!("Career data:    none yet — create a career in the app before racing");
+    } else {
         let data = store.read().unwrap();
         println!(
             "Career data:    {} ({} championship(s), {} session(s))",

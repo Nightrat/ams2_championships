@@ -1251,3 +1251,129 @@ fn test_set_driver_attr_enforces_the_documented_range_per_field() {
         );
     }
 }
+
+// ── Baselines ────────────────────────────────────────────────────────────────
+
+/// A class file on disk, in its own temp folder, for the baseline tests.
+fn baseline_fixture(tag: &str) -> std::path::PathBuf {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_baseline_{tag}_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("F-Classic_Gen1.xml");
+    std::fs::write(&file, SAMPLE_WITH_SCALARS).unwrap();
+    file
+}
+
+#[test]
+fn test_a_baseline_is_taken_once_and_holds_the_original() {
+    // The whole point: a file already backed up keeps the copy it has. Re-taking it after an edit
+    // would quietly redefine what "reset" means, and the original would be gone.
+    let file = baseline_fixture("once");
+    assert!(!has_baseline(&file), "a fresh class has none");
+
+    ensure_baseline(&file).unwrap();
+    assert!(has_baseline(&file));
+    assert_eq!(
+        std::fs::read_to_string(baseline_path(&file)).unwrap(),
+        SAMPLE_WITH_SCALARS
+    );
+
+    set_team_scalars(&file, "Williams", scalars(1.02, 1.01, 0.99)).unwrap();
+    ensure_baseline(&file).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(baseline_path(&file)).unwrap(),
+        SAMPLE_WITH_SCALARS,
+        "the baseline still holds the file as it was before any edit"
+    );
+
+    let _ = std::fs::remove_dir_all(file.parent().unwrap());
+}
+
+#[test]
+fn test_the_first_edit_records_a_baseline_by_itself() {
+    // Nothing has to remember to call `ensure_baseline` before writing — the writer does it.
+    let file = baseline_fixture("implicit");
+    set_team_scalars(&file, "Williams", scalars(1.02, 1.01, 0.99)).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(baseline_path(&file)).unwrap(),
+        SAMPLE_WITH_SCALARS
+    );
+    let _ = std::fs::remove_dir_all(file.parent().unwrap());
+}
+
+#[test]
+fn test_reset_restores_the_file_and_leaves_the_baseline_in_place() {
+    let file = baseline_fixture("reset");
+    set_team_scalars(&file, "Williams", scalars(1.02, 1.01, 0.99)).unwrap();
+    assert_ne!(
+        std::fs::read_to_string(&file).unwrap(),
+        SAMPLE_WITH_SCALARS,
+        "the edit landed"
+    );
+
+    reset_from_baseline(&file).unwrap();
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), SAMPLE_WITH_SCALARS);
+    assert!(has_baseline(&file), "resetting is repeatable");
+
+    let _ = std::fs::remove_dir_all(file.parent().unwrap());
+}
+
+#[test]
+fn test_reset_without_a_baseline_refuses_rather_than_emptying_the_file() {
+    let file = baseline_fixture("no_baseline");
+    let err = reset_from_baseline(&file).expect_err("there is nothing to restore from");
+    assert!(err.contains("no baseline"), "{err}");
+    assert_eq!(
+        std::fs::read_to_string(&file).unwrap(),
+        SAMPLE_WITH_SCALARS,
+        "and the file is untouched"
+    );
+    let _ = std::fs::remove_dir_all(file.parent().unwrap());
+}
+
+#[test]
+fn test_set_baseline_adopts_the_current_file() {
+    // The escape hatch from the one-time rule, for a roster hand-tuned after the app first
+    // recorded a baseline. Without it the baseline holds the older version forever and a reset
+    // would throw that tuning away.
+    let file = baseline_fixture("adopt");
+    set_team_scalars(&file, "Williams", scalars(1.02, 1.01, 0.99)).unwrap();
+    let tuned = std::fs::read_to_string(&file).unwrap();
+
+    set_baseline(&file).unwrap();
+    assert_eq!(std::fs::read_to_string(baseline_path(&file)).unwrap(), tuned);
+
+    // And reset now returns to the new baseline, not the shipped file.
+    set_team_scalars(&file, "AGS", scalars(1.0, 1.0, 1.0)).unwrap();
+    reset_from_baseline(&file).unwrap();
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), tuned);
+
+    let _ = std::fs::remove_dir_all(file.parent().unwrap());
+}
+
+#[test]
+fn test_a_baseline_sits_beside_the_file_where_ams2_ignores_it() {
+    // The game loads a CustomAIDrivers file only when its stem is a class in its own registry.
+    // `F-Classic_Gen1.xml.bak` has the stem `F-Classic_Gen1.xml`, which is not a class name — so
+    // keeping the baseline in the install folder cannot put a second roster on the grid.
+    let file = std::path::Path::new("/ams2/UserData/CustomAIDrivers/F-Classic_Gen1.xml");
+    let backup = baseline_path(file);
+    assert_eq!(backup.file_name().unwrap(), "F-Classic_Gen1.xml.bak");
+    assert_eq!(backup.parent(), file.parent());
+    assert_eq!(
+        class_of_file(backup.file_name().unwrap().to_str().unwrap()),
+        "F-Classic_Gen1.xml",
+        "not a class name, so AMS2 skips it"
+    );
+}
+
+#[test]
+fn test_baseline_operations_refuse_a_file_that_is_not_there() {
+    let missing = std::env::temp_dir().join("ams2_baseline_missing_xyz/F-Classic_Gen1.xml");
+    assert!(ensure_baseline(&missing).is_err());
+    assert!(set_baseline(&missing).is_err());
+    assert!(reset_from_baseline(&missing).is_err());
+}

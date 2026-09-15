@@ -46,6 +46,18 @@ pub(crate) fn capture(
     lap_chart: Vec<LapChartEntry>,
     player_name: Option<&str>,
 ) {
+    // No active career — the saves folder was empty at startup. Pushing the session into the
+    // store would look like it had been recorded, but creating the first career replaces the
+    // store's contents, so it would vanish the moment the user did the thing they are being
+    // asked to do. Say so instead.
+    if path.as_os_str().is_empty() {
+        eprintln!(
+            "No active career — the session at {} was NOT recorded. \
+             Create a career in the app first.",
+            session.track_location
+        );
+        return;
+    }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -112,6 +124,9 @@ pub(crate) fn capture(
 /// Capture the current live session immediately, regardless of auto-record settings.
 /// Returns an error string if nothing is worth capturing.
 pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String> {
+    if path.as_os_str().is_empty() {
+        return Err("No active career — create one first".into());
+    }
     let session = read_live_session();
     if !session.connected {
         return Err("AMS2 is not connected".into());
@@ -281,6 +296,7 @@ pub fn start(
             if session_state == SESSION_RACE {
                 accumulate_lap_chart(&mut lap_chart, &mut leader_laps, &session);
             }
+
 
             // ── Always refresh the rolling cache ─────────────────────────────
             // P/Q run at game_state=4 so we must not gate the cache on game_state.

@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// List `*.xml` files directly inside `dir`, sorted alphabetically.
 /// Returns an empty list if the directory does not exist or can't be read.
@@ -392,8 +392,7 @@ pub fn set_team_scalars_str(xml: &str, team: &str, s: Scalars) -> Result<String,
 /// Applies [`set_team_scalars_str`] to a file on disk.
 ///
 /// These files live in the user's AMS2 install and were hand-tuned, so the first edit of a given
-/// file copies it to `<name>.xml.bak` first. Later edits keep that original backup rather than
-/// overwriting it with an already-edited copy.
+/// file records a baseline first. See [`ensure_baseline`].
 pub fn set_team_scalars(path: &Path, team: &str, s: Scalars) -> Result<(), String> {
     s.validate()?;
     let xml =
@@ -402,13 +401,78 @@ pub fn set_team_scalars(path: &Path, team: &str, s: Scalars) -> Result<(), Strin
     write_with_backup(path, &updated)
 }
 
-/// Overwrites `path`, keeping a one-time `<name>.xml.bak` of whatever was there first.
+/// Overwrites `path`, recording a baseline first if it has none.
 fn write_with_backup(path: &Path, contents: &str) -> Result<(), String> {
-    let backup = path.with_extension("xml.bak");
-    if !backup.exists() {
-        fs::copy(path, &backup).map_err(|e| format!("cannot write backup: {e}"))?;
-    }
+    ensure_baseline(path)?;
     fs::write(path, contents).map_err(|e| format!("cannot write {}: {e}", path.display()))
+}
+
+// ── Baselines ────────────────────────────────────────────────────────────────
+
+/// Where a class's baseline lives: `<name>.xml.bak`, beside the file it describes.
+///
+/// AMS2 ignores it — the game loads a `CustomAIDrivers` file only when its stem is a class in its
+/// own registry, and this one's stem is `<name>.xml` — so it is safe to keep in the install
+/// folder, next to the roster it belongs to rather than in the app's own data.
+pub fn baseline_path(path: &Path) -> PathBuf {
+    path.with_extension("xml.bak")
+}
+
+/// True when `path` has a baseline to reset to.
+pub fn has_baseline(path: &Path) -> bool {
+    baseline_path(path).is_file()
+}
+
+/// Record `path` as its own baseline, unless it already has one.
+///
+/// **One-time by design.** A file that has been backed up keeps the copy it has, which is the
+/// *original* — re-taking it after an edit would quietly redefine what "reset" means, and the
+/// original would be gone. [`set_baseline`] is the deliberate way to do that.
+///
+/// Called before every write, and when a season picks a roster: a class a career races must have
+/// a baseline whether or not the app has ever edited it.
+pub fn ensure_baseline(path: &Path) -> Result<(), String> {
+    let backup = baseline_path(path);
+    if backup.exists() {
+        return Ok(());
+    }
+    if !path.is_file() {
+        return Err(format!("{} does not exist", path.display()));
+    }
+    fs::copy(path, &backup)
+        .map(|_| ())
+        .map_err(|e| format!("cannot write {}: {e}", backup.display()))
+}
+
+/// Restore `path` from its baseline, discarding every change made since.
+pub fn reset_from_baseline(path: &Path) -> Result<(), String> {
+    let backup = baseline_path(path);
+    if !backup.is_file() {
+        return Err(format!(
+            "{} has no baseline to reset to",
+            path.display()
+        ));
+    }
+    fs::copy(&backup, path)
+        .map(|_| ())
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))
+}
+
+/// Replace the baseline with the file as it stands now.
+///
+/// For a roster tuned by hand *after* the app first recorded one: without this the baseline holds
+/// the older version forever, and a reset would throw that tuning away. It overwrites, which is
+/// the whole point and the opposite of [`ensure_baseline`] — so the caller is responsible for
+/// warning first. What it discards is the ability to get back to the earlier file, and it also
+/// moves every figure derived from the baseline.
+pub fn set_baseline(path: &Path) -> Result<(), String> {
+    if !path.is_file() {
+        return Err(format!("{} does not exist", path.display()));
+    }
+    let backup = baseline_path(path);
+    fs::copy(path, &backup)
+        .map(|_| ())
+        .map_err(|e| format!("cannot write {}: {e}", backup.display()))
 }
 
 // ── Per-driver AI attributes ─────────────────────────────────────────────────
