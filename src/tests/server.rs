@@ -4666,8 +4666,9 @@ fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
     let out = resolve_live_teams(&dir, &two_seasons(), &grid, true);
 
-    let warning = out.warning.expect("a short grid is worth interrupting for");
-    assert!(warning.contains("Short grid"), "{warning}");
+    let grid = out.grid.expect("a short grid is worth interrupting for");
+    assert!(!grid.ok, "{grid:?}");
+    assert!(grid.text.contains("Short grid"), "{grid:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -4678,7 +4679,7 @@ fn test_live_warning_is_silent_for_a_career_with_no_roster() {
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
     let out = resolve_live_teams(&dir, &two_seasons(), &grid, false);
 
-    assert!(out.warning.is_none());
+    assert!(out.grid.is_none());
     // The team names still resolve — nothing about the warning switches those off.
     assert!(!out.teams.is_empty());
     let _ = std::fs::remove_dir_all(&dir);
@@ -4694,8 +4695,9 @@ fn test_live_warning_when_no_championship_is_active() {
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
     let out = resolve_live_teams(&dir, &champs, &grid, true);
 
-    let warning = out.warning.expect("no Active season is worth saying");
-    assert!(warning.contains("Active"), "{warning}");
+    let grid = out.grid.expect("no Active season is worth saying");
+    assert!(!grid.ok, "{grid:?}");
+    assert!(grid.text.contains("Active"), "{grid:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -4706,7 +4708,9 @@ fn test_live_warning_says_nothing_before_a_session_loads() {
     let dir = make_live_teams_dir();
     let out = resolve_live_teams(&dir, &two_seasons(), &[], true);
 
-    assert!(out.warning.is_none());
+    // Not `ok: false` and not `ok: true` — there is nothing to report on yet, and saying
+    // either would be a claim about a grid that has not loaded.
+    assert!(out.grid.is_none());
     assert!(out.fit.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -4723,4 +4727,21 @@ fn test_the_page_carries_the_hooks_the_grid_warning_needs() {
     ] {
         assert!(html.contains(id), "the page is missing #{id}");
     }
+}
+
+/// The other half of the banner, and the reason it is one field: a grid that is right says so.
+/// Silence cannot distinguish "checked, all good" from "never checked", and the live tab is
+/// the last place the driver can act on the difference.
+#[test]
+fn test_live_says_so_when_the_grid_is_the_roster() {
+    let dir = make_live_teams_dir();
+    // CORE_XML fields three cars; the player takes one of them.
+    let grid = live_grid(&[("Alan Alpha", false), ("Ben Bravo", false), ("Me", true)]);
+    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true);
+
+    let status = out.grid.expect("a full grid is worth confirming");
+    assert!(status.ok, "{status:?}");
+    assert!(status.text.contains("Full grid"), "{status:?}");
+    assert!(status.text.contains('3'), "it names the size: {status:?}");
+    let _ = std::fs::remove_dir_all(&dir);
 }

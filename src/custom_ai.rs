@@ -106,10 +106,22 @@ fn extract_team_name(livery: &str) -> String {
     }
 }
 
-/// Walks primary `<driver>` blocks (those carrying a `<name>` tag — track-specific override
-/// blocks repeat `livery_name` but omit `<name>`, and are skipped) in document order.
-/// Yields `(livery_name, block_text)` pairs.
-fn primary_driver_blocks(xml: &str) -> Vec<(String, String)> {
+/// One `<driver>` block: the livery it binds to, its text, and the `tracks` attribute when it
+/// carries one.
+///
+/// **`tracks` is what makes a block an override, not the absence of a `<name>`.** AMS2 lets a
+/// per-track block name a *substitute driver* — F-Vintage_Gen2 puts Tino Brambilla in Amon's
+/// Ferrari for Monza 1971 — and reading the old way counted that stand-in as a 27th full-time
+/// driver of a 26-car roster, and handed Ferrari his skill as its incumbent bar.
+struct DriverBlock {
+    livery: String,
+    block: String,
+    /// `Some` for a per-track override, whether or not it renames the driver.
+    tracks: Option<String>,
+}
+
+/// Every `<driver>` block that binds a livery, in document order — overrides included.
+fn all_driver_blocks(xml: &str) -> Vec<DriverBlock> {
     let xml = strip_comments(xml);
     let mut out = Vec::new();
     let mut rest = xml.as_str();
@@ -119,6 +131,10 @@ fn primary_driver_blocks(xml: &str) -> Vec<(String, String)> {
         let tag = &rest[..=tag_end];
         let self_closing = tag.trim_end().ends_with("/>");
         let livery = attr_value(tag, "livery_name").map(|s| s.to_string());
+        let tracks = attr_value(tag, "tracks")
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
 
         let block_end = if self_closing {
             tag_end + 1
@@ -129,8 +145,12 @@ fn primary_driver_blocks(xml: &str) -> Vec<(String, String)> {
         };
         let block = &rest[..block_end];
 
-        if let (Some(_), Some(livery)) = (element_text(block, "name"), &livery) {
-            out.push((livery.clone(), block.to_string()));
+        if let Some(livery) = livery {
+            out.push(DriverBlock {
+                livery,
+                block: block.to_string(),
+                tracks,
+            });
         }
 
         rest = &rest[block_end..];
@@ -138,12 +158,38 @@ fn primary_driver_blocks(xml: &str) -> Vec<(String, String)> {
     out
 }
 
-/// Parses `<driver livery_name="..."><name>...</name>...</driver>` blocks.
-/// Track-specific override blocks (which repeat `livery_name` but omit `<name>`) are skipped —
-/// only the primary block per driver carries the display name.
+/// Blocks that name a driver: the regular entries plus the overrides that field a stand-in.
+///
+/// This is the list for **matching a name to a seat** — a stand-in on track is in that team's
+/// car, and the seat they are standing in for is occupied while they are. It is *not* the list
+/// for counting cars (seats repeat, so count with [`car_count`]) or for asking what a team
+/// demands of a newcomer (a one-race substitute is not the incumbent — see
+/// [`regular_driver_blocks`]).
+fn named_driver_blocks(xml: &str) -> Vec<(String, String)> {
+    all_driver_blocks(xml)
+        .into_iter()
+        .filter(|b| element_text(&b.block, "name").is_some())
+        .map(|b| (b.livery, b.block))
+        .collect()
+}
+
+/// Blocks for the driver who *holds* each seat: named, and not restricted to certain tracks.
+///
+/// What a team is, for a season: its cars, its scalars and the drivers whose skill a newcomer
+/// has to beat. A per-track substitute is none of those.
+fn regular_driver_blocks(xml: &str) -> Vec<(String, String)> {
+    all_driver_blocks(xml)
+        .into_iter()
+        .filter(|b| b.tracks.is_none() && element_text(&b.block, "name").is_some())
+        .map(|b| (b.livery, b.block))
+        .collect()
+}
+
+/// Every driver name in the file mapped to their team, **stand-ins included**: a substitute on
+/// track is driving that team's car, so the live grid should say so.
 pub fn parse_driver_teams_str(xml: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
-    for (livery, block) in primary_driver_blocks(xml) {
+    for (livery, block) in named_driver_blocks(xml) {
         if let Some(name) = element_text(&block, "name") {
             map.entry(name.to_string())
                 .or_insert_with(|| extract_team_name(&livery));
@@ -178,7 +224,8 @@ fn parse_scalar(block: &str, tag: &str) -> f32 {
 /// Sorted alphabetically by team.
 pub fn parse_car_performance_str(xml: &str) -> Vec<CarPerformance> {
     let mut map: BTreeMap<String, CarPerformance> = BTreeMap::new();
-    for (livery, block) in primary_driver_blocks(xml) {
+    // Regular entries only: a driver who appears for one weekend is not one of the team's.
+    for (livery, block) in regular_driver_blocks(xml) {
         let team = extract_team_name(&livery);
         let car = map.entry(team.clone()).or_insert_with(|| CarPerformance {
             team,
@@ -256,10 +303,13 @@ fn fmt_scalar(v: f32) -> String {
 
 /// Byte ranges of primary `<driver>` blocks in the **raw** text, paired with their `livery_name`.
 ///
-/// [`primary_driver_blocks`] strips comments first and hands back copies, so its offsets do not
+/// [`all_driver_blocks`] strips comments first and hands back copies, so its offsets do not
 /// index the original file — no good for an edit that must leave every other byte alone. This
 /// walks the untouched text instead, stepping over comment regions as it goes.
-fn primary_driver_spans(xml: &str) -> Vec<(std::ops::Range<usize>, String)> {
+///
+/// It must stay **positionally identical** to [`all_driver_blocks`]: the Driver Performance tab
+/// sends back the index it was given, and the writer resolves it here. Filter, never re-walk.
+fn driver_spans(xml: &str) -> Vec<DriverSpan> {
     let mut out = Vec::new();
     let mut pos = 0usize;
     while let Some(next) = xml[pos..].find('<') {
@@ -290,14 +340,30 @@ fn primary_driver_spans(xml: &str) -> Vec<(std::ops::Range<usize>, String)> {
             tail.len()
         };
         let block = &xml[at..at + block_len];
-        if let (Some(_), Some(livery)) =
-            (element_text(block, "name"), attr_value(tag, "livery_name"))
-        {
-            out.push((at..at + block_len, livery.to_string()));
+        if let Some(livery) = attr_value(tag, "livery_name") {
+            out.push(DriverSpan {
+                range: at..at + block_len,
+                livery: livery.to_string(),
+                tracks: attr_value(tag, "tracks")
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string()),
+                named: element_text(block, "name").is_some(),
+            });
         }
         pos = at + block_len;
     }
     out
+}
+
+/// One `<driver>` block located in the raw file text. See [`driver_spans`].
+struct DriverSpan {
+    range: std::ops::Range<usize>,
+    livery: String,
+    /// `Some` for a per-track override — see [`DriverBlock::tracks`].
+    tracks: Option<String>,
+    /// Whether the block declares its own `<name>`.
+    named: bool,
 }
 
 /// Indentation used by the first child element of a `<driver>` block, so an inserted tag lines up
@@ -356,16 +422,18 @@ fn set_tag_in_block(block: &str, tag: &str, value: f32) -> String {
 ///
 /// One row in the Car Performance table is one *team*, so an edit applies to the whole team:
 /// teammates that were tuned apart (the shipped 1980 Brabham gives Lauda 1.00 power and Watson
-/// 0.98) end up sharing the edited value. Track-specific override blocks — which repeat
-/// `livery_name` but carry no `<name>` — are left alone, so a per-track scalar there still wins
-/// at that track.
+/// 0.98) end up sharing the edited value. Track-specific override blocks are left alone, so a
+/// per-track scalar there still wins at that track — that now holds for an override that names
+/// a stand-in too, which used to be written like a regular entry because it had a `<name>`.
 ///
 /// `Err` when the file has no driver on that team.
 pub fn set_team_scalars_str(xml: &str, team: &str, s: Scalars) -> Result<String, String> {
     let team = team.trim();
-    let spans: Vec<(std::ops::Range<usize>, String)> = primary_driver_spans(xml)
+    let spans: Vec<(std::ops::Range<usize>, String)> = driver_spans(xml)
         .into_iter()
-        .filter(|(_, livery)| extract_team_name(livery).eq_ignore_ascii_case(team))
+        .filter(|d| d.tracks.is_none() && d.named)
+        .filter(|d| extract_team_name(&d.livery).eq_ignore_ascii_case(team))
+        .map(|d| (d.range, d.livery))
         .collect();
     if spans.is_empty() {
         return Err(format!("no driver in this file drives for {team}"));
@@ -631,34 +699,66 @@ pub struct DriverAttributes {
     pub phantom: Option<bool>,
 }
 
-/// Every named `<driver>` entry in a `CustomAIDrivers` XML file, in document order.
+/// Every `<driver>` entry in a `CustomAIDrivers` XML file, in document order — the regular
+/// entries and the per-track overrides between them.
+///
+/// Overrides were previously visible only when they renamed the driver, because the walk kept
+/// blocks by the presence of a `<name>`. That showed a substitute as a full-time driver while
+/// hiding every override that only retunes the regular one, which is the more common kind. An
+/// override with no `<name>` inherits the name of the entry it modifies — that *is* who drives
+/// the car at those tracks — so the column stays meaningful and the row can still be edited.
 ///
 /// `phantom` is left `None`; run [`mark_phantom_entries`] to fill it in.
 pub fn parse_driver_attributes_str(xml: &str) -> Vec<DriverAttributes> {
-    primary_driver_blocks(xml)
-        .into_iter()
+    let blocks = all_driver_blocks(xml);
+    let names = inherited_names(&blocks);
+    blocks
+        .iter()
         .enumerate()
-        .filter_map(|(index, (livery, block))| {
-            let driver = element_text(&block, "name")?.to_string();
-            let tag_end = block.find('>')?;
-            let tracks = attr_value(&block[..=tag_end], "tracks").map(|s| s.to_string());
+        .filter_map(|(index, b)| {
+            let driver = names.get(index)?.clone()?;
             let attrs: BTreeMap<String, f32> = DRIVER_ATTRS
                 .iter()
                 .filter_map(|field| {
-                    let text = element_text(&block, block_tag(&block, field))?;
+                    let text = element_text(&b.block, block_tag(&b.block, field))?;
                     Some((field.to_string(), text.parse::<f32>().ok()?))
                 })
                 .collect();
             Some(DriverAttributes {
                 index,
                 driver,
-                team: extract_team_name(&livery),
-                livery,
-                tracks,
+                team: extract_team_name(&b.livery),
+                livery: b.livery.clone(),
+                tracks: b.tracks.clone(),
                 rating: rate_driver(&attrs),
                 attrs,
                 phantom: None,
             })
+        })
+        .collect()
+}
+
+/// The driver each block describes: its own `<name>`, or the name of the regular entry for the
+/// same livery when it has none.
+///
+/// Positional, so it lines up with [`all_driver_blocks`] — and with the spans the writer edits,
+/// which is what lets an index from the table address the same block later. `None` for a block
+/// whose livery has no named entry at all, which is a malformed file rather than an override.
+fn inherited_names(blocks: &[DriverBlock]) -> Vec<Option<String>> {
+    let mut by_livery: HashMap<&str, &str> = HashMap::new();
+    for b in blocks {
+        if b.tracks.is_none() {
+            if let Some(name) = element_text(&b.block, "name") {
+                by_livery.entry(b.livery.as_str()).or_insert(name);
+            }
+        }
+    }
+    blocks
+        .iter()
+        .map(|b| {
+            element_text(&b.block, "name")
+                .map(str::to_string)
+                .or_else(|| by_livery.get(b.livery.as_str()).map(|s| s.to_string()))
         })
         .collect()
 }
@@ -707,12 +807,24 @@ pub fn set_driver_attr_str(
             "{field} must be between {lo:.2} and {hi:.2}, got {value}"
         ));
     }
-    let spans = primary_driver_spans(xml);
-    let Some((range, _)) = spans.get(index).cloned() else {
+    let spans = driver_spans(xml);
+    let Some(span) = spans.get(index) else {
         return Err(format!("this file has no driver entry at position {index}"));
     };
+    let range = span.range.clone();
     let block = &xml[range.clone()];
-    let found = element_text(block, "name").unwrap_or_default();
+    // An override with no `<name>` is shown under the name of the entry it modifies, so that is
+    // what comes back — resolve it the same way the reader did rather than reading an empty
+    // string and rejecting every edit to those rows.
+    let found = match element_text(block, "name") {
+        Some(name) => name.to_string(),
+        None => spans
+            .iter()
+            .find(|d| d.tracks.is_none() && d.named && d.livery == span.livery)
+            .and_then(|d| element_text(&xml[d.range.clone()], "name"))
+            .unwrap_or_default()
+            .to_string(),
+    };
     if found != expect_driver.trim() {
         return Err(format!(
             "entry {index} is {found}, not {expect_driver} - reload the tab, the file changed"
@@ -894,7 +1006,10 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
 /// from the map rather than defaulted, so callers can tell "no bar known" from "a low bar".
 pub fn parse_team_skills_str(xml: &str) -> HashMap<String, f32> {
     let mut out: HashMap<String, f32> = HashMap::new();
-    for (livery, block) in primary_driver_blocks(xml) {
+    // **Regular drivers only.** The bar is the seat a newcomer would displace, and a one-race
+    // substitute holds no seat — F-Vintage_Gen2's Monza stand-in is `race_skill` 0.68 against
+    // Rodríguez's 0.73, so counting him quietly made the Ferrari seat five points cheaper.
+    for (livery, block) in regular_driver_blocks(xml) {
         let Some(skill) = element_text(&block, "race_skill").and_then(|s| s.parse::<f32>().ok())
         else {
             continue;
@@ -994,8 +1109,13 @@ pub fn name_key(name: &str) -> String {
 }
 
 /// Grid seats defined by a Custom AI Driver file, one entry per named driver.
+///
+/// A per-track stand-in gets an entry too, sharing the seat of the driver they replace: at that
+/// track they are the car, and leaving them out would make the seat look empty and the car look
+/// like an AI the roster does not know. Entries therefore repeat per seat — count cars with
+/// [`car_count`], never with `len()`.
 pub fn parse_seats_str(xml: &str) -> Vec<SeatEntry> {
-    primary_driver_blocks(xml)
+    named_driver_blocks(xml)
         .into_iter()
         .filter_map(|(livery, block)| {
             let driver = element_text(&block, "name")?.to_string();
@@ -1215,7 +1335,7 @@ impl GridFit {
             .count();
         Self {
             cars: grid.len(),
-            seats: distinct_seats(seats),
+            seats: car_count(seats),
             ai,
             matched,
         }
@@ -1283,18 +1403,36 @@ impl GridFit {
         }
         None
     }
+
+    /// Confirmation that this grid *is* the roster, for a surface that says so out loud.
+    ///
+    /// Only the live tab uses it, and only because silence there is ambiguous: with nothing on
+    /// screen the driver cannot tell a grid that was checked and passed from one that was
+    /// never checked, and the whole point of the banner is to be trusted before the lights go
+    /// out. The Manage and Career tabs stay quiet on a clean session — a flag per race that
+    /// says "fine" is noise in a list of forty.
+    ///
+    /// `None` whenever [`Self::note`] has something to say, so a caller cannot show both.
+    pub fn confirmation(&self) -> Option<String> {
+        self.is_full().then(|| {
+            format!(
+                "Full grid: all {} cars of the roster are out. This session will be judged on it.",
+                self.cars
+            )
+        })
+    }
 }
 
 /// Cars a roster can put on the grid: distinct `seat` values, i.e. team plus car number.
 ///
 /// **This must agree with `driver_rating::expected_positions`**, which ranks the same distinct
-/// seats to decide where a car is expected to finish. A warning derived from a different count
-/// than the thing it warns about would contradict it.
+/// seats to decide where a car is expected to finish. A count derived any other way would
+/// contradict the thing it is used to judge.
 ///
-/// Counting liveries instead would over-count: a season roster lists every driver who ever sat
-/// in a car, so Brabham #8 can appear twice with two skins and is still one car on track.
-/// Per-track override rows never reach here — [`parse_seats`] keeps only primary blocks.
-fn distinct_seats(seats: &[SeatEntry]) -> usize {
+/// It is also why nothing should count `parse_seats` entries with `len()`: the list holds one
+/// entry per *driver*, so a car with two skins across a season, or a per-track stand-in, adds
+/// entries without adding a car. F-Vintage_Gen2 is 27 entries and 26 cars.
+pub fn car_count(seats: &[SeatEntry]) -> usize {
     seats
         .iter()
         .map(|e| e.seat.as_str())

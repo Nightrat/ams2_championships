@@ -138,7 +138,8 @@ function renderDriverPerfClass(cls, idx, attrs) {
   }).join('');
   return '<section class="carperf-class" data-carperf-class="' + esc(cls.class) + '">' +
     '<h3 class="carperf-heading">' + carPerfClassLabel(cls) +
-    ' <span class="carperf-year">(' + drivers.length + ' entries)</span> ' +
+    ' <span class="carperf-year">(' + drivers.length + ' entries, ' +
+      (cls.cars || 0) + ' cars)</span> ' +
     driverPerfHeadingNote(drivers) + '</h3>' +
     '<div class="driverperf-scroll">' +
     '<table class="stats-table sortable driverperf-table" id="' + tableId + '">' +
@@ -267,9 +268,11 @@ function renderDriverPerformance(data) {
     '<code>livery_name</code> AMS2 owns no car for, so it is silently ignored and that driver ' +
     'never reaches a grid — a roster can name more drivers than the class has cars. This is ' +
     'checked against the livery manifests your livery mods install; a class no mod covers reads ' +
-    'as “liveries not verifiable” rather than guessing. The entries that do have a livery are ' +
-    'the cars this class can field, so their count is the grid size to race it at — one fewer ' +
-    'opponent than that, since one of the seats is yours. ' +
+    'as “liveries not verifiable” rather than guessing. ' +
+    'The heading counts entries and cars separately, and it is the car count that says what ' +
+    'grid size to race the class at — one fewer opponent than that, since one seat is yours. ' +
+    'They differ because a season roster names every driver who ever sat in a car: a per-track ' +
+    'stand-in and a second livery for the same car are extra entries, not extra cars. ' +
     'Rating is a 0–100 composite of the entry’s own attributes, weighted toward race pace — ' +
     'hover the column for the exact weights. It is a summary of what the file declares, not a ' +
     'measure of results, so it is not the same quantity as the driver ratings in the Car ' +

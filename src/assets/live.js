@@ -80,20 +80,27 @@ function loadLiveTeams() {
     .then(function (r) { return r.json(); })
     .then(function (t) {
       liveTeams = { teams: t.teams || {}, player_team: t.player_team };
-      renderGridWarning(t.warning);
+      renderGridStatus(t.grid);
     })
     .catch(function () {});
 }
 
 // The banner above the timing table. The sentence is the server's — the same one the Manage and
-// Career tabs show — so this only decides whether it is on screen.
-function renderGridWarning(msg) {
+// Career tabs show — so this only decides how it looks.
+//
+// It says so when the grid is *right* as well as when it is wrong. An empty space cannot tell
+// the driver whether the grid was checked and passed or never checked at all, and this is the
+// one screen where knowing that still lets them do something about it.
+function renderGridStatus(status) {
   var box = document.getElementById('live-grid-warning');
   if (!box) return;
-  if (!msg) { box.hidden = true; box.textContent = ''; return; }
+  if (!status || !status.text) { box.hidden = true; box.textContent = ''; return; }
   box.hidden = false;
-  box.innerHTML = '<span class="live-grid-warning-icon">&#9888;</span>' +
-    '<span class="live-grid-warning-text">' + esc(msg) + '</span>';
+  box.className = status.ok ? 'live-grid-warning live-grid-ok' : 'live-grid-warning';
+  box.innerHTML = '<span class="live-grid-warning-icon">' +
+      (status.ok ? '&#10003;' : '&#9888;') +
+    '</span>' +
+    '<span class="live-grid-warning-text">' + esc(status.text) + '</span>';
 }
 
 var SESSION_NAMES = ['', 'Practice', 'Test', 'Qualify', 'Formation Lap', 'Race', 'Time Attack'];
@@ -112,7 +119,7 @@ function processLiveData(d) {
       if (!statusEl || !liveBody) return;
 
       if (!d.connected || d.game_state < 2) {
-        renderGridWarning(null);
+        renderGridStatus(null);
         liveGridSize = -1;
         statusEl.className = 'live-status live-disconnected';
         statusTxt.textContent = 'Not connected \u2014 start AMS2 to see live data';

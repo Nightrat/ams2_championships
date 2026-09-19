@@ -407,3 +407,7 @@ const JS_SAVES: &str = include_str!("assets/saves.js");
 const JS_CARPERF: &str = include_str!("assets/car_performance.js");
 const JS_DRIVERPERF: &str = include_str!("assets/driver_performance.js");
 const JS_MAIN: &str = include_str!("assets/main.js");
+
+#[cfg(test)]
+#[path = "tests/assets.rs"]
+mod tests;

@@ -207,15 +207,33 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - The Car and Driver Performance tabs surface it per row (`no livery`), and `mark_phantom_entries` carries the tri-state through: `true` ignored by AMS2, `false` fine, `null` not checkable — which the tabs must not report as a clean bill of health.
 - Separately, `infer_player_seat` gives up with `RosterNotDetected` when **fewer than half** the AI on a recorded grid are named in the file. That is the "this session did not use it" case, and it is a *skip*, never a failure: it means the session was run on stock AI, which is not something to accuse the user of.
 
+### A per-track override is not a driver (`custom_ai.rs`)
+
+**`tracks` is what marks an override, not the absence of a `<name>`.** AMS2 lets a per-track block name a *substitute*: F-Vintage_Gen2 puts Tino Brambilla in Amon's Ferrari for Monza 1971. Reading overrides the old way made that file 27 drivers of a 26-car grid and handed Ferrari the stand-in's 0.68 as its incumbent bar instead of Rodríguez's 0.73. It bites F-Junior (+11 entries) and F-Retro_Gen1 (+17) too; the F-Classic files are untouched because every one of their overrides is unnamed.
+
+Three lists over `all_driver_blocks`, and **which one a caller wants is the whole question**:
+
+| List | Contents | Used by |
+|---|---|---|
+| `all_driver_blocks` | every block binding a livery | the Driver Performance tab, and the spans the writer edits |
+| `named_driver_blocks` | blocks with a `<name>` — regular entries **plus** stand-ins | `parse_seats_str`, `parse_driver_teams_str` |
+| `regular_driver_blocks` | named, and no `tracks` | `parse_team_skills_str`, `parse_car_performance_str` |
+
+- **A stand-in stays in the seat list on purpose.** At their track they *are* the car: drop them and that grid reads as a car the roster does not know (a false "stock AI" warning) with the seat they filled apparently free, which is exactly the elimination `infer_player_seat` depends on. So seats hold one entry per *driver* and repeat per seat — **count cars with `car_count`, never `len()`**.
+- The **bar** comes from `regular_driver_blocks`: the bar is the seat a newcomer displaces, and nobody displaces a driver who is there for one weekend. Same reasoning puts the team's driver list and its scalars on that list.
+- The tab lists **both kinds of override**, and one with no `<name>` **inherits** the name of the entry it modifies (`inherited_names`) — that is who drives the car at those tracks. Previously only the renaming kind was visible, which is the rarer one: the commoner kind, a pure per-track retune, could be neither seen nor edited.
+- `driver_spans` must stay **positionally identical** to `all_driver_blocks`: the tab sends back the index it was given. Filter that list, never re-walk. `set_driver_attr_str` resolves an inherited name the same way the reader did, so the staleness guard still bites on rows whose name is not their own; `set_team_scalars_str` filters to regular spans, which is what its doc always promised.
+
 ### Telling the user the grid was wrong (`GridFit`)
 
 The dependency above is invisible from inside the game, so the app says it out loud. `custom_ai::GridFit` is the whole of the reasoning and **the only place the wording lives** — the live banner, the Manage panel and the Career flag all print the same sentence, and three copies would drift.
 
 - It reports **counts, not a verdict** (`cars`, `seats`, `ai`, `matched`), because the problems are not exclusive: a grid can be short *and* padded with stock AI. `note()` picks what to lead with — "not raced on this roster" first, since a short grid is beside the point when the grid is somebody else's.
-- **`seats` counts distinct `seat` values** (team + car number), which is what `driver_rating::expected_positions` ranks. Counting liveries would over-count a season roster that lists two drivers for one car, and a warning derived from a different number than the thing it warns about would contradict it. Phantom seats are already gone — the callers pass a filtered list.
+- **`seats` counts distinct `seat` values** (`custom_ai::car_count`), which is what `driver_rating::expected_positions` ranks — a count derived any other way would contradict the thing it is used to judge. Entries repeat per seat (a second livery, a per-track stand-in), so `seats.len()` is not a car count; `/api/championships/:id/grid-check` got that wrong once and printed a different grid size in its panel than in the notes below it. Phantom seats are already gone — callers pass a filtered list.
 - `not_roster()` reuses **the same majority test** `infer_player_seat` gives up on. Two thresholds could disagree about the same session, and the user would get a warning that the rating did not act on, or the reverse.
 - **`seats == 0` is "nothing to check against", not "all clear".** `note()` returns `None` and `is_full()` is false, so a caller cannot report a career with no rosters as perfect. Every surface says *why* instead.
-- Three surfaces, one check: `GET /api/live-teams` carries `warning` + `fit` (computed only for a career whose `mode.uses_roster()`, and only when a grid is actually loaded — an empty grid is the menu); `GET /api/championships/:id/grid-check` carries a row per assigned session plus a season summary, for the Manage tab; `SessionView.grid_note` rides `/api/career` for the Career tab's per-race flag.
+- Three surfaces, one check: `GET /api/live-teams` carries `grid` + `fit` (computed only for a career whose `mode.uses_roster()`, and only when a grid is actually loaded — an empty grid is the menu); `GET /api/championships/:id/grid-check` carries a row per assigned session plus a season summary, for the Manage tab; `SessionView.grid_note` rides `/api/career` for the Career tab's per-race flag.
+- **Only the live tab says so when the grid is *right*** (`GridFit::confirmation`, green). Silence there is ambiguous — the driver cannot tell a grid that passed from one that was never checked — and it is the last moment the opponent count can still be changed. The other two stay quiet on a clean session: a per-race tick reading "fine" is noise in a list of forty. `confirmation()` is `None` whenever `note()` is `Some`, so no caller can show both, and both are `None` when there is nothing to check — which is why `LiveTeams.grid` is **one** `Option<GridStatus>` carrying `ok` rather than a warning beside a confirmation.
 - **Practice is never flagged**, in either the route or the career view: nothing is derived from it, so a short practice grid is a choice rather than a mistake, and flagging it would put a warning on the one session type the warning cannot apply to.
 - Nothing here blocks anything — unlike `check_player_team`, which hides contradicting sessions from the picker. A grid warning is about what a result can *mean*, not about whether it may be recorded, assigned or scored.
 - `resolve_live_teams` takes `&[GridEntry]` rather than the shared-memory rows, so the resolver has no use for the other forty fields and a test can hand it a grid without fabricating sentinel values for them.

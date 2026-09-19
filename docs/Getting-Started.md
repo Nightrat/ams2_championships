@@ -71,7 +71,12 @@ Then race the season **with that roster active in AMS2**, and — just as import
 
 > **Opponents = the number of cars the roster can field, minus your own.** One livery is one seat, so a class with 22 installed liveries is a 22-car grid: set 21 opponents and race the field the season was designed around.
 
-The number that matters is **how many of the roster's entries have a livery AMS2 owns**, not how many drivers the file lists. A roster naming 24 drivers for 22 liveries fields 22 cars; the extra two are ignored by the game and tagged **no livery** in the Driver Performance tab, which is where to count them.
+The number that matters is **cars**, not entries, and the Driver Performance tab prints both in each class heading — *"29 entries, 26 cars"*. Use the car count.
+
+They differ for two reasons, and a season roster usually has both:
+
+- **A driver the game cannot field.** An entry whose livery AMS2 does not own is silently ignored and never reaches a grid; those rows are tagged **no livery**.
+- **More than one entry for the same car.** A roster names everyone who sat in that car across the season — a stand-in for one race, or a second livery — and they all share one seat on track. F-Vintage_Gen2 is 29 entries and 26 cars for exactly this reason: Tino Brambilla replaces Chris Amon in the Ferrari at Monza 1971, and two more entries only retune a driver at certain circuits.
 
 Getting it wrong breaks nothing, but it quietly costs you the things the roster was for:
 

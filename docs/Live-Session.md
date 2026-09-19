@@ -21,19 +21,24 @@ Use this if you have auto-recording turned off for a session type (e.g. practice
 
 > **Watching a replay?** The recorder freezes while one plays, and so does this button (saving is refused with a message). A replay refills the live timing data with a race that is already over, so what is on screen is not the session — recording it would file a mid-race picture as the result. Everything picks up where it was when you leave the replay.
 
-## Grid warning
+## Grid check
 
-In a singleplayer career, a banner appears above the timing table when the grid on track is not the one your season is judged against:
+In a singleplayer career, a banner above the timing table says whether the grid on track is the one your season will be judged against — **including when it is**:
 
 | Banner | Meaning |
 |---|---|
+| ✓ *Full grid: all N cars of the roster are out* | Green. Every car the roster can field is on track, so the session will be judged on it. Nothing to do |
 | *Not raced on this roster* | Hardly any of the AI on track are in the season's Custom AI file, so nothing from this session can count towards your rating |
 | *Short grid* | Fewer cars are running than the roster can field — your finish will be judged against the full roster, which a smaller field flatters |
 | *N cars not in the roster* | The opponent count is above what the roster can field, so AMS2 has filled the rest with its own AI |
 | *No championship is Active* | Nothing marks which season you are racing, so the session has no grid to be judged against |
 | *No Custom AI Drivers file / folder* | There is no roster to resolve team names from, or to rate against |
 
-This is the one place a grid problem can still be **fixed**: quit to the menu, set the opponent count to match the roster, and start again. Afterwards the same message follows the session into the Manage and Career tabs, where it can only explain rather than prevent.
+The green line is there because an empty space cannot tell you whether the grid was checked and passed or never checked at all — and this is the one place a problem can still be **fixed**: quit to the menu, set the opponent count to match the roster, and start again. Afterwards the same message follows the session into the Manage and Career tabs, where it can only explain rather than prevent.
+
+Those two tabs stay quiet on a session that was fine, rather than marking each one — a tick against every race in a list of forty says nothing you could act on.
+
+The banner is blank until a session loads, which is not the same as good news: there is simply no grid to check yet.
 
 Nothing is blocked by it — the session still records, still assigns and still scores championship points. A multiplayer career never shows it: it has no roster to race.
 

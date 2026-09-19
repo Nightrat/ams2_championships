@@ -29,7 +29,7 @@ A motorsport career tracker for Automobilista 2. It records race results directl
 - **Multiple careers** — every career is a separate save folder with its own championships, sessions and stats; switch between them from the header without restarting. Each career is either **singleplayer** or **multiplayer**, chosen when it is created
 - **Driver rating** — a 0–100 rating derived from your recorded results, measured against what the car should have done so a slow car is no handicap. Re-derived on every request and never stored. Each team on the grid has a requirement built from car pace and the skill of the driver already in the seat — all of it read from the season's Custom AI Drivers roster, so a session not raced on that roster is skipped rather than guessed at
 - **Contracts and money** (singleplayer) — teams offer seats on terms your rating has earned: a salary scaled by car pace, a season objective, renewals for delivering, and back-of-the-grid seats that ask for sponsorship instead. Salary is paid one instalment per race; prize money is paid when a season is marked Final
-- **Grid checks** — warns when the grid raced is not the one a season is judged against: a roster that was not used, a short grid, or one padded with stock AI. Shown live while it can still be fixed, on the season in Manage, and flagged on the affected races in Career. It never blocks anything
+- **Grid checks** — says whether the grid raced is the one a season is judged against, live and in green when it is; warns when it is not: a roster that was not used, a short grid, or one padded with stock AI. Shown live while it can still be fixed, on the season in Manage, and flagged on the affected races in Career. It never blocks anything
 - **Car & Driver Performance tabs** — edit the performance scalars and driver skills in your AMS2 Custom AI Drivers rosters in place, with a one-time backup per class to reset to
 - **Live session overlay** — real-time timing table pushed over WebSocket from AMS2 shared memory: position, laps, race interval, gap to fastest lap, sector times, best/last lap, car/team, and tyre compound for the player
 - **Historic team names** — AMS2 exposes no livery field, so the live grid resolves each driver to their real team from the **active** championship Custom AI Drivers file, and your own row from that championship **My Team** setting; anything unmatched falls back to the AMS2 car model
@@ -246,7 +246,7 @@ Track layout data is stored as JSON files in `championships/track_layouts/`, one
 | `GET` | `/api/spotter/voices` | TTS voices installed on this PC |
 | `GET` | `/api/track-layout/:track` | Load saved track radar points for a track |
 | `POST` | `/api/track-layout/:track` | Save track radar points for a track |
-| `GET` | `/api/live-teams` | Driver → team names for the live grid, from the active championship's Custom AI Drivers file, plus that championship's player team and any grid warning |
+| `GET` | `/api/live-teams` | Driver → team names for the live grid, from the active championship's Custom AI Drivers file, plus that championship's player team and the grid check |
 | `GET` | `/live` | Current AMS2 session state snapshot (JSON) |
 | `WS` | `/ws` | WebSocket endpoint — pushes live session JSON at the configured poll interval |
 

@@ -605,8 +605,12 @@ function renderGridCheck(data) {
     return;
   }
 
+  var cards = {};
+  document.querySelectorAll('[data-grid-session]').forEach(function (el) {
+    cards[el.getAttribute('data-grid-session')] = el;
+  });
   (data.sessions || []).forEach(function (row) {
-    var card = document.querySelector('[data-grid-session="' + cssEscapeId(row.id) + '"]');
+    var card = cards[row.id];
     if (!card) return;
     var box = card.querySelector('.session-grid-note');
     if (!box) return;
@@ -626,12 +630,6 @@ function renderGridCheck(data) {
       '</div>'
     : '<div class="grid-box grid-box-ok">Every recorded session raced the full ' +
         data.seats + '-car roster.</div>';
-}
-
-// Session ids are unix timestamps today, but a hand-edited career can hold anything, and this
-// goes into a selector. Quotes are the only character that could break out of one here.
-function cssEscapeId(id) {
-  return String(id).replace(/["\]/g, '\$&');
 }
 
 document.querySelectorAll('.tab-btn').forEach(function (btn) {

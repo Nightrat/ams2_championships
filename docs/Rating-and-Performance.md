@@ -37,7 +37,7 @@ This matters because of how the rating is worked out. What your car *should* do 
 
 Race ten opponents on a 22-car roster and your car is still expected to finish around P18, but P18 does not exist in an eleven-car race — so merely finishing looks like a heroic drive and the rating climbs on nothing. Race more opponents than the roster has cars and AMS2 fills the rest with its own AI; once those outnumber the roster cars the session is skipped entirely.
 
-Count the cars the roster can really field, not the drivers it lists: entries whose livery AMS2 does not own never appear, and are tagged **no livery** in the Driver Performance tab.
+Count the cars the roster can really field, not the entries it lists — the Driver Performance tab prints both in each class heading. An entry whose livery AMS2 does not own never appears at all (tagged **no livery**), and several entries can share one car: a roster names every driver who sat in it that season, stand-ins included.
 
 ## What a team asks for
 
@@ -92,3 +92,14 @@ The first time the app writes to a class it saves a copy of the roster as it was
 ## Driver Performance tab
 
 The same idea for the drivers: the skill values each roster declares, editable in place and written back to the XML. These feed the *incumbent skill* bar, so raising a driver's skill raises what their team asks of you.
+
+### Per-track entries
+
+A roster may give a car different values at certain circuits, and the **Tracks** column marks those rows. Two kinds exist and both are listed:
+
+- one that only retunes the regular driver — the row carries their name, inherited from their main entry;
+- one that fields a **stand-in**, which carries the substitute's own name.
+
+Editing such a row changes that circuit only; the driver's main entry is untouched, and vice versa.
+
+A stand-in is **not** treated as one of the team's drivers: they add no car to the grid, and the bar their team asks of you comes from the driver who actually holds the seat. A one-race substitute is nobody's incumbent.

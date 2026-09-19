@@ -1387,7 +1387,7 @@ fn test_baseline_operations_refuse_a_file_that_is_not_there() {
 fn test_seats_counts_cars_not_entries() {
     let seats = parse_seats_str(ROSTER);
     assert_eq!(seats.len(), 10);
-    assert_eq!(distinct_seats(&seats), 9);
+    assert_eq!(car_count(&seats), 9);
 }
 
 /// The whole roster on track, with the player in one of its cars.
@@ -1502,4 +1502,177 @@ fn test_no_roster_means_no_verdict() {
     assert!(!fit.is_full());
     assert!(!fit.not_roster());
     assert_eq!(fit.note(), None);
+}
+
+// ── Per-track overrides are not extra drivers ────────────────────────────────
+//
+// Mirrors F-Vintage_Gen2: Ferrari #11 is Amon's car, with Tino Brambilla standing in for one
+// race, and the other two entries carry a per-track tweak without renaming anyone. Reading an
+// override as a full-time entry made that file 27 drivers of a 26-car grid, and handed Ferrari
+// the stand-in's weaker skill as the bar a newcomer had to beat.
+const STAND_IN_ROSTER: &str = r#"<custom_ai_drivers>
+    <driver livery_name="Ferrari #11 C. Amon">
+        <name>Chris Amon</name>
+        <race_skill>0.87</race_skill>
+    </driver>
+    <driver livery_name="Ferrari #11 C. Amon" tracks="Monza_1971">
+        <name>Tino Brambilla</name>
+        <race_skill>0.68</race_skill>
+    </driver>
+    <driver livery_name="Ferrari #12 P. Rodriguez">
+        <name>Pedro Rodriguez</name>
+        <race_skill>0.73</race_skill>
+    </driver>
+    <driver livery_name="BRM #14 J. Surtees">
+        <name>John Surtees</name>
+        <race_skill>0.85</race_skill>
+    </driver>
+    <driver livery_name="BRM #14 J. Surtees" tracks="Silverstone_1975_No_Chicane">
+        <race_skill>0.89</race_skill>
+    </driver>
+</custom_ai_drivers>"#;
+
+#[test]
+fn test_a_per_track_stand_in_is_not_an_extra_car() {
+    let seats = parse_seats_str(STAND_IN_ROSTER);
+    // The stand-in keeps an entry — see the next test for what it is for — but the roster
+    // still fields three cars.
+    assert_eq!(seats.len(), 4);
+    assert_eq!(car_count(&seats), 3);
+}
+
+/// The reason the stand-in stays in the seat list. At Monza, AMS2 fields Brambilla instead of
+/// Amon; drop him and that grid reads as a car the roster does not know, with Ferrari #11
+/// apparently free for the player to have claimed.
+#[test]
+fn test_a_stand_in_still_fills_the_seat_they_replace() {
+    let seats = parse_seats_str(STAND_IN_ROSTER);
+    let rows = vec![
+        ("Tino Brambilla", M1, false),
+        ("Pedro Rodriguez", M1, false),
+        ("Me", M1, true),
+    ];
+    let g = grid(&rows);
+
+    let fit = GridFit::measure(&seats, &g);
+    assert_eq!(fit.stock_fill(), 0, "the stand-in is a roster car");
+    assert_eq!(fit.note(), None, "a full grid, whoever is in the Ferrari");
+
+    match infer_player_seat(&seats, &g) {
+        PlayerSeat::Derived(seat) => assert_eq!(seat.seat, "BRM #14"),
+        other => panic!("both Ferraris were taken, so BRM #14 is the only seat left: {other:?}"),
+    }
+}
+
+/// The bar is the seat a newcomer would displace, and nobody displaces a driver who is there
+/// for one weekend. Ferrari asks for Rodriguez's 0.73, not Brambilla's 0.68.
+#[test]
+fn test_a_per_track_stand_in_is_not_the_incumbent() {
+    let skills = parse_team_skills_str(STAND_IN_ROSTER);
+    assert_eq!(skills.get("Ferrari"), Some(&0.73));
+    // The unnamed override is a tweak to Surtees, not a second BRM driver.
+    assert_eq!(skills.get("BRM"), Some(&0.85));
+}
+
+#[test]
+fn test_a_per_track_stand_in_is_not_one_of_the_teams_drivers() {
+    let cars = parse_car_performance_str(STAND_IN_ROSTER);
+    let ferrari = cars.iter().find(|c| c.team == "Ferrari").unwrap();
+    assert_eq!(ferrari.drivers, vec!["Chris Amon", "Pedro Rodriguez"]);
+}
+
+/// A stand-in is still driving that team's car, so the live grid names them correctly.
+#[test]
+fn test_a_stand_in_resolves_to_the_team_they_drive_for() {
+    let teams = parse_driver_teams_str(STAND_IN_ROSTER);
+    assert_eq!(teams.get("Tino Brambilla").map(String::as_str), Some("Ferrari"));
+}
+
+/// The Driver Performance tab lists every override, including the ones that only retune the
+/// regular driver. Those used to be dropped entirely — the tab had a Tracks column it could
+/// only ever fill from the rarer kind of override, the kind that renames the driver.
+#[test]
+fn test_an_override_with_no_name_is_listed_under_the_driver_it_modifies() {
+    let rows = parse_driver_attributes_str(STAND_IN_ROSTER);
+    assert_eq!(rows.len(), 5, "three regular entries and two overrides");
+
+    let surtees_tweak = &rows[4];
+    assert_eq!(surtees_tweak.driver, "John Surtees");
+    assert_eq!(
+        surtees_tweak.tracks.as_deref(),
+        Some("Silverstone_1975_No_Chicane")
+    );
+    assert_eq!(surtees_tweak.attrs.get("race_skill"), Some(&0.89));
+
+    // The one that does rename keeps its own name rather than inheriting.
+    assert_eq!(rows[1].driver, "Tino Brambilla");
+    assert_eq!(rows[1].tracks.as_deref(), Some("Monza_1971"));
+}
+
+/// The index the tab sends back must land on the block it was shown. An override row and the
+/// entry it modifies carry the same driver name, so nothing but the position separates them.
+#[test]
+fn test_editing_a_track_override_row_writes_to_that_block() {
+    let out = set_driver_attr_str(STAND_IN_ROSTER, 4, "John Surtees", "race_skill", 0.91).unwrap();
+    let rows = parse_driver_attributes_str(&out);
+
+    assert_eq!(rows[4].attrs.get("race_skill"), Some(&0.91), "the override");
+    assert_eq!(rows[3].attrs.get("race_skill"), Some(&0.85), "Surtees himself");
+}
+
+/// The staleness guard still bites on a row whose name is inherited: an index from a table
+/// loaded before the file changed must not retune whoever now sits at that position.
+#[test]
+fn test_editing_a_track_override_row_still_checks_the_driver() {
+    let err = set_driver_attr_str(STAND_IN_ROSTER, 4, "Chris Amon", "race_skill", 0.91)
+        .expect_err("position 4 is Surtees' override, not Amon");
+    assert!(err.contains("John Surtees"), "{err}");
+}
+
+/// A per-track block is left as it is, so its tuning still wins at those tracks. That now holds
+/// for one that names a stand-in, which used to be written like a regular entry.
+#[test]
+fn test_team_scalars_leave_a_stand_ins_block_alone() {
+    let out = set_team_scalars_str(STAND_IN_ROSTER, "Ferrari", scalars(0.97, 1.0, 1.0)).unwrap();
+    let brambilla = out
+        .split("<driver")
+        .find(|b| b.contains("Monza_1971"))
+        .unwrap();
+    assert!(
+        !brambilla.contains("power_scalar"),
+        "the override should be untouched: {brambilla}"
+    );
+    // The regular entries did get the edit.
+    assert_eq!(out.matches("<power_scalar>0.97</power_scalar>").count(), 2);
+}
+
+
+/// `note` and `confirmation` are opposite halves of the same judgement: exactly one of them
+/// ever has something to say, so a caller cannot put a warning and a tick on screen together.
+#[test]
+fn test_a_grid_is_either_worth_warning_about_or_worth_confirming() {
+    let seats = parse_seats_str(STAND_IN_ROSTER);
+    let full = vec![
+        ("Chris Amon", M1, false),
+        ("Pedro Rodriguez", M1, false),
+        ("Me", M1, true),
+    ];
+    let short: Vec<(&str, &str, bool)> = full.iter().take(2).cloned().collect();
+
+    for rows in [&full, &short] {
+        let fit = GridFit::measure(&seats, &grid(rows));
+        assert_ne!(
+            fit.note().is_some(),
+            fit.confirmation().is_some(),
+            "exactly one of the two speaks: {fit:?}"
+        );
+    }
+
+    let fit = GridFit::measure(&seats, &grid(&full));
+    assert!(fit.confirmation().unwrap().contains("all 3 cars"), "{fit:?}");
+
+    // Nothing to measure against stays silent both ways: it is not good news.
+    let nothing = GridFit::measure(&[], &grid(&full));
+    assert_eq!(nothing.note(), None);
+    assert_eq!(nothing.confirmation(), None);
 }

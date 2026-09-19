@@ -1315,3 +1315,10 @@ header h1 { flex: 1 1 100%; }
   font-size: 0.74rem; line-height: 1.4;
 }
 .round-session-flagged { border-left: 3px solid #7a5c18; padding-left: 0.5rem; }
+
+/* The same banner in the affirmative. Quieter than the warning it replaces — green, and no
+   heavier border — because "carry on" should not read as loudly as "stop and fix this". */
+.live-grid-warning.live-grid-ok {
+  background: #14231a; border-color: #2f5d3a; color: #8fc79a;
+}
+.live-grid-ok .live-grid-warning-icon { color: #6a9955; }

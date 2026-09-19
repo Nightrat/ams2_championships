@@ -333,16 +333,39 @@ struct LiveTeams {
     teams: std::collections::HashMap<String, String>,
     /// Manual override for the player's row — their profile name won't be in the file.
     player_team: Option<String>,
-    /// Why the grid on track will not be judged the way the user expects, or `None` when there
-    /// is nothing to say. The live tab is the only place a grid problem can still be *fixed* —
-    /// quit to the menu, set the opponent count, start again — so it is worth interrupting for.
+    /// What to tell the driver about the grid on track — **including when it is right**.
     ///
-    /// Server-side, like every other user-facing sentence about the roster: the same text is
-    /// shown by the Manage and Career tabs, and three copies would drift.
-    warning: Option<String>,
+    /// One field rather than a warning beside a confirmation, so the two can never both be on
+    /// screen and the client is not left deciding which wins. `None` means there is nothing to
+    /// check yet (no session loaded, or a career with no roster), which is why it is not the
+    /// same as good news and must not be rendered as such.
+    ///
+    /// The live tab is the only place a grid problem can still be *fixed* — quit to the menu,
+    /// set the opponent count, start again — so it is the only one that says anything when
+    /// there is no problem. The sentences are server-side, like every other one about the
+    /// roster: the Manage and Career tabs show the same text, and copies would drift.
+    grid: Option<GridStatus>,
     /// How the live grid measures up, when a roster could be found. Carried alongside the
     /// sentence so the tab can show the counts without re-deriving them.
     fit: Option<ams2_championship::custom_ai::GridFit>,
+}
+
+/// A sentence about the live grid, and whether it is good news.
+#[derive(serde::Serialize, Default, Debug)]
+struct GridStatus {
+    /// True when the grid is the roster. The banner is green rather than amber, and nothing
+    /// needs doing before the session starts.
+    ok: bool,
+    text: String,
+}
+
+impl GridStatus {
+    fn warn(text: impl Into<String>) -> Option<Self> {
+        Some(Self {
+            ok: false,
+            text: text.into(),
+        })
+    }
 }
 
 /// Team names for the live timing grid, taken from the **active** championship.
@@ -371,23 +394,29 @@ fn resolve_live_teams(
     else {
         return LiveTeams {
             // Only a singleplayer career is judged on a roster, so only it is nagged about one.
-            warning: sp.then(|| {
-                "No championship is Active, so this session has no season to belong to — its \
-                 result will not be judged against any grid. Mark one Active in the Manage tab."
-                    .to_string()
-            }),
+            grid: sp
+                .then(|| {
+                    GridStatus::warn(
+                        "No championship is Active, so this session has no season to belong \
+                         to — its result will not be judged against any grid. Mark one Active \
+                         in the Manage tab.",
+                    )
+                })
+                .flatten(),
             ..Default::default()
         };
     };
     let Some(file) = champ.custom_ai_file.as_deref() else {
         return LiveTeams {
-            warning: sp.then(|| {
-                format!(
-                    "“{}” has no Custom AI Drivers file, so team names, your rating and any \
-                     contract have nothing to be measured against.",
-                    champ.name
-                )
-            }),
+            grid: sp
+                .then(|| {
+                    GridStatus::warn(format!(
+                        "“{}” has no Custom AI Drivers file, so team names, your rating and \
+                         any contract have nothing to be measured against.",
+                        champ.name
+                    ))
+                })
+                .flatten(),
             ..Default::default()
         };
     };
@@ -398,7 +427,16 @@ fn resolve_live_teams(
     LiveTeams {
         teams: ams2_championship::custom_ai::parse_driver_teams(&dir.join(file)),
         player_team: champ.player_team.clone().filter(|t| !t.trim().is_empty()),
-        warning: if sp { fit.and_then(|f| f.note()) } else { None },
+        // A multiplayer career is judged on no roster, so it is told nothing either way.
+        grid: if sp {
+            fit.and_then(|f| {
+                f.note()
+                    .map(|text| GridStatus { ok: false, text })
+                    .or_else(|| f.confirmation().map(|text| GridStatus { ok: true, text }))
+            })
+        } else {
+            None
+        },
         fit,
     }
 }
@@ -415,6 +453,11 @@ fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -
     struct ClassRow {
         class: String,
         year: Option<u16>,
+        /// Cars this class can field — the grid size to race it at. Not the number of rows
+        /// below: a season roster names every driver who ever sat in a car, so per-track
+        /// stand-ins and second liveries add entries without adding a car. Sent from here
+        /// because only the server knows which liveries are actually installed.
+        cars: usize,
         drivers: Vec<custom_ai::DriverAttributes>,
     }
     #[derive(serde::Serialize)]
@@ -440,11 +483,17 @@ fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -
             custom_ai::class_performance(&dir)
                 .into_iter()
                 .map(|c| {
-                    let mut drivers =
-                        custom_ai::parse_driver_attributes(&dir.join(format!("{}.xml", c.class)));
+                    let file = format!("{}.xml", c.class);
+                    let mut drivers = custom_ai::parse_driver_attributes(&dir.join(&file));
                     custom_ai::mark_phantom_entries(&mut drivers, installed.as_ref());
+                    let cars = custom_ai::car_count(&roster_seats_with(
+                        &dir,
+                        &file,
+                        installed.as_ref(),
+                    ));
                     ClassRow {
                         drivers,
+                        cars,
                         class: c.class,
                         year: c.year,
                     }
@@ -651,11 +700,14 @@ fn handle(
             // Nothing can be resolved without the folder, and in a singleplayer career that is
             // the first thing to fix rather than something to discover from an empty column.
             None => LiveTeams {
-                warning: sp.then(|| {
-                    "No Custom AI Drivers folder is set, so the grid cannot be resolved to teams \
-                     and nothing can be rated. Set it in the Config tab."
-                        .to_string()
-                }),
+                grid: sp
+                    .then(|| {
+                        GridStatus::warn(
+                            "No Custom AI Drivers folder is set, so the grid cannot be resolved \
+                             to teams and nothing can be rated. Set it in the Config tab.",
+                        )
+                    })
+                    .flatten(),
                 ..Default::default()
             },
         };
@@ -1531,7 +1583,10 @@ fn handle(
             body.reason = Some("That Custom AI Drivers file lists no cars this install can field.".into());
         }
         body.checked = !seats.is_empty();
-        body.seats = seats.len();
+        // Cars, not roster entries: a seat with a stand-in or a second livery is still one car,
+        // and this number has to be the one `GridFit` measures against or the panel and the
+        // notes under it would state different grid sizes.
+        body.seats = ams2_championship::custom_ai::car_count(&seats);
 
         if body.checked {
             let assigned: Vec<&str> = champ
@@ -1580,7 +1635,7 @@ fn handle(
                      was not on track.",
                     if rated == 1 { "" } else { "s" },
                     if flagged == 1 { "was" } else { "were" },
-                    seats.len(),
+                    body.seats,
                     if flagged == 1 { "it can" } else { "they can" },
                 )
             });
