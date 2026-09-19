@@ -298,6 +298,7 @@ fn test_assigned_sessions_keeps_only_what_a_championship_claims() {
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
+        planned_rounds: None,
     };
     let kept = assigned_sessions(&[champ], &sessions);
     assert_eq!(
@@ -328,6 +329,7 @@ fn test_rating_ignores_unassigned_sessions() {
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
+        planned_rounds: None,
     };
     let rated = assigned_sessions(&[champ], &winning);
     let r = compute_reputation_global(Some("Nightrat"), &rated, &ctxs, None);

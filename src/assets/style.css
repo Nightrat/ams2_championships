@@ -629,10 +629,16 @@ table { border-collapse: collapse; width: 100%; }
 .dmg-row-val { width: 3.2rem; text-align: right; font-size: 0.74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .dmg-track { flex: 1; height: 9px; background: #12121e; border: 1px solid #2a2a3e; border-radius: 3px; overflow: hidden; }
 .dmg-fill { height: 100%; transition: width 0.15s linear; }
-.dmg-contact { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.9rem;
+/* Wraps because the strip now carries four pairs — on a narrow panel the last
+   one drops to its own line rather than being squeezed out of the flex row. */
+.dmg-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem;
+  margin-top: 0.9rem;
   padding-top: 0.6rem; border-top: 1px solid #2a2a3e; font-size: 0.74rem; }
 .dmg-contact-lbl { color: #7f8c8d; }
 .dmg-contact-val { color: #bdc3c7; font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 0.9rem; }
+/* Which corner the lowest reading came from — a qualifier on the value, not a
+   value of its own, so it is dimmed inside it rather than given its own pair. */
+.dmg-corner { color: #7f8c8d; font-weight: 400; }
 
 /* ── Manage tab ──────────────────────────────────────────────────────────── */
 .manage-layout {
@@ -785,6 +791,11 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
 
 /* Lap chart */
 .lap-chart-wrap { margin-top: 0.6rem; }
+/* Author-level display on the children beats the UA stylesheet's display:none for a closed
+   <details>, so the collapsed state has to be stated explicitly. */
+.lap-chart-wrap:not([open]) > :not(summary) { display: none; }
+.lap-chart-wrap > summary { cursor: pointer; }
+.lap-chart-empty { font-size: 0.75rem; color: #777; padding: 0.3rem 0; }
 .lap-chart-label { font-size: 0.72rem; color: #95a5a6; margin-bottom: 0.25rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 .lap-chart-scroll { overflow-x: auto; }
 .lap-chart-table { border-collapse: collapse; font-size: 0.7rem; }
@@ -855,6 +866,18 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
   font-family: inherit;
 }
 .manage-input:focus { outline: none; border-color: #e74c3c; }
+
+/* A race count is two digits; a full-width field beside it reads as free text. */
+.manage-input-num { width: 4.5rem; }
+
+/* Matches .manage-checkbox-label so a labelled field sits level with the checkboxes. */
+.manage-inline-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #bdc3c7;
+}
 
 .manage-select {
   background: #0d0d1a;
@@ -1067,6 +1090,11 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
   background: #2a1a1a; color: #e74c3c; border: 1px solid #8b1a1a;
   border-radius: 3px; padding: 0 4px; letter-spacing: 0.03em;
 }
+.config-diverged {
+  font-size: 0.8rem; color: #e0b050;
+  background: #2a2410; border: 1px solid #6b5518;
+  border-radius: 3px; padding: 0.4rem 0.6rem; margin-bottom: 0.5rem;
+}
 .config-check-group { display: flex; gap: 1.2rem; flex-wrap: wrap; }
 .config-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; }
 .config-save-msg { font-size: 0.82rem; color: #aaa; }
@@ -1167,6 +1195,47 @@ header h1 { flex: 1 1 100%; }
 .ledger-missed td:nth-child(5) { color: #e74c3c; }
 .career-empty { color: #888; padding: 1rem; }
 
+/* Finances — the season being raced, as a running total */
+.finance-heading {
+  margin: 1.6rem 0 0.2rem; font-size: 0.82rem; font-weight: 700; color: #bdc3c7;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.finance-now {
+  margin-top: 0.8rem; padding: 0.8rem 1rem;
+  background: #14142a; border: 1px solid #2a2a4a; border-radius: 6px;
+}
+.finance-now-head { display: flex; gap: 0.7rem; align-items: baseline; flex-wrap: wrap; }
+.finance-now-title { font-size: 1rem; font-weight: 700; color: #e0e0e0; }
+.finance-now-team { color: #bdc3c7; font-size: 0.85rem; }
+.finance-now-races { margin-left: auto; color: #888; font-size: 0.8rem; }
+
+/* How far through the declared calendar the season is. */
+.finance-bar {
+  height: 4px; margin: 0.6rem 0 0.9rem; border-radius: 2px;
+  background: #0d0d1a; overflow: hidden;
+}
+.finance-bar-fill { height: 100%; background: #e74c3c; }
+
+.finance-stats {
+  display: grid; gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+.finance-stat { display: flex; flex-direction: column; gap: 0.15rem; }
+.finance-stat-label {
+  color: #888; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.finance-stat-value { color: #e0e0e0; font-size: 1.15rem; }
+.finance-stat-note { color: #777; font-size: 0.75rem; line-height: 1.35; }
+.finance-of { color: #888; font-size: 0.85rem; }
+
+/* Money that has not been banked yet reads differently from money that has. */
+.finance-projected, .ledger-projected { color: #e0a04a; }
+.finance-spent { color: #e74c3c; }
+
+.finance-split td:first-child { color: #bdc3c7; }
+.finance-split .finance-why { color: #777; font-size: 0.75rem; }
+.finance-split-total td { border-top: 1px solid #2a2a4a; border-bottom: none; }
+
 .saves-error { color: #e0a04a; font-size: 0.78rem; cursor: help; }
 
 /* Telemetry — tyres */
@@ -1193,3 +1262,13 @@ header h1 { flex: 1 1 100%; }
   margin-top: 0.7rem; padding-top: 0.5rem; border-top: 1px solid #2a2a3e; font-size: 0.68rem; color: #555; }
 .tel-obs-lbl { font-style: italic; }
 .tel-obs-item b { color: #6b6b7d; font-weight: 600; }
+
+/* Reset for the run's ride-height record. Sits in the contact strip, so it is
+   sized to the 0.74rem text around it rather than to a form control. */
+.dmg-reset { margin-left: auto; background: #21213a; color: #95a5a6;
+  border: 1px solid #2a2a4a; border-radius: 3px; padding: 0.1rem 0.5rem;
+  font-size: 0.7rem; font-family: inherit; cursor: pointer; }
+.dmg-reset:hover { background: #2a2a4a; color: #e0e0f0; }
+/* The number a setup is chosen against — the one reading on the panel the
+   driver is actually hunting for. */
+.dmg-seen-low { color: #e0e0f0; }

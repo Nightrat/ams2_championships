@@ -353,3 +353,145 @@ fn test_should_capture_no_participants_returns_false() {
     s.num_participants = 0;
     assert!(!should_capture(&s));
 }
+
+// ── replays ───────────────────────────────────────────────────────────────────
+
+/// The same session as `make_session`, but as AMS2 reports it while a replay of it plays:
+/// the rows are refilled with an earlier moment of the race.
+fn as_replay(mut s: LiveSessionData, game_state: u32) -> LiveSessionData {
+    s.game_state = game_state;
+    s
+}
+
+fn finished_race() -> LiveSessionData {
+    make_session(
+        5,
+        vec![
+            make_participant("Alice", 1, 30, 90.0, "Ferrari"),
+            make_participant("Bob", 2, 30, 91.0, "McLaren"),
+        ],
+    )
+}
+
+/// Mid-race, as a replay plays it back: Bob still leads and only 20 laps are done.
+fn rewound_race() -> LiveSessionData {
+    make_session(
+        5,
+        vec![
+            make_participant("Alice", 2, 20, 90.0, "Ferrari"),
+            make_participant("Bob", 1, 20, 91.0, "McLaren"),
+        ],
+    )
+}
+
+#[test]
+fn test_replay_game_states_are_recognised() {
+    assert!(is_replay(6), "in-game replay");
+    assert!(is_replay(7), "front-end replay");
+    assert!(!is_replay(2), "driving");
+    assert!(!is_replay(4), "garage / results screen");
+}
+
+#[test]
+fn test_a_replay_watched_after_the_race_does_not_change_the_result() {
+    // Race, watch the replay to lap 20, quit. The recorded result must be the race's, not
+    // the frame the replay happened to be showing when AMS2 went away.
+    let mut state = RecorderState::new(true, true, true);
+    state.poll(&finished_race());
+    for gs in [6, 6, 7] {
+        assert!(
+            state.poll(&as_replay(rewound_race(), gs)).is_none(),
+            "a replay poll must never capture"
+        );
+    }
+    let mut gone = finished_race();
+    gone.connected = false;
+    let taken = state.poll(&gone).expect("the race is captured on disconnect");
+    assert_eq!(taken.session.participants[0].race_position, 1, "Alice won");
+    assert_eq!(taken.session.participants[0].laps_completed, 30);
+}
+
+#[test]
+fn test_a_replay_does_not_rewind_the_lap_chart() {
+    let mut state = RecorderState::new(true, true, true);
+    for lap in 1..=5 {
+        state.poll(&make_session(
+            5,
+            vec![make_participant("Alice", 1, lap, 90.0, "Ferrari")],
+        ));
+    }
+    // A replay stepping back through laps 1-3 would otherwise look like a restart to
+    // `accumulate_lap_chart`, which clears the chart on a falling lap count.
+    for lap in 1..=3 {
+        state.poll(&as_replay(
+            make_session(5, vec![make_participant("Alice", 1, lap, 90.0, "Ferrari")]),
+            6,
+        ));
+    }
+    let mut gone = make_session(5, vec![make_participant("Alice", 1, 5, 90.0, "Ferrari")]);
+    gone.connected = false;
+    let taken = state.poll(&gone).expect("captured");
+    let laps: std::collections::BTreeSet<u32> = taken.lap_chart.iter().map(|e| e.lap).collect();
+    assert_eq!(laps.into_iter().collect::<Vec<_>>(), vec![1, 2, 3, 4, 5]);
+}
+
+#[test]
+fn test_a_session_change_during_a_replay_is_acted_on_when_it_ends() {
+    // Watching a quali replay from the race lobby: the session state has already moved on,
+    // but nothing may be captured until the game is live again — and then it is the quali
+    // session that is written, not the replay's rewound rows.
+    let mut state = RecorderState::new(true, true, true);
+    state.poll(&make_session(
+        3,
+        vec![make_participant("Alice", 1, 4, 88.0, "Ferrari")],
+    ));
+    assert!(state
+        .poll(&as_replay(
+            make_session(5, vec![make_participant("Alice", 6, 1, 95.0, "Ferrari")]),
+            6
+        ))
+        .is_none());
+    let taken = state
+        .poll(&make_session(
+            5,
+            vec![make_participant("Alice", 6, 0, 0.0, "Ferrari")],
+        ))
+        .expect("the qualifying session is captured on the change to race");
+    assert_eq!(taken.session.session_state, 3);
+    assert_eq!(taken.session.participants[0].fastest_lap_time, 88.0);
+}
+
+#[test]
+fn test_live_polls_still_capture_on_a_session_change() {
+    // The plain path, so the replay hold cannot be mistaken for it: P → Q captures practice.
+    let mut state = RecorderState::new(true, true, true);
+    state.poll(&make_session(
+        1,
+        vec![make_participant("Alice", 1, 3, 92.0, "Ferrari")],
+    ));
+    let taken = state
+        .poll(&make_session(
+            3,
+            vec![make_participant("Alice", 1, 0, 0.0, "Ferrari")],
+        ))
+        .expect("practice is captured");
+    assert_eq!(taken.session.session_state, 1);
+}
+
+#[test]
+fn test_a_session_type_that_is_not_recorded_is_not_captured() {
+    let mut state = RecorderState::new(false, true, true);
+    state.poll(&make_session(
+        1,
+        vec![make_participant("Alice", 1, 3, 92.0, "Ferrari")],
+    ));
+    assert!(
+        state
+            .poll(&make_session(
+                3,
+                vec![make_participant("Alice", 1, 0, 0.0, "Ferrari")]
+            ))
+            .is_none(),
+        "practice recording is off"
+    );
+}

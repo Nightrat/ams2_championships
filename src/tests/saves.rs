@@ -496,3 +496,77 @@ fn test_list_saves_reads_a_save_with_a_byte_order_mark() {
     assert_eq!(saves[0].sessions, 1);
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_delete_survives_something_holding_the_folder_for_a_moment() {
+    // The bug this fixes, seen on a saves folder inside Google Drive: `remove_dir_all` empties
+    // the career folder and is then denied the directory itself, because the sync client still
+    // holds it. The career vanishes from the switcher and an empty folder stays behind.
+    //
+    // The holder is transient — a plain `rmdir` a second later succeeds — so retrying is the
+    // fix. Here an open handle inside the folder stands in for the sync client, released while
+    // the retries are still running.
+    let dir = tmp_dir("del_held");
+    let career = write_save(&dir, "held", CAREER_JSON);
+    let pinned = write_nested_file(&career, "extra", "pinned.bin");
+
+    // Opened *without* FILE_SHARE_DELETE, which is what makes the removal fail — a plain
+    // `File::open` shares delete access and would not reproduce the bug at all.
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+    let handle = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ)
+        .open(&pinned)
+        .unwrap();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        drop(handle);
+    });
+
+    delete_save(&dir, "held").unwrap();
+    assert!(
+        !dir.join("held").exists(),
+        "the folder goes too, not just what was in it"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_removing_a_folder_that_is_already_gone_is_not_a_failure() {
+    // Something else may finish the job mid-retry — a sync client completing its own delete, or
+    // the user clicking twice. The folder being absent is the outcome that was wanted, so it
+    // must not come back as an error.
+    let dir = tmp_dir("del_vanished");
+    assert!(remove_dir_all_briefly(&dir.join("never_existed")).is_ok());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_the_startup_sweep_clears_husks_and_leaves_everything_else() {
+    // A delete that could not remove its own folder leaves an empty one behind, and only a
+    // later process can clear it. Empty is the whole test for safety: a save always has its
+    // career.json, and `track_layouts` has files, so neither is ever a candidate.
+    let dir = tmp_dir("sweep_husks");
+    fs::create_dir_all(dir.join("husk_one")).unwrap();
+    fs::create_dir_all(dir.join("husk_two")).unwrap();
+    write_save(&dir, "real_career", CAREER_JSON);
+    fs::create_dir_all(dir.join("track_layouts")).unwrap();
+    fs::write(dir.join("track_layouts").join("monza.json"), "[]").unwrap();
+    write_legacy(&dir, "flat", CAREER_JSON);
+
+    assert_eq!(sweep_empty_husks(&dir), 2);
+    assert!(!dir.join("husk_one").exists());
+    assert!(!dir.join("husk_two").exists());
+    assert!(dir.join("real_career").is_dir(), "a save is never empty");
+    assert!(dir.join("track_layouts").is_dir(), "shared layouts stay");
+    assert!(
+        legacy_save_path(&dir, "flat").is_file(),
+        "files are not touched"
+    );
+
+    // Nothing left to do on the next start.
+    assert_eq!(sweep_empty_husks(&dir), 0);
+    let _ = fs::remove_dir_all(&dir);
+}

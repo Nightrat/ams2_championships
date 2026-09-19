@@ -39,9 +39,28 @@ function loadConfig() {
       document.getElementById('cfg-show-track-map').checked        = cfg.show_track_map;
       document.getElementById('cfg-track-map-max-points').value    = cfg.track_map_max_points;
       applyTrackMapConfig(cfg);
+      // The career runs on the tuning it was created with, so say so when the two have parted.
+      var diverged = document.getElementById('cfg-rating-diverged');
+      if (diverged) diverged.hidden = cfg.career_rating_matches !== false;
       setConfigMsg('');
     })
     .catch(function () { setConfigMsg('Failed to load config.', true); });
+}
+
+// Move the active career onto the rating settings now in config.json. Deliberate, and confirmed,
+// because it re-judges every season the career has already raced.
+function adoptRatingSettings() {
+  var msg = document.getElementById('cfg-rating-adopt-msg');
+  if (!confirm('Move this career onto the driver rating settings in Config?\n\n' +
+      'Every rating and every team requirement is worked out afresh, including for seasons ' +
+      'already raced, so a seat you earned may read differently afterwards.')) return;
+  fetch('/api/career/rating/adopt', { method: 'POST' })
+    .then(function (r) { return r.ok ? r.json() : r.text().then(function (t) { throw new Error(t); }); })
+    .then(function () {
+      if (msg) msg.textContent = 'This career now uses the settings above.';
+      loadConfig();
+    })
+    .catch(function () { if (msg) msg.textContent = 'Could not apply the settings.'; });
 }
 
 // Apply track map visibility on page load
@@ -127,6 +146,9 @@ document.getElementById('config-form').addEventListener('submit', function (e) {
   };
   saveConfig(newCfg);
 });
+
+var _ratingAdoptBtn = document.getElementById('cfg-rating-adopt');
+if (_ratingAdoptBtn) _ratingAdoptBtn.addEventListener('click', adoptRatingSettings);
 
 document.querySelectorAll('.tab-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {

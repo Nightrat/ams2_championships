@@ -23,6 +23,7 @@ fn sample_championship() -> Championship {
         session_ids: vec!["100".into()],
         custom_ai_file: None,
         player_team: None,
+        planned_rounds: None,
     }
 }
 
@@ -235,6 +236,7 @@ fn make_champ(pts: Vec<i32>, sessions: &[&str]) -> Championship {
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
+        planned_rounds: None,
     }
 }
 
@@ -1265,6 +1267,7 @@ fn champ_with(id: &str, status: ChampionshipStatus, file: Option<&str>) -> Champ
         session_ids: vec![],
         custom_ai_file: file.map(str::to_string),
         player_team: None,
+        planned_rounds: None,
     }
 }
 
@@ -1417,4 +1420,218 @@ fn test_persist_accepts_a_save_that_only_had_a_byte_order_mark() {
     persist(&store, &path).expect("a BOM is not damage");
     assert!(!fs::read_to_string(&path).unwrap().starts_with('\u{feff}'));
     let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_driver_standings_name_the_team_falling_back_to_the_car() {
+    let champ = make_champ(vec![25, 18, 15], &["s1"]);
+    let mut sessions = vec![make_session(
+        "s1",
+        5,
+        vec![
+            ("Alice", 1, false, "Lotus 49"),
+            ("Bob", 2, false, "Brabham BT26"),
+            ("Carol", 3, false, "Matra MS80"),
+        ],
+    )];
+    // Carol is the player, and the seat is named on the championship rather than in
+    // any roster — the one case the Custom AI file can never answer.
+    sessions[0].results[2].is_player = true;
+
+    let mut champ = champ;
+    champ.player_team = Some("Tyrrell".into());
+
+    let mut roster = std::collections::HashMap::new();
+    roster.insert("Alice".to_string(), "Team Lotus".to_string());
+
+    let st = standings_with(&champ, &sessions, &roster);
+    let team_of = |n: &str| {
+        st.iter()
+            .find(|e| e.name == n)
+            .unwrap()
+            .team
+            .clone()
+            .unwrap()
+    };
+    assert_eq!(team_of("Alice"), "Team Lotus"); // roster wins
+    assert_eq!(team_of("Carol"), "Tyrrell"); // player override, absent from the roster
+    assert_eq!(team_of("Bob"), "Brabham BT26"); // nothing named it, so the car
+}
+
+#[test]
+fn test_standings_without_a_roster_names_no_team() {
+    let champ = make_champ(vec![25, 18], &["s1"]);
+    let sessions = vec![make_session("s1", 5, vec![("Alice", 1, false, "")])];
+    // Neither a roster nor a car to fall back to: the field is absent rather than
+    // an empty string, so the standings table draws no team span at all.
+    assert_eq!(standings(&champ, &sessions)[0].team, None);
+}
+
+
+
+// ── FIA countback ────────────────────────────────────────────────────────────
+// Equal points are separated by most wins, then most seconds, then most thirds,
+// and so on. A retirement is not a place and so never enters the countback.
+
+#[test]
+fn test_countback_separates_equal_points_on_second_places() {
+    // Only a win scores, so both drivers finish the season level on 10.
+    let champ = make_champ(vec![10], &["r1", "r2", "r3"]);
+    let sessions = vec![
+        make_session(
+            "r1",
+            5,
+            vec![("Alice", 1, false, ""), ("Bob", 2, false, "")],
+        ),
+        make_session(
+            "r2",
+            5,
+            vec![("Bob", 1, false, ""), ("Alice", 2, false, "")],
+        ),
+        make_session(
+            "r3",
+            5,
+            vec![("Alice", 2, false, ""), ("Bob", 3, false, "")],
+        ),
+    ];
+    let st = standings(&champ, &sessions);
+    assert_eq!(st[0].points, st[1].points, "the tie is the point of the test");
+    assert_eq!(st[0].wins, st[1].wins, "and it survives the win count");
+    // Two seconds against one.
+    assert_eq!(st[0].name, "Alice");
+    assert_eq!(st[1].name, "Bob");
+}
+
+#[test]
+fn test_countback_walks_on_down_the_order_until_it_finds_a_difference() {
+    // Level on points, wins and seconds — only the third places separate them.
+    let champ = make_champ(vec![10], &["r1", "r2", "r3"]);
+    let sessions = vec![
+        make_session(
+            "r1",
+            5,
+            vec![("Alice", 1, false, ""), ("Bob", 2, false, "")],
+        ),
+        make_session(
+            "r2",
+            5,
+            vec![("Bob", 1, false, ""), ("Alice", 2, false, "")],
+        ),
+        make_session(
+            "r3",
+            5,
+            vec![("Alice", 3, false, ""), ("Bob", 4, false, "")],
+        ),
+    ];
+    let st = standings(&champ, &sessions);
+    assert_eq!(st[0].points, st[1].points);
+    assert_eq!(st[0].wins, st[1].wins);
+    assert_eq!(st[0].name, "Alice"); // a third beats a fourth
+}
+
+#[test]
+fn test_a_retirement_is_not_a_place_in_the_countback() {
+    // Bob is classified P1 but retired, so it is neither a win nor a place —
+    // the same rule that stops it scoring. Alice's P2 is worth no points here
+    // and still puts her ahead.
+    let champ = make_champ(vec![10], &["r1"]);
+    let sessions = vec![make_session(
+        "r1",
+        5,
+        vec![("Bob", 1, true, ""), ("Alice", 2, false, "")],
+    )];
+    let st = standings(&champ, &sessions);
+    assert_eq!(st[0].points, 0);
+    assert_eq!(st[1].points, 0);
+    assert_eq!(st[0].wins, 0, "a retirement is not a win");
+    assert_eq!(st[0].name, "Alice");
+}
+
+#[test]
+fn test_anyone_who_finished_outranks_someone_who_never_did() {
+    // Both are pointless. Carol has a finish to her name; Dave has nothing.
+    let champ = make_champ(vec![10], &["r1"]);
+    let sessions = vec![make_session(
+        "r1",
+        5,
+        vec![
+            ("Alice", 1, false, ""),
+            ("Carol", 2, false, ""),
+            ("Dave", 3, true, ""),
+        ],
+    )];
+    let st = standings(&champ, &sessions);
+    assert_eq!(st[1].name, "Carol");
+    assert_eq!(st[2].name, "Dave");
+}
+
+#[test]
+fn test_a_table_with_nothing_to_separate_it_is_still_stable() {
+    // Every driver retired: no points, no places, nothing for the countback to
+    // read. This used to fall through to `HashMap` order, which is seeded per
+    // map — so the tail of the table reshuffled on every request.
+    let champ = make_champ(vec![25, 18], &["r1"]);
+    let sessions = vec![make_session(
+        "r1",
+        5,
+        vec![
+            ("Erin", 1, true, ""),
+            ("Carol", 2, true, ""),
+            ("Alice", 3, true, ""),
+            ("Dave", 4, true, ""),
+            ("Bob", 5, true, ""),
+        ],
+    )];
+    let first = standings(&champ, &sessions);
+    let names: Vec<&str> = first.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(names, ["Alice", "Bob", "Carol", "Dave", "Erin"]);
+    for _ in 0..8 {
+        let again = standings(&champ, &sessions);
+        let again: Vec<&str> = again.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, again, "same career, same order, every time");
+    }
+}
+
+#[test]
+fn test_a_hand_edited_position_off_the_grid_is_ignored_not_allocated() {
+    // Career files are hand-edited, and the countback indexes by position. A
+    // number past the grid is not a place; it must not become a 4-billion-entry
+    // resize either.
+    let champ = make_champ(vec![10], &["r1"]);
+    let sessions = vec![make_session(
+        "r1",
+        5,
+        vec![("Alice", 1, false, ""), ("Bob", 999_999, false, "")],
+    )];
+    let st = standings(&champ, &sessions);
+    let bob = st.iter().find(|e| e.name == "Bob").unwrap();
+    assert_eq!(bob.points, 0);
+    assert_eq!(bob.wins, 0);
+}
+
+#[test]
+fn test_constructor_standings_use_the_same_countback() {
+    // Both teams level on points and wins; one has the better second place.
+    let champ = make_champ(vec![10], &["r1", "r2", "r3"]);
+    let sessions = vec![
+        make_session(
+            "r1",
+            5,
+            vec![("Alice", 1, false, "Lotus"), ("Bob", 2, false, "Brabham")],
+        ),
+        make_session(
+            "r2",
+            5,
+            vec![("Bob", 1, false, "Brabham"), ("Alice", 2, false, "Lotus")],
+        ),
+        make_session(
+            "r3",
+            5,
+            vec![("Alice", 2, false, "Lotus"), ("Bob", 3, false, "Brabham")],
+        ),
+    ];
+    let career = compute_career(&[champ], &sessions);
+    let cs = &career.championships[0].constructor_standings;
+    assert_eq!(cs[0].points, cs[1].points);
+    assert_eq!(cs[0].name, "Lotus");
 }

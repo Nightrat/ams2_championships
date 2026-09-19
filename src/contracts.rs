@@ -182,6 +182,47 @@ pub struct Contract {
     /// merit, which is every contract until buy-ins exist.
     #[serde(default)]
     pub bought_for: i64,
+    /// What the season paid, stamped the moment it was marked `Final`. See [`Settlement`].
+    ///
+    /// `None` means the season is still running, or was finished before sealing existed —
+    /// [`finances`] falls back to deriving the prize in that case, so an unsealed save behaves
+    /// exactly as it did before. [`seal_finished`] is the one-time upgrade that fills it in.
+    #[serde(default)]
+    pub settled: Option<Settlement>,
+}
+
+/// What a season paid, fixed at the moment it closed.
+///
+/// Prize money is otherwise re-derived on every request from the *current* [`PrizeParams`],
+/// which meant that retuning `champion_prize` or `last_place_prize` in the Config tab silently
+/// re-paid every season the career had already finished. Marking a championship `Final` stamps
+/// this instead: the payout becomes history, exactly like the salary agreed at signing, and
+/// config can no longer reach back into a season that is over.
+///
+/// **Only the money is stamped.** Position and field are not, because this module records only
+/// what results cannot recover — and those can be. The consequence is the intended one: the
+/// Config tab cannot move a finished season, while reassigning a session to an old championship
+/// still moves the standings it is shown against. The money is settled; the history is not
+/// rewritten to match it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Settlement {
+    /// Prize money awarded, in credits, under the economy in force when the season closed.
+    pub prize: i64,
+    /// Unix seconds at close. Zero on a season sealed by the upgrade rather than by being
+    /// finished, because there is no record of when that happened.
+    #[serde(default)]
+    pub at: u64,
+    /// Salary drawn across the season, stamped for the same reason the prize is.
+    ///
+    /// The salary *rate* was frozen at signing, so config cannot reach it — but once a season
+    /// pays per race ([`salary_earned`]) the total depends on how many rounds it ran, and
+    /// reassigning a session away from a closed season would quietly take back wages already
+    /// drawn. Closing the books fixes the money; the history stays free to move.
+    ///
+    /// `None` on a stamp taken before seasons paid per race. Those paid the whole salary at
+    /// `Final` and there is nothing to reconstruct, so [`finances`] falls back to exactly that.
+    #[serde(default)]
+    pub salary: Option<i64>,
 }
 
 impl Contract {
@@ -194,6 +235,7 @@ impl Contract {
             salary: offer.salary,
             objective: offer.objective,
             bought_for: 0,
+            settled: None,
         }
     }
 }
@@ -650,8 +692,26 @@ pub struct SeasonLedger {
     /// championship has no roster, or has been deleted. A team name only identifies a team
     /// *within* a class: "Ferrari" appears in seven of the eight shipped rosters.
     pub class: String,
-    /// Salary credited. Zero until the season is complete — see [`finances`].
+    /// Salary credited so far — the wage for the races run, or the whole figure at `Final` for
+    /// a season with no declared calendar. See [`salary_earned`].
     pub salary: i64,
+    /// The whole season's wage as it was agreed, which [`Self::salary`] is drawn against.
+    ///
+    /// Carried separately because the two answer different questions — what has been banked,
+    /// and what the deal is worth — and a client showing "drawn 11,264 of 33,792" needs both.
+    /// A capped wage means this is a ceiling: see [`salary_earned`].
+    pub salary_contracted: i64,
+    /// Races run so far, so a client can show what the salary has been paid against.
+    pub races_run: u32,
+    /// The declared calendar, or `None` for a season that never had one.
+    pub planned_rounds: Option<u32>,
+    /// What the season would pay out if it ended on today's standings.
+    ///
+    /// `None` once the season is complete, because then [`Self::prize`] is not a projection but
+    /// the settled fact. Derived server-side rather than in the browser for the same reason
+    /// `offerWhy()` never recomputes a rate: the prize curve belongs to [`prize`], and a second
+    /// copy of it in a client would drift from this one.
+    pub projected_prize: Option<i64>,
     /// Prize money credited. Zero until the season is complete.
     pub prize: i64,
     /// Credits paid to take the seat.
@@ -664,7 +724,8 @@ pub struct SeasonLedger {
     pub objective: Option<u32>,
     /// Whether it was met. `None` while the season is unfinished, or when there was no target.
     pub objective_met: Option<bool>,
-    /// True once the championship is `Final`.
+    /// True once the championship is `Final` — and so, since [`seal_finished`] runs whenever a
+    /// career is loaded, once its payout is settled and beyond the reach of the Config tab.
     pub complete: bool,
 }
 
@@ -696,12 +757,66 @@ fn flagged_player(sessions: &[RecordedSession]) -> Option<&str> {
         .map(|r| r.name.as_str())
 }
 
+/// Races actually run in a season: rounds holding at least one race session.
+///
+/// A round groups practice, qualifying and the race, so counting rounds alone would pay a wage
+/// for a weekend that was only practised. Session type 5 is the race — the same test
+/// [`crate::data_store::standings`] scores on, so a round that pays is a round that counted.
+fn races_run(champ: &Championship, sessions: &[RecordedSession]) -> u32 {
+    champ
+        .rounds
+        .iter()
+        .filter(|r| {
+            r.session_ids.iter().any(|id| {
+                sessions
+                    .iter()
+                    .any(|s| s.id == *id && s.session_type == crate::data_store::SESSION_RACE)
+            })
+        })
+        .count() as u32
+}
+
+/// Salary drawn so far, in credits — the wage for the races actually run.
+///
+/// A contract's `salary` is the figure for a whole season. Split across the declared calendar
+/// it becomes a per-race wage, paid as each race is recorded rather than in one lump at the
+/// end, which is what [`Championship::planned_rounds`] exists to make possible.
+///
+/// **Capped, and never topped up.** Running the full calendar draws the whole salary; stopping
+/// short draws only what was raced, and a season that overruns its calendar earns nothing
+/// beyond it. So the contracted figure is a ceiling rather than a promise — the driver is paid
+/// for the races they turned up to, and the team does not pay twice for a longer season.
+///
+/// A season with no declared calendar keeps the old rule exactly: nothing until `Final`, then
+/// the whole salary. That is every season written before this existed.
+pub fn salary_earned(
+    contract: &Contract,
+    champ: &Championship,
+    sessions: &[RecordedSession],
+) -> i64 {
+    // A settled season pays what it was stamped as paying. A stamp from before per-race pay
+    // carries no salary, and those seasons drew the whole of it.
+    if let Some(s) = &contract.settled {
+        return s.salary.unwrap_or(contract.salary);
+    }
+    let Some(planned) = champ.planned_rounds.filter(|n| *n > 0) else {
+        return if champ.status == ChampionshipStatus::Final {
+            contract.salary
+        } else {
+            0
+        };
+    };
+    let run = races_run(champ, sessions).min(planned);
+    // Saturating because `salary` is hand-editable in the career file; rounded down, so the
+    // instalments can never sum past the contracted figure.
+    contract.salary.saturating_mul(run as i64) / planned as i64
+}
+
 /// What every contracted season paid, and the balance that leaves.
 ///
-/// Salary and prize money are credited only once the championship is `Final`. A season in
-/// progress has no payout because there is nothing to pro-rate against — rounds are added as
-/// they are raced, so a career never declares how long a season is meant to be, and "half way
-/// through" is not a figure this data can produce.
+/// Prize money is credited only once the championship is `Final` — it pays on a final standings
+/// position, and there is no such thing until the season is over. Salary is credited race by
+/// race against the declared calendar; see [`salary_earned`] for the season that has none.
 ///
 /// `driver` names the player; when `None` the recorder's own `is_player` flag decides. A career
 /// whose player cannot be identified still reports its salaries and its spending, and simply
@@ -745,9 +860,21 @@ pub fn finances(
                 .map(crate::custom_ai::class_of_file)
                 .unwrap_or_default()
                 .to_string(),
-            salary: if complete { c.salary } else { 0 },
-            prize: match (complete, position) {
-                (true, Some(p)) => prize(p, table.len(), params),
+            salary: salary_earned(c, champ, sessions),
+            salary_contracted: c.salary,
+            races_run: races_run(champ, sessions),
+            planned_rounds: champ.planned_rounds,
+            // What today's standings would pay. A season that is over reports the real thing.
+            projected_prize: match (complete, position) {
+                (false, Some(p)) => Some(prize(p, table.len(), params)),
+                (false, None) => Some(0),
+                (true, _) => None,
+            },
+            // A sealed season pays what it paid. Only an unsealed one — still being raced, or
+            // finished before sealing existed — is re-derived from the economy in force now.
+            prize: match (complete, &c.settled, position) {
+                (true, Some(s), _) => s.prize,
+                (true, None, Some(p)) => prize(p, table.len(), params),
                 _ => 0,
             },
             bought_for: c.bought_for,
@@ -774,7 +901,13 @@ pub fn finances(
             team: c.team.clone(),
             // No championship left to name a class, so this season is in no series at all.
             class: String::new(),
+            // No championship left to say how many races were run, or against what calendar —
+            // and so nothing to project a payout from either.
             salary: 0,
+            salary_contracted: c.salary,
+            races_run: 0,
+            planned_rounds: None,
+            projected_prize: None,
             prize: 0,
             bought_for: c.bought_for,
             position: None,
@@ -794,6 +927,97 @@ pub fn finances(
         spent,
         seasons,
     }
+}
+
+// ── Closing a season ─────────────────────────────────────────────────────────
+
+/// Stamps what a season paid onto its contract, if it has one and is `Final`.
+///
+/// Call this on the transition *into* `Final`. It is idempotent, and deliberately so: a
+/// contract that already carries a [`Settlement`] keeps it, for the same reason
+/// `custom_ai::ensure_baseline` is one-time. The first stamp was taken under the economy the
+/// season was actually raced under, and re-taking it later would quietly redefine what the
+/// season paid — which is the exact problem sealing exists to remove.
+///
+/// Returns whether a stamp was written, so a caller can tell whether it has anything to persist.
+pub fn settle(
+    contracts: &mut [Contract],
+    champ: &Championship,
+    sessions: &[RecordedSession],
+    driver: Option<&str>,
+    params: &PrizeParams,
+    now: u64,
+) -> bool {
+    if champ.status != ChampionshipStatus::Final {
+        return false;
+    }
+    let player = driver.or_else(|| flagged_player(sessions));
+    let Some(contract) = contracts.iter_mut().find(|c| c.champ_id == champ.id) else {
+        return false;
+    };
+    if contract.settled.is_some() {
+        return false;
+    }
+    // The same derivation `finances` runs, taken once and kept. A driver who cannot be
+    // identified in the standings wins nothing, which is what the derivation said too.
+    let table = crate::data_store::standings(champ, sessions);
+    let position = player.and_then(|name| {
+        table
+            .iter()
+            .position(|e| e.name == name)
+            .map(|i| i as u32 + 1)
+    });
+    // Taken before the stamp exists, so it reads the derivation rather than itself.
+    let salary = salary_earned(contract, champ, sessions);
+    contract.settled = Some(Settlement {
+        prize: position.map_or(0, |p| prize(p, table.len(), params)),
+        at: now,
+        salary: Some(salary),
+    });
+    true
+}
+
+/// Tears up a season's settlement, so that finishing it again takes a fresh one.
+///
+/// Reopening a finished season takes its payout back. That was true while the payout was
+/// derived and it stays true now: the stamp records what a season paid *on closing*, so a
+/// season that is no longer closed must not carry one.
+///
+/// Returns whether a stamp was removed.
+pub fn unsettle(contracts: &mut [Contract], champ_id: &str) -> bool {
+    contracts
+        .iter_mut()
+        .find(|c| c.champ_id == champ_id)
+        .is_some_and(|c| c.settled.take().is_some())
+}
+
+/// Seals every `Final` season that has a contract but no [`Settlement`], at what it pays under
+/// `params` right now. Returns how many were sealed — zero means there is nothing to persist.
+///
+/// This is the one-time upgrade for a career finished before sealing existed, and *when* it
+/// runs is the whole of its correctness. Run once at load, against the config the career has
+/// been running on, every figure it writes is the figure the ledger was already showing and the
+/// upgrade is invisible. Run it on the request path instead and it would seal those seasons at
+/// whatever the economy had been retuned to in the meantime — sealing the wrong numbers, with
+/// no way back. So it belongs beside `config::load_and_upgrade`: at startup, and on the one
+/// other path that loads a career, `POST /api/saves/activate`.
+///
+/// The stamps it writes carry `at: 0`. There is no record of when these seasons were finished,
+/// and inventing "now" would date a 2023 season to the day the app was upgraded.
+pub fn seal_finished(
+    contracts: &mut [Contract],
+    champs: &[Championship],
+    sessions: &[RecordedSession],
+    driver: Option<&str>,
+    params: &PrizeParams,
+) -> usize {
+    let mut sealed = 0;
+    for champ in champs {
+        if settle(contracts, champ, sessions, driver, params, 0) {
+            sealed += 1;
+        }
+    }
+    sealed
 }
 
 #[cfg(test)]

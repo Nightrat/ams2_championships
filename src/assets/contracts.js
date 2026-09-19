@@ -215,10 +215,15 @@ function releaseSeat(champId, team) {
     .catch(function () {});
 }
 
-// ── Career tab: the ledger ────────────────────────────────────────────────────
+// ── Career tab: the finances page ─────────────────────────────────────────────
+//
+// Four sections over one payload: what the career is worth, what the season being raced is
+// doing right now, every season's row, and where the money went. Nothing is computed here that
+// the server owns — the salary rate and the prize curve stay on its side, so the only arithmetic
+// below is summing and subtracting fields that already arrived.
 
 function loadFinances() {
-  var box = document.getElementById('career-contracts-container');
+  var box = document.getElementById('career-finances-container');
   if (!box) return;
   fetch('/api/career/finances').then(function (r) { return r.json(); })
     .then(function (f) { renderFinances(f); })
@@ -226,7 +231,7 @@ function loadFinances() {
 }
 
 function renderFinances(f) {
-  var box = document.getElementById('career-contracts-container');
+  var box = document.getElementById('career-finances-container');
   if (!box) return;
   if (!f || !f.enabled) {
     box.innerHTML = '<div class="career-empty">Contracts belong to a singleplayer career. ' +
@@ -239,6 +244,98 @@ function renderFinances(f) {
     return;
   }
 
+  box.innerHTML =
+    financeSummary(f) +
+    runningSeason(f) +
+    seasonLedger(f) +
+    whereItWent(f);
+}
+
+/// What the career is worth, and how it got there.
+function financeSummary(f) {
+  return '<div class="ledger-totals">' +
+      '<span class="ledger-total"><b>' + fmtCredits(f.balance) + '</b> balance</span>' +
+      (f.starting ? '<span class="ledger-total">' + fmtCredits(f.starting) + ' started with</span>' : '') +
+      '<span class="ledger-total">' + fmtCredits(f.earned) + ' earned</span>' +
+      '<span class="ledger-total">' + fmtCredits(f.spent) + ' spent</span>' +
+    '</div>';
+}
+
+/// The season being raced, as a running total.
+///
+/// This is the half a per-race wage made worth showing: until salary was paid out across a
+/// calendar there was nothing here but zeroes until the season ended. Left out entirely when
+/// nothing is being raced, rather than drawn empty.
+function runningSeason(f) {
+  var s = null;
+  for (var i = 0; i < f.seasons.length; i++) {
+    if (!f.seasons[i].complete) s = f.seasons[i];
+  }
+  if (!s) return '';
+
+  // Both are payload fields; finishing the calendar draws exactly the contracted figure, so
+  // what is left to race for is a subtraction rather than a second copy of the wage rule.
+  var toCome = Math.max(0, s.salary_contracted - s.salary);
+  var racesLeft = s.planned_rounds ? Math.max(0, s.planned_rounds - s.races_run) : 0;
+  var pct = s.planned_rounds
+    ? Math.min(100, Math.round(s.races_run * 100 / s.planned_rounds))
+    : 0;
+  var projected = s.projected_prize || 0;
+
+  var wage = s.planned_rounds
+    ? fmtCredits(s.salary) + ' <span class="finance-of">of ' + fmtCredits(s.salary_contracted) + '</span>'
+    : '<span class="finance-of">' + fmtCredits(s.salary_contracted) + ' at the end</span>';
+  var wageNote = s.planned_rounds
+    ? (racesLeft
+        ? fmtCredits(toCome) + ' still to race for, over ' + racesLeft +
+          ' race' + (racesLeft === 1 ? '' : 's')
+        : 'the full calendar has been raced')
+    : 'no calendar set, so it pays in one lump when the season is marked Final';
+
+  return '<div class="finance-now">' +
+    '<div class="finance-now-head">' +
+      '<span class="finance-now-title">' + esc(s.name || '(unnamed season)') + '</span>' +
+      '<span class="finance-now-team">' + esc(s.team) + '</span>' +
+      (s.planned_rounds
+        ? '<span class="finance-now-races">' + s.races_run + ' of ' + s.planned_rounds + ' races</span>'
+        : '') +
+    '</div>' +
+    (s.planned_rounds
+      ? '<div class="finance-bar"><div class="finance-bar-fill" style="width:' + pct + '%"></div></div>'
+      : '') +
+    '<div class="finance-stats">' +
+      '<div class="finance-stat">' +
+        '<span class="finance-stat-label">Salary drawn</span>' +
+        '<span class="finance-stat-value">' + wage + '</span>' +
+        '<span class="finance-stat-note">' + wageNote + '</span>' +
+      '</div>' +
+      '<div class="finance-stat">' +
+        '<span class="finance-stat-label">Prize, on today&rsquo;s standings</span>' +
+        '<span class="finance-stat-value finance-projected">' + fmtCredits(projected) + '</span>' +
+        '<span class="finance-stat-note">' +
+          (s.position
+            ? 'P' + s.position + ' of ' + s.field + ' &mdash; paid when the season is marked Final'
+            : 'nothing scored yet') +
+        '</span>' +
+      '</div>' +
+      (s.bought_for
+        ? '<div class="finance-stat">' +
+            '<span class="finance-stat-label">Sponsorship paid</span>' +
+            '<span class="finance-stat-value finance-spent">-' + fmtCredits(s.bought_for) + '</span>' +
+            '<span class="finance-stat-note">paid on signing, already out of the balance</span>' +
+          '</div>'
+        : '') +
+      '<div class="finance-stat">' +
+        '<span class="finance-stat-label">On course for</span>' +
+        '<span class="finance-stat-value">' + fmtCredits(toCome + projected) + '</span>' +
+        '<span class="finance-stat-note">still to come if the calendar is raced out and the ' +
+          'standings hold</span>' +
+      '</div>' +
+    '</div>' +
+    '</div>';
+}
+
+function seasonLedger(f) {
   var rows = f.seasons.map(function (s) {
     var result = s.position ? 'P' + s.position + ' of ' + s.field : '—';
     var target = s.objective
@@ -247,35 +344,84 @@ function renderFinances(f) {
       : '—';
     var cls = s.objective_met === true ? ' ledger-met'
       : s.objective_met === false ? ' ledger-missed' : '';
+    // A season with a declared calendar draws its wage race by race, so the count is what the
+    // salary beside it has been paid against. One without pays in a single lump at Final.
+    var races = s.planned_rounds
+      ? s.races_run + ' of ' + s.planned_rounds
+      : '—';
     return '<tr class="' + cls + '">' +
       '<td>' + esc(s.name || '(deleted)') + '</td>' +
       '<td>' + esc(s.team) + '</td>' +
       '<td>' + (s.complete ? 'Complete' : 'Racing') + '</td>' +
       '<td class="num">' + result + '</td>' +
       '<td class="num">' + target + '</td>' +
+      '<td class="num">' + races + '</td>' +
       '<td class="num">' + fmtCredits(s.salary) + '</td>' +
-      '<td class="num">' + fmtCredits(s.prize) + '</td>' +
+      // A season still being raced has no final position, so its prize is what today's
+      // standings would pay rather than what it paid. Marked, so the two never read alike.
+      '<td class="num">' +
+        (s.complete
+          ? fmtCredits(s.prize)
+          : '<span class="ledger-projected" title="Projected on today&rsquo;s standings">~' +
+            fmtCredits(s.projected_prize || 0) + '</span>') +
+      '</td>' +
       '<td class="num">' + (s.bought_for ? '-' + fmtCredits(s.bought_for) : '') + '</td>' +
       '</tr>';
   }).join('');
 
-  box.innerHTML =
-    '<div class="ledger-totals">' +
-      '<span class="ledger-total"><b>' + fmtCredits(f.balance) + '</b> balance</span>' +
-      (f.starting ? '<span class="ledger-total">' + fmtCredits(f.starting) + ' started with</span>' : '') +
-      '<span class="ledger-total">' + fmtCredits(f.earned) + ' earned</span>' +
-      '<span class="ledger-total">' + fmtCredits(f.spent) + ' spent</span>' +
-    '</div>' +
-    '<p class="config-note">A season pays out when its championship is marked <em>Final</em>. ' +
-      'Everything here is worked out from results as they stand, so reopening a season takes its ' +
-      'payout back.</p>' +
+  return '<h4 class="finance-heading">Season by season</h4>' +
+    '<p class="config-note">Salary is paid one instalment per race, against the number of races ' +
+      'the season was set to run. Race the full calendar and you draw the whole salary; stop ' +
+      'short and you keep only what you raced for, and races beyond the calendar add nothing. ' +
+      'Prize money pays on your final position, so it lands when the championship is marked ' +
+      '<em>Final</em> &mdash; and is settled at that moment, so changing prize money in Config ' +
+      'afterwards cannot reach back into a season that is over. Reopening one takes the payout ' +
+      'back, and finishing it again settles it afresh.</p>' +
     '<table class="ledger-table"><thead><tr>' +
       '<th>Season</th><th>Team</th><th>State</th><th class="num">Result</th>' +
-      '<th class="num">Target</th><th class="num">Salary</th><th class="num">Prize</th>' +
+      '<th class="num">Target</th><th class="num">Races</th>' +
+      '<th class="num">Salary</th><th class="num">Prize</th>' +
       '<th class="num">Sponsorship</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
-document.querySelectorAll('[data-career-sub="contracts"]').forEach(function (btn) {
+/// Where the money went, across the whole career.
+///
+/// Sums of fields already in the payload, so this adds no rule of its own — it only groups the
+/// ledger by what kind of money each column is. Capital is kept apart from income for the same
+/// reason `Finances.starting` is its own field: a career that was founded with a million did not
+/// earn it.
+function whereItWent(f) {
+  var wages = 0, prizes = 0, sponsor = 0;
+  f.seasons.forEach(function (s) {
+    wages += s.salary;
+    prizes += s.prize;
+    sponsor += s.bought_for;
+  });
+  var rows = [
+    ['Founded with', f.starting, 'capital, not income'],
+    ['Wages', wages, 'drawn race by race across each season&rsquo;s calendar'],
+    ['Prize money', prizes, 'paid on final standings, once a season is marked Final'],
+    ['Sponsorship bought', -sponsor, 'paid to teams for seats the rating had not earned']
+  ].filter(function (r) { return r[1]; }).map(function (r) {
+    return '<tr>' +
+      '<td>' + r[0] + '</td>' +
+      '<td class="num' + (r[1] < 0 ? ' finance-spent' : '') + '">' + fmtCredits(r[1]) + '</td>' +
+      '<td class="finance-why">' + r[2] + '</td>' +
+      '</tr>';
+  }).join('');
+
+  return '<h4 class="finance-heading">Where the money went</h4>' +
+    '<table class="ledger-table finance-split"><tbody>' + rows +
+      '<tr class="finance-split-total">' +
+        '<td>Balance</td>' +
+        '<td class="num"><b>' + fmtCredits(f.balance) + '</b></td>' +
+        '<td class="finance-why">may run negative &mdash; reassigning a session can move ' +
+          'standings that were already paid out</td>' +
+      '</tr>' +
+    '</tbody></table>';
+}
+
+document.querySelectorAll('[data-career-sub="finances"]').forEach(function (btn) {
   btn.addEventListener('click', loadFinances);
 });

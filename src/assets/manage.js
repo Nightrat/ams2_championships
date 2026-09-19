@@ -218,6 +218,13 @@ function renderChampDetail(id) {
     '</div>' +
     '<div class="champ-detail-meta">' +
       '<label>Points&nbsp;<input class="manage-input champ-points-input" value="' + esc(champ.points_system.join(',')) + '" data-id="' + esc(champ.id) + '" size="32" title="Comma-separated points per finishing position"></label>' +
+      // Not locked by the first session the way the roster and the seat are: the wage is capped
+      // and never topped up, so resizing the calendar only changes the instalments still to
+      // come. It is also how a season created before calendars existed starts paying per race.
+      (mpCareer ? '' :
+      '<label title="How many races the season runs. Your salary is paid out across them, one instalment per race.">Races&nbsp;' +
+        '<input type="number" min="1" max="99" class="manage-input manage-input-num champ-races-input" value="' + (champ.planned_rounds || '') + '" placeholder="—">' +
+      '</label>') +
       '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
       // A multiplayer career has no roster and no team, so both pickers are left out rather
       // than shown disabled — a dead control that explains why it is dead is still dead.
@@ -260,6 +267,12 @@ function renderChampDetail(id) {
   });
   right.querySelector('.champ-manufacturer-check').addEventListener('change', function () {
     patchChamp(champ.id, { manufacturer_scoring: this.checked });
+  });
+  // Absent in a multiplayer career, which has no salary to pay out across a calendar.
+  var racesInput = right.querySelector('.champ-races-input');
+  if (racesInput) racesInput.addEventListener('blur', function () {
+    var n = parseInt(this.value, 10);
+    if (n > 0) patchChamp(champ.id, { planned_rounds: n });
   });
   // Both pickers are absent in a multiplayer career, so neither is assumed to be there.
   var aiSelect = right.querySelector('.champ-custom-ai-select');
@@ -469,6 +482,9 @@ if (addChampBtn && newForm) {
   addChampBtn.addEventListener('click', function () {
     newForm.style.display = '';
     var ai = document.getElementById('new-champ-ai');
+    // The calendar is only asked for where a salary is paid out across it.
+    var racesLabel = document.getElementById('new-champ-races-label');
+    if (racesLabel) racesLabel.style.display = careerMode === 'singleplayer' ? '' : 'none';
     if (ai) {
       var sp = careerMode === 'singleplayer';
       ai.style.display = sp ? '' : 'none';
@@ -506,6 +522,13 @@ if (addChampBtn && newForm) {
     if (careerMode === 'singleplayer') {
       if (!aiEl || !aiEl.value) { alert('Choose a Custom AI Drivers file for the season.'); return; }
       body.custom_ai_file = aiEl.value;
+      // Declared up front because nothing later can supply it: rounds appear as they are raced,
+      // so a season in progress cannot say how far through it is. It is what a salary is split
+      // across, so a season without one could only ever pay in one lump at the end.
+      var racesEl = document.getElementById('new-champ-races');
+      var races = racesEl ? parseInt(racesEl.value, 10) : NaN;
+      if (!races || races < 1) { alert('Enter how many races the season runs.'); return; }
+      body.planned_rounds = races;
     }
     fetch('/api/championships', {
       method: 'POST',

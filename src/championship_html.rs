@@ -32,7 +32,7 @@ fn generate_html() -> String {
       <button class="sub-tab-btn sub-tab-active" data-career-sub="champs">Championships</button>
       <button class="sub-tab-btn" data-career-sub="stats">Driver Stats</button>
       <button class="sub-tab-btn" data-career-sub="tracks">Track Stats</button>
-      <button class="sub-tab-btn" data-career-sub="contracts">Contracts</button>
+      <button class="sub-tab-btn" data-career-sub="finances">Finances</button>
       <button id="career-export-btn" class="career-export-btn">&#128229; Download HTML</button>
     </div>
     <div id="career-sub-champs" class="sub-tab-panel">
@@ -48,8 +48,8 @@ fn generate_html() -> String {
     <div id="career-sub-tracks" class="sub-tab-panel sub-tab-panel-hidden">
       <div id="career-tracks-container"></div>
     </div>
-    <div id="career-sub-contracts" class="sub-tab-panel sub-tab-panel-hidden">
-      <div id="career-contracts-container"></div>
+    <div id="career-sub-finances" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-finances-container"></div>
     </div>
   </div>
   <div id="tab-live" class="tab-panel">
@@ -128,6 +128,10 @@ fn generate_html() -> String {
           <!-- Singleplayer only: manage.js fills and reveals it. A season is defined by the grid
                it is raced on, so the roster is chosen here rather than after the fact. -->
           <select id="new-champ-ai" class="manage-select" style="display:none" title="The grid this season is raced on"></select>
+          <!-- The calendar. Rounds are added as they are raced, so this is the only place the
+               length of a season can come from — and without it a salary has no denominator to
+               be paid out across. Required wherever contracts exist; manage.js reveals it. -->
+          <label id="new-champ-races-label" class="manage-inline-label" style="display:none">Races&nbsp;<input id="new-champ-races" type="number" min="1" max="99" value="15" class="manage-input manage-input-num" title="How many races the season runs — your salary is paid out across them"></label>
           <label class="manage-checkbox-label"><input type="checkbox" id="new-champ-manufacturer"> Constructor Scoring</label>
           <button id="new-champ-save" class="manage-btn manage-btn-primary">Create</button>
           <button id="new-champ-cancel" class="manage-btn">Cancel</button>
@@ -164,7 +168,7 @@ fn generate_html() -> String {
          or <strong>multiplayer</strong> (race people: no roster, no team, no contracts, as many seasons at once as you like).
          The kind is chosen when the career is created and kept — make a new career to race the other way.</p>
       <p class="config-note">Each save is a separate career — its own championships, sessions and stats.
-         Saves are the <code>*.json</code> files in <code id="saves-dir-label">…</code>; recorded sessions
+         A save is a folder in <code id="saves-dir-label">…</code> holding a <code>career.json</code>; recorded sessions
          always go into the active one. Track radar maps are shared by all saves.
          Change the folder under <em>Server Configuration</em> below.</p>
       <ul id="saves-list" class="saves-list"></ul>
@@ -233,7 +237,7 @@ fn generate_html() -> String {
         </div>
         <div class="config-group">
           <label class="config-label">Contracts</label>
-          <span class="config-hint">Contracts are on for every singleplayer career and off for every multiplayer one — the career's kind decides, so there is nothing to switch here. The settings below tune the money they deal in. The ledger is on the Career tab under <em>Contracts</em>.</span>
+          <span class="config-hint">Contracts are on for every singleplayer career and off for every multiplayer one — the career's kind decides, so there is nothing to switch here. The settings below tune the money they deal in. The ledger is on the Career tab under <em>Finances</em>.</span>
         </div>
         <div class="config-group">
           <label class="config-label" for="cfg-contract-top-salary">Salary range</label>
@@ -249,7 +253,7 @@ fn generate_html() -> String {
             <input class="config-input" id="cfg-champion-prize" type="number" min="1" title="Winning the championship" />
             <input class="config-input" id="cfg-last-place-prize" type="number" min="1" title="Last of the drivers who scored" />
           </div>
-          <span class="config-hint">Paid on final championship position once a season is marked Final, scaled by the size of the field.</span>
+          <span class="config-hint">Paid on final championship position once a season is marked Final, scaled by the size of the field. The payout is settled at the moment a season is marked Final, so changing these never moves a season the career has already finished &mdash; only the ones still to come.</span>
         </div>
         <div class="config-group">
           <label class="config-label" for="cfg-starting-balance">Starting balance</label>
@@ -263,6 +267,9 @@ fn generate_html() -> String {
         </div>
         <details class="config-details">
           <summary class="config-details-summary">Driver rating tuning</summary>
+          <div class="config-group">
+            <span class="config-hint">A career records these when it is created and keeps them, so retuning here changes <em>new</em> careers only. Everything the rating decides &mdash; which seats were ever open, what a team asked, whether a contract could have been signed &mdash; would otherwise be rewritten backwards through seasons already raced. Use the button below to move the career you are playing onto these settings deliberately.</span>
+          </div>
           <div class="config-group">
             <label class="config-label" for="cfg-starting-rating">Starting rating</label>
             <input class="config-input" id="cfg-starting-rating" name="starting_rating" type="number" min="0" max="100" step="1" />
@@ -308,6 +315,12 @@ fn generate_html() -> String {
             <label class="config-label" for="cfg-retirement-distance-pct">Retirement threshold (% of distance)</label>
             <input class="config-input" id="cfg-retirement-distance-pct" name="retirement_distance_pct" type="number" min="0" max="100" step="1" />
             <span class="config-hint">A car must finish short of this share of the leader's distance to count as retired (default 90%). Both thresholds have to agree, so loosening either one alone only makes retirements rarer. 100% calls anything off the lead lap a retirement; 0% means nothing ever is.</span>
+          </div>
+          <div class="config-group">
+            <div id="cfg-rating-diverged" class="config-diverged" hidden>The career you are playing is not using the settings above &mdash; it is still on the ones it was created with.</div>
+            <button id="cfg-rating-adopt" class="manage-btn" type="button">Apply these settings to the current career</button>
+            <span class="config-hint">Save first, then apply. This moves every rating and every team bar in the career, including the ones past seasons were judged against, so a seat you earned may read differently afterwards.</span>
+            <span id="cfg-rating-adopt-msg" class="config-hint"></span>
           </div>
         </details>
         <div class="config-group config-group-check">

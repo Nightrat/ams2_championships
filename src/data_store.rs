@@ -43,10 +43,13 @@ pub struct RecordedSession {
     pub car_name: String,
     #[serde(default)]
     pub car_class: String,
-    /// session_state from AMS2: 1=Practice, 3=Qualify, 5=Race.
+    /// session_state from AMS2: 1=Practice, 3=Qualify, 5=Race — see [`SESSION_RACE`].
     pub session_type: u32,
     pub results: Vec<SessionResult>,
-    #[serde(default)]
+    /// Empty in every folder save: the chart lives in `laps/<id>.json` beside the career, and
+    /// is read only when someone opens that session's chart. See [`crate::lap_charts`] for why.
+    /// Still filled for a legacy flat save, which has nowhere else to put it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lap_chart: Vec<LapChartEntry>,
 }
 
@@ -56,6 +59,10 @@ pub struct Round {
     /// Session IDs that belong to this round, in any order.
     pub session_ids: Vec<String>,
 }
+
+/// `session_type` of a race, as AMS2 reports it. The one session type that scores points, and
+/// so the one that counts a round as raced.
+pub const SESSION_RACE: u32 = 5;
 
 /// Lifecycle state of a championship.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
@@ -102,6 +109,18 @@ pub struct Championship {
     /// `custom_ai_file` does for AI drivers.
     #[serde(default)]
     pub player_team: Option<String>,
+    /// How many races the season is meant to run, declared when it is created.
+    ///
+    /// The calendar is the one thing a career could never answer for itself: [`Self::rounds`]
+    /// grows as rounds are raced, so after round one there is no way to tell whether a season
+    /// is an eighth or a fifteenth of the way through. That is the only reason a salary could
+    /// not be paid out across a season rather than in one lump at the end, so declaring it up
+    /// front is what makes per-race pay possible — see [`crate::contracts::salary_earned`].
+    ///
+    /// `None` on every season created before this existed, and on any season in a career that
+    /// does not use contracts. Those pay exactly as they did: the whole salary, at `Final`.
+    #[serde(default)]
+    pub planned_rounds: Option<u32>,
 }
 
 /// Which kind of career a save holds, and therefore which rules its seasons follow.
@@ -210,6 +229,21 @@ pub struct CareerData {
     /// This is the *only* persisted part of the contracts feature — see [`crate::contracts`].
     #[serde(default)]
     pub contracts: Vec<crate::contracts::Contract>,
+    /// The rating tuning this career runs on.
+    ///
+    /// Copied from `config.rating_params()` when the career is created and then **kept**, for the
+    /// same reason [`Self::starting_balance`] is: the rating decides which seats a career was
+    /// ever allowed to take, so retuning it in Config would retroactively rewrite whether every
+    /// contract the career has signed could have been signed at all. The rating itself is still
+    /// derived from the assigned sessions on every request — it is only the *tuning* that stops
+    /// moving.
+    ///
+    /// `None` on a save written before this existed, which then falls back to config and behaves
+    /// exactly as it did. That is the pre-upgrade state only: stamping happens wherever a career
+    /// is loaded, so a career in use has its own copy. `POST /api/career/rating/adopt` is the one
+    /// way to replace it afterwards.
+    #[serde(default)]
+    pub rating_params: Option<crate::driver_rating::RatingParams>,
 }
 
 pub type SharedStore = Arc<RwLock<CareerData>>;
@@ -284,6 +318,12 @@ pub fn load_store(path: &Path) -> SharedStore {
 #[derive(Serialize)]
 pub struct StandingsEntry {
     pub name: String,
+    /// The driver's team, for the driver standings only. Omitted from the JSON when
+    /// absent, which is always the case in the constructor standings — there the
+    /// entry *is* the team and a second copy of it under another name would be a
+    /// field that can only ever agree with `name`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team: Option<String>,
     pub points: i32,
     pub wins: u32,
 }
@@ -311,7 +351,6 @@ pub struct SessionView {
     pub track_variation: String,
     pub session_type: u32,
     pub results: Vec<SessionResultView>,
-    pub lap_chart: Vec<LapChartEntry>,
 }
 
 /// Round with sessions already resolved from IDs.
@@ -387,11 +426,85 @@ fn resolve_sessions<'a>(
         .collect()
 }
 
+/// Finishing positions, as counts indexed by `position - 1`: `[2, 0, 1]` is two wins and a
+/// third. Only classified finishes are recorded — a retirement is not a place, which is the
+/// same rule that stops it scoring.
+///
+/// The derived `Ord` **is** the FIA countback. Lexicographic comparison walks the positions in
+/// order and stops at the first that differs, which is exactly "most wins; if equal, most
+/// seconds; if equal, most thirds…". That only holds because a trailing zero can never occur:
+/// `record` pads with zeros up to the position it is about to increment, so the last element is
+/// always at least 1, and an entry that never finished is the empty vec — which sorts below
+/// every entry that finished anything, as it should.
+#[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
+struct Countback(Vec<u32>);
+
+/// Highest position a countback will record. The shared memory's participant array is 64, so
+/// anything beyond it is not a grid slot — and a career file is hand-edited often enough that
+/// an unbounded `resize` on a parsed number is not worth the risk.
+const MAX_GRID: u32 = 64;
+
+impl Countback {
+    fn record(&mut self, position: u32) {
+        if position == 0 || position > MAX_GRID {
+            return;
+        }
+        let i = position as usize - 1;
+        if self.0.len() <= i {
+            self.0.resize(i + 1, 0);
+        }
+        self.0[i] += 1;
+    }
+
+    fn wins(&self) -> u32 {
+        self.0.first().copied().unwrap_or(0)
+    }
+}
+
+/// Sorts a scored table into finishing order and drops the countbacks.
+///
+/// Points, then the FIA countback, then the name. The name is not an FIA rule — the regulations
+/// hand a dead heat to the stewards to settle "according to such criteria as it thinks fit",
+/// which is not something this can do. It is here so that the answer is at least *stable*:
+/// without a total order the tied entries kept whatever order the `HashMap` iterated in, which
+/// is seeded per map and so reshuffled on every single request.
+///
+/// Both tables rank through here so the two cannot drift apart.
+fn rank(mut table: Vec<(StandingsEntry, Countback)>) -> Vec<StandingsEntry> {
+    table.sort_by(|(a, a_cb), (b, b_cb)| {
+        b.points
+            .cmp(&a.points)
+            .then_with(|| b_cb.cmp(a_cb))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    table.into_iter().map(|(e, _)| e).collect()
+}
+
 /// Championship standings, best first. Races only — points come from `champ.points_system`,
-/// and a retirement scores nothing.
+/// and a retirement scores nothing. Ties are broken by the FIA countback; see `rank`.
+///
+/// Team-less: every entry's `team` is `None`. Callers that have a roster to hand want
+/// `standings_with`, which is the same table with the names resolved.
 pub fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<StandingsEntry> {
+    standings_with(champ, sessions, &HashMap::new())
+}
+
+/// `standings`, with each driver's team resolved against `team_map` — the roster read off the
+/// championship's Custom AI file. Mirrors the `*_with` convention in `driver_rating` and
+/// `contracts`: the plain call is this one on an empty map.
+///
+/// The team falls back the same way a result row's does (`SessionResultView::car_name`):
+/// roster, then the player's manual override, then the car itself. A career with no roster
+/// still says something useful, which is why the column reads "Team / Car" — the same
+/// admission the constructor standings' header already makes.
+pub fn standings_with(
+    champ: &Championship,
+    sessions: &[RecordedSession],
+    team_map: &HashMap<String, String>,
+) -> Vec<StandingsEntry> {
     let mut pts: HashMap<String, i32> = HashMap::new();
-    let mut wins: HashMap<String, u32> = HashMap::new();
+    let mut backs: HashMap<String, Countback> = HashMap::new();
+    let mut teams: HashMap<String, String> = HashMap::new();
     for round in &champ.rounds {
         for s in resolve_sessions(&round.session_ids, sessions) {
             if s.session_type != 5 {
@@ -399,29 +512,41 @@ pub fn standings(champ: &Championship, sessions: &[RecordedSession]) -> Vec<Stan
             }
             for r in &s.results {
                 let p = pts.entry(r.name.clone()).or_insert(0);
-                wins.entry(r.name.clone()).or_insert(0);
+                let cb = backs.entry(r.name.clone()).or_default();
+                if let Some(team) = team_map
+                    .get(&r.name)
+                    .cloned()
+                    .or_else(|| resolve_player_team(r, champ).map(|s| s.to_string()))
+                    .or_else(|| Some(r.car_name.clone()).filter(|c| !c.is_empty()))
+                {
+                    teams.insert(r.name.clone(), team);
+                }
                 if !r.dnf {
                     let pos = r.race_position as usize;
                     if pos > 0 && pos <= champ.points_system.len() {
                         *p += champ.points_system[pos - 1];
                     }
-                    if r.race_position == 1 {
-                        *wins.entry(r.name.clone()).or_insert(0) += 1;
-                    }
+                    cb.record(r.race_position);
                 }
             }
         }
     }
-    let mut out: Vec<StandingsEntry> = pts
-        .into_iter()
-        .map(|(name, points)| StandingsEntry {
-            points,
-            wins: wins.get(&name).copied().unwrap_or(0),
-            name,
-        })
-        .collect();
-    out.sort_by(|a, b| b.points.cmp(&a.points).then(b.wins.cmp(&a.wins)));
-    out
+    rank(
+        pts.into_iter()
+            .map(|(name, points)| {
+                let cb = backs.remove(&name).unwrap_or_default();
+                (
+                    StandingsEntry {
+                        points,
+                        wins: cb.wins(),
+                        team: teams.get(&name).cloned(),
+                        name,
+                    },
+                    cb,
+                )
+            })
+            .collect(),
+    )
 }
 
 /// The player's manual team override, if this result is the player's and one is set.
@@ -440,7 +565,7 @@ fn constructors(
     team_map: &HashMap<String, String>,
 ) -> Vec<StandingsEntry> {
     let mut pts: HashMap<String, i32> = HashMap::new();
-    let mut wins: HashMap<String, u32> = HashMap::new();
+    let mut backs: HashMap<String, Countback> = HashMap::new();
     for round in &champ.rounds {
         for s in resolve_sessions(&round.session_ids, sessions) {
             if s.session_type != 5 {
@@ -459,29 +584,34 @@ fn constructors(
                     continue;
                 };
                 let p = pts.entry(key.clone()).or_insert(0);
-                wins.entry(key.clone()).or_insert(0);
+                let cb = backs.entry(key.clone()).or_default();
                 if !r.dnf {
                     let pos = r.race_position as usize;
                     if pos > 0 && pos <= champ.points_system.len() {
                         *p += champ.points_system[pos - 1];
                     }
-                    if r.race_position == 1 {
-                        *wins.entry(key.clone()).or_insert(0) += 1;
-                    }
+                    cb.record(r.race_position);
                 }
             }
         }
     }
-    let mut out: Vec<StandingsEntry> = pts
-        .into_iter()
-        .map(|(name, points)| StandingsEntry {
-            points,
-            wins: wins.get(&name).copied().unwrap_or(0),
-            name,
-        })
-        .collect();
-    out.sort_by(|a, b| b.points.cmp(&a.points).then(b.wins.cmp(&a.wins)));
-    out
+    rank(
+        pts.into_iter()
+            .map(|(name, points)| {
+                let cb = backs.remove(&name).unwrap_or_default();
+                (
+                    StandingsEntry {
+                        points,
+                        wins: cb.wins(),
+                        // The entry is the team here; see `StandingsEntry::team`.
+                        team: None,
+                        name,
+                    },
+                    cb,
+                )
+            })
+            .collect(),
+    )
 }
 
 /// Resolve the driver-name -> team/livery-name map for a championship's assigned
@@ -559,7 +689,7 @@ pub fn compute_career_full(
 
     for champ in champs {
         let team_map = resolve_team_map(champ, ai_dir);
-        let driver_standings = standings(champ, sessions);
+        let driver_standings = standings_with(champ, sessions, &team_map);
         let constructor_standings = constructors(champ, sessions, &team_map);
 
         if champ.status == ChampionshipStatus::Final {
@@ -653,7 +783,6 @@ pub fn compute_career_full(
                     track_variation: s.track_variation.clone(),
                     session_type: s.session_type,
                     results: result_views,
-                    lap_chart: s.lap_chart.clone(),
                 });
             }
             rounds.push(RoundView {

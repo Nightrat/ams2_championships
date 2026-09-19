@@ -289,6 +289,75 @@ pub fn rename_save(dir: &Path, name: &str, new_name: &str) -> Result<PathBuf, St
     }
 }
 
+/// Quick attempts made while the user is still waiting for the delete to answer.
+///
+/// Their delays sum to a fifth of a second, which is all an inline retry is worth: measured
+/// against a real saves folder, retrying *within the failing call* does not clear the holder at
+/// all — see [`sweep_folder_in_background`], which is what actually gets the folder away.
+const DELETE_ATTEMPTS: u32 = 4;
+
+/// Removes a directory tree, retrying briefly when the directory itself will not go.
+///
+/// `remove_dir_all` empties a folder and then removes it, and on Windows that last step fails
+/// while anything still holds a handle to the directory. Saves folders live inside Google Drive
+/// and OneDrive often enough that this is ordinary rather than exotic; a virus scanner, the
+/// search indexer or an open Explorer window do the same. The contents are already gone by the
+/// time it fails, so what the user sees is exactly the symptom this guards against: the career
+/// disappears from the switcher and an empty folder stays behind.
+fn remove_dir_all_briefly(folder: &Path) -> std::io::Result<()> {
+    let mut last = match fs::remove_dir_all(folder) {
+        Ok(()) => return Ok(()),
+        Err(e) => e,
+    };
+    for attempt in 1..DELETE_ATTEMPTS {
+        std::thread::sleep(std::time::Duration::from_millis(20 * attempt as u64));
+        // Something else may have finished the job — a sync client completing its own delete.
+        if !folder.exists() {
+            return Ok(());
+        }
+        match fs::remove_dir_all(folder) {
+            Ok(()) => return Ok(()),
+            Err(e) => last = e,
+        }
+    }
+    Err(last)
+}
+
+/// Removes empty directories left in the saves folder by a delete that could not finish.
+///
+/// Called once at startup, and the timing is the whole of why it works. Measured against a real
+/// saves folder inside Google Drive: after Drive has taken a new folder up, the process that
+/// *created* it can no longer remove it — `remove_dir_all` and a bare `remove_dir` are both
+/// denied, ninety seconds later, on a directory that is already empty — while any other process
+/// removes it on the first try, instantly. So the lockout follows the process, not the clock,
+/// and no retry, however patient, can clear it from inside the run that made the folder. The
+/// next launch is a different process, and simply succeeds.
+///
+/// Only **empty** directories go. That is what makes this safe to do unasked: an empty directory
+/// holds nothing that can be lost, `track_layouts` has files in it and stays, and a save always
+/// has its `career.json`, so nothing this removes was ever a career. Returns how many went.
+pub fn sweep_empty_husks(dir: &Path) -> usize {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut swept = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        // `read_dir(..).next().is_none()` is the emptiness test rather than counting, so a
+        // folder with a thousand files costs one entry to reject.
+        let empty = fs::read_dir(&path)
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(false);
+        if empty && fs::remove_dir(&path).is_ok() {
+            swept += 1;
+        }
+    }
+    swept
+}
+
 /// Delete the save called `name`, folder and all.
 ///
 /// A folder save is a recursive delete, which a single file never was, so it is guarded: the
@@ -302,8 +371,24 @@ pub fn delete_save(dir: &Path, name: &str) -> Result<(), String> {
         if folder.parent() != Some(dir) {
             return Err("refusing to delete a folder outside the saves directory".to_string());
         }
-        return fs::remove_dir_all(&folder)
-            .map_err(|e| format!("cannot delete {}: {e}", folder.display()));
+        return match remove_dir_all_briefly(&folder) {
+            Ok(()) => Ok(()),
+            // The career file is what makes a folder a save, so once that is gone the save is
+            // deleted whatever became of the directory. Reporting a failure here would be wrong
+            // twice over: the switcher has already stopped listing the career, and there is
+            // nothing the user could usefully retry — this process cannot remove the folder at
+            // all, however long it waits. [`sweep_empty_husks`] clears it on the next launch.
+            Err(_) if !folder.join(CAREER_FILE).exists() => {
+                eprintln!(
+                    "Deleted the career '{name}'. Its folder is empty but could not be removed \
+                     by this process — a file-sync client is holding it. It will be cleared on \
+                     the next start, or you can delete it now: {}",
+                    folder.display()
+                );
+                Ok(())
+            }
+            Err(e) => Err(format!("cannot delete {}: {e}", folder.display())),
+        };
     }
     let flat = legacy_save_path(dir, name);
     if flat.is_file() {

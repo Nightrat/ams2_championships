@@ -20,15 +20,36 @@ mod ams2 {
     pub const RACE_STATE_RETIRED: u32 = 5;
     pub const RACE_STATE_DNF: u32 = 6;
 
-    /// game_state values
+    /// game_state values, in the PCars2 header's declaration order. The values this recorder
+    /// has actually observed fit that order exactly — 2 while driving, 4 in the garage during
+    /// practice and on the results screen, both menus with the session clock still running —
+    /// so the two replay values below follow from the same counting the struct offsets do.
     pub const GAME_STATE_EXITED: u32 = 0;
-    pub const GAME_STATE_MENUS: u32 = 1;
-    pub const GAME_STATE_TIMEDOUT: u32 = 3;
+    pub const GAME_STATE_FRONT_END: u32 = 1;
     pub const GAME_STATE_IN_GAME: u32 = 2;
-    pub const GAME_STATE_REPLAY: u32 = 4;
+    pub const GAME_STATE_PAUSED: u32 = 3;
+    pub const GAME_STATE_MENU_TIME_TICKING: u32 = 4;
+    pub const GAME_STATE_RESTARTING: u32 = 5;
+    /// Watching a replay from the pause or results screen.
+    pub const GAME_STATE_REPLAY: u32 = 6;
+    /// Watching a replay loaded from the main menu.
+    pub const GAME_STATE_FRONT_END_REPLAY: u32 = 7;
 }
 
-use ams2::{SESSION_PRACTICE, SESSION_QUALIFY, SESSION_RACE};
+use ams2::{
+    GAME_STATE_FRONT_END_REPLAY, GAME_STATE_REPLAY, SESSION_PRACTICE, SESSION_QUALIFY,
+    SESSION_RACE,
+};
+
+/// True while AMS2 is playing a replay back rather than running the session.
+///
+/// A replay refills the very same participant rows the live session uses, stepping
+/// *backwards* through a race that has already been decided: positions, lap counts and lap
+/// times all come back as they were mid-race. Nothing read during one describes the session's
+/// current state, so the recorder must not let any of it reach a result.
+pub(crate) fn is_replay(game_state: u32) -> bool {
+    matches!(game_state, GAME_STATE_REPLAY | GAME_STATE_FRONT_END_REPLAY)
+}
 
 #[cfg(test)]
 #[path = "tests/session_recorder.rs"]
@@ -86,7 +107,7 @@ pub(crate) fn capture(
         })
         .collect();
 
-    let recorded = RecordedSession {
+    let mut recorded = RecordedSession {
         id: now.to_string(),
         recorded_at: now,
         track: session.track_location.clone(),
@@ -112,6 +133,10 @@ pub(crate) fn capture(
         recorded.results.len()
     );
 
+    // The chart goes beside the career rather than into it — it is the bulk of a session and
+    // nothing but its own view reads it. A save that cannot take one keeps it inline.
+    crate::lap_charts::externalize(path, std::slice::from_mut(&mut recorded));
+
     {
         let mut data = store.write().unwrap();
         data.sessions.push(recorded);
@@ -130,6 +155,11 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
     let session = read_live_session();
     if !session.connected {
         return Err("AMS2 is not connected".into());
+    }
+    // The rows a replay fills are a moment in a race that is already over, so recording them
+    // would file a mid-race snapshot as the result. Refuse rather than take the picture.
+    if is_replay(session.game_state) {
+        return Err("AMS2 is playing a replay — stop it first, then record".into());
     }
     if session.num_participants == 0 {
         return Err("No active participants".into());
@@ -212,6 +242,8 @@ pub(crate) fn should_capture(cached: &LiveSessionData) -> bool {
 ///   Race   — when the race is finished the user can only leave session which leads to a disconnect (in SP he can also restart the session, meaning he throws away the current cached result).
 ///   P / Q  — session_state changes (P→Q, Q→Race lobby)
 ///   Any    — disconnect while session was active
+///
+/// Held (nothing read, nothing captured): game=6 or 7, a replay — see `is_replay`.
 pub fn start(
     store: SharedStore,
     path: SavePath,
@@ -223,98 +255,159 @@ pub fn start(
         // Read fresh from the shared path at each capture — the active save can be switched
         // at runtime via POST /api/saves/activate while this thread is running.
         let current_path = || path.read().map(|p| p.clone()).unwrap_or_default();
-        let mut prev_session_state: u32 = 0;
-        // Rolling snapshot — updated whenever in a capturable session with participants,
-        // regardless of game_state (P/Q use game=4, not game=2).
-        let mut session_cache: Option<LiveSessionData> = None;
-        // Lap-by-lap position chart accumulated during a race session.
-        let mut lap_chart: Vec<LapChartEntry> = vec![];
-        let mut leader_laps: u32 = 0;
-        // Name of the human player, learned from any poll in the current session where
-        // AMS2 correctly reported mViewedParticipantIndex — see the comment on `capture()`.
-        let mut player_name: Option<String> = None;
+        let mut state = RecorderState::new(record_practice, record_qualify, record_race);
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
 
-            let session = read_live_session();
-
-            let should_record = |state: u32| -> bool {
-                match state {
-                    SESSION_PRACTICE => record_practice,
-                    SESSION_QUALIFY => record_qualify,
-                    SESSION_RACE => record_race,
-                    _ => false,
-                }
-            };
-
-            if !session.connected {
-                if let Some(ref cached) = session_cache {
-                    if should_capture(cached) && should_record(cached.session_state) {
-                        capture(
-                            &store,
-                            &current_path(),
-                            cached,
-                            std::mem::take(&mut lap_chart),
-                            player_name.as_deref(),
-                        );
-                    }
-                }
-                prev_session_state = 0;
-                session_cache = None;
-                lap_chart.clear();
-                leader_laps = 0;
-                player_name = None;
-                continue;
-            }
-
-            let session_state = session.session_state;
-            if prev_session_state == 0 {
-                prev_session_state = session_state;
-            }
-
-            if prev_session_state != session_state {
-                if let Some(ref cached) = session_cache {
-                    if should_capture(cached) && should_record(cached.session_state) {
-                        capture(
-                            &store,
-                            &current_path(),
-                            cached,
-                            std::mem::take(&mut lap_chart),
-                            player_name.as_deref(),
-                        );
-                    }
-                }
-                session_cache = None;
-                lap_chart.clear();
-                leader_laps = 0;
-                player_name = None;
-                prev_session_state = session_state;
-            }
-
-            // ── Accumulate per-lap positions during a race ────────────────────
-            if session_state == SESSION_RACE {
-                accumulate_lap_chart(&mut lap_chart, &mut leader_laps, &session);
-            }
-
-
-            // ── Always refresh the rolling cache ─────────────────────────────
-            // P/Q run at game_state=4 so we must not gate the cache on game_state.
-            if matches!(
-                session_state,
-                SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE
-            ) && session.num_participants > 0
-            {
-                if let Some(p) = session.participants.iter().find(|p| p.is_player) {
-                    player_name = Some(p.name.clone());
-                }
-                session_cache = Some(session.clone());
-            } else if !matches!(
-                session_state,
-                SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE
-            ) {
-                session_cache = None;
+            if let Some(taken) = state.poll(&read_live_session()) {
+                capture(
+                    &store,
+                    &current_path(),
+                    &taken.session,
+                    taken.lap_chart,
+                    taken.player_name.as_deref(),
+                );
             }
         }
     });
+}
+
+/// Everything the polling thread carries between polls.
+///
+/// It is a type rather than a handful of locals so the decisions — what is cached, what a
+/// session change captures, what a replay freezes — can be driven a poll at a time in tests,
+/// which cannot run AMS2.
+pub(crate) struct RecorderState {
+    record_practice: bool,
+    record_qualify: bool,
+    record_race: bool,
+    prev_session_state: u32,
+    /// Rolling snapshot — updated whenever in a capturable session with participants,
+    /// regardless of game_state (P/Q use game=4, not game=2).
+    session_cache: Option<LiveSessionData>,
+    /// Lap-by-lap position chart accumulated during a race session.
+    lap_chart: Vec<LapChartEntry>,
+    leader_laps: u32,
+    /// Name of the human player, learned from any poll in the current session where
+    /// AMS2 correctly reported mViewedParticipantIndex — see the comment on `capture()`.
+    player_name: Option<String>,
+    /// Whether the previous poll was a replay, so the freeze is announced once rather than
+    /// once a second for as long as the user watches.
+    was_replay: bool,
+}
+
+/// A session the recorder has decided to write, handed back to the polling thread because
+/// only it holds the store and the active save path.
+pub(crate) struct Taken {
+    pub session: LiveSessionData,
+    pub lap_chart: Vec<LapChartEntry>,
+    pub player_name: Option<String>,
+}
+
+impl RecorderState {
+    pub(crate) fn new(record_practice: bool, record_qualify: bool, record_race: bool) -> Self {
+        Self {
+            record_practice,
+            record_qualify,
+            record_race,
+            prev_session_state: 0,
+            session_cache: None,
+            lap_chart: vec![],
+            leader_laps: 0,
+            player_name: None,
+            was_replay: false,
+        }
+    }
+
+    fn should_record(&self, state: u32) -> bool {
+        match state {
+            SESSION_PRACTICE => self.record_practice,
+            SESSION_QUALIFY => self.record_qualify,
+            SESSION_RACE => self.record_race,
+            _ => false,
+        }
+    }
+
+    /// The cached session, if it is one worth writing. Takes the lap chart with it.
+    fn take_cached(&mut self) -> Option<Taken> {
+        let cached = self.session_cache.as_ref()?;
+        if !(should_capture(cached) && self.should_record(cached.session_state)) {
+            return None;
+        }
+        Some(Taken {
+            session: cached.clone(),
+            lap_chart: std::mem::take(&mut self.lap_chart),
+            player_name: self.player_name.clone(),
+        })
+    }
+
+    /// Forgets the session in hand — used when one ends, and when AMS2 goes away.
+    fn clear_session(&mut self) {
+        self.session_cache = None;
+        self.lap_chart.clear();
+        self.leader_laps = 0;
+        self.player_name = None;
+    }
+
+    /// One poll of shared memory. Returns the session to write, if this poll ended one.
+    pub(crate) fn poll(&mut self, session: &LiveSessionData) -> Option<Taken> {
+        if !session.connected {
+            let taken = self.take_cached();
+            self.clear_session();
+            self.prev_session_state = 0;
+            self.was_replay = false;
+            return taken;
+        }
+
+        // ── A replay freezes the recorder ────────────────────────────────────
+        // Watching one rewinds every participant row to a mid-race moment, and the user
+        // usually watches from the results screen and then leaves — so the snapshot in hand
+        // when AMS2 disconnects would be a lap-20-of-30 picture filed as the final result,
+        // with the standings computed off it. Nothing is read and nothing is stepped
+        // forward, including `prev_session_state`: a session change that happens while the
+        // replay plays is acted on when the game comes back, against the same held snapshot.
+        if is_replay(session.game_state) {
+            if !self.was_replay {
+                self.was_replay = true;
+                println!("[recorder] replay playing — paused, holding the session result");
+            }
+            return None;
+        }
+        self.was_replay = false;
+
+        let session_state = session.session_state;
+        if self.prev_session_state == 0 {
+            self.prev_session_state = session_state;
+        }
+
+        let mut taken = None;
+        if self.prev_session_state != session_state {
+            taken = self.take_cached();
+            self.clear_session();
+            self.prev_session_state = session_state;
+        }
+
+        // ── Accumulate per-lap positions during a race ────────────────────
+        if session_state == SESSION_RACE {
+            accumulate_lap_chart(&mut self.lap_chart, &mut self.leader_laps, session);
+        }
+
+        // ── Always refresh the rolling cache ─────────────────────────────
+        // P/Q run at game_state=4 so we must not gate the cache on game_state.
+        let capturable = matches!(
+            session_state,
+            SESSION_PRACTICE | SESSION_QUALIFY | SESSION_RACE
+        );
+        if capturable && session.num_participants > 0 {
+            if let Some(p) = session.participants.iter().find(|p| p.is_player) {
+                self.player_name = Some(p.name.clone());
+            }
+            self.session_cache = Some(session.clone());
+        } else if !capturable {
+            self.session_cache = None;
+        }
+
+        taken
+    }
 }

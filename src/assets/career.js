@@ -18,21 +18,40 @@ function careerConstructorsHtml(constructors) {
 function careerStandingsHtml(standings) {
   if (!standings.length) return '<p class="manage-empty">No results yet.</p>';
   var rows = standings.map(function (d, i) {
+    // Beside the name rather than in a column of its own: the standings panel is
+    // narrow and this is the same shape a session result row already uses for the
+    // very same value. `team` is absent when nothing named it, so no empty span.
+    var team = d.team ? ' <span class="result-car">' + esc(d.team) + '</span>' : '';
     return '<tr>' +
       '<td class="pos">' + (i + 1) + '</td>' +
-      '<td>' + esc(d.name) + '</td>' +
+      '<td>' + esc(d.name) + team + '</td>' +
       '<td class="pts">' + d.points + '</td>' +
       '<td class="pts">' + d.wins + '</td>' +
       '</tr>';
   }).join('');
   return '<table class="standings-table">' +
-    '<thead><tr><th>Pos</th><th>Driver</th><th>Pts</th><th>W</th></tr></thead>' +
+    '<thead><tr><th>Pos</th><th>Driver / Team</th><th>Pts</th><th>W</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>';
 }
 
+// A race session's chart, collapsed and not yet fetched. The chart is the bulk of a career and
+// is read one session at a time, so it is no longer part of /api/career — opening this is what
+// asks for it. `lapChartTableHtml` then draws it from the reply.
+// Sessions by id, so a chart arriving later can order its drivers by their final position.
+// Only the race sessions that have a chart section go in — this is a lookup, not a second copy
+// of the career.
+var _lapChartSessions = {};
+
 function lapChartHtml(s) {
-  var chart = s.lap_chart || [];
-  if (!chart.length) return '';
+  _lapChartSessions[s.id] = s;
+  return '<details class="lap-chart-wrap" data-session="' + esc(s.id) + '">' +
+    '<summary class="lap-chart-label">Lap Chart</summary>' +
+    '<div class="lap-chart-body"></div>' +
+    '</details>';
+}
+
+function lapChartTableHtml(s, chart) {
+  if (!chart.length) return '<div class="lap-chart-empty">No lap chart recorded.</div>';
 
   // Collect laps and build byDriverLap[driver][lap] = position
   var laps = [];
@@ -68,14 +87,34 @@ function lapChartHtml(s) {
     return '<tr><td class="lc-driver">' + esc(d) + '</td>' + cells + '</tr>';
   }).join('');
 
-  return '<div class="lap-chart-wrap">' +
-    '<div class="lap-chart-label">Lap Chart</div>' +
-    '<div class="lap-chart-scroll">' +
+  return '<div class="lap-chart-scroll">' +
     '<table class="lap-chart-table">' +
     '<thead><tr><th class="lc-driver-h">Driver</th>' + lapHeaders + '</tr></thead>' +
     '<tbody>' + bodyRows + '</tbody>' +
-    '</table></div></div>';
+    '</table></div>';
 }
+
+// Fetch a chart the first time its section is opened, and once only. Delegated from the
+// container because the career view rebuilds its HTML wholesale on every reload.
+document.addEventListener('toggle', function (e) {
+  var box = e.target;
+  if (!box.classList || !box.classList.contains('lap-chart-wrap')) return;
+  if (!box.open || box.dataset.loaded) return;
+  box.dataset.loaded = '1';
+  var body = box.querySelector('.lap-chart-body');
+  var id = box.dataset.session;
+  body.textContent = 'Loading…';
+  fetch('/api/sessions/' + encodeURIComponent(id) + '/lap-chart')
+    .then(function (r) { return r.json(); })
+    .then(function (chart) {
+      var s = _lapChartSessions[id];
+      body.innerHTML = s ? lapChartTableHtml(s, chart || []) : '';
+    })
+    .catch(function () {
+      box.dataset.loaded = '';
+      body.textContent = 'Could not load the lap chart.';
+    });
+}, true);
 
 function careerRoundsHtml(champ) {
   var rounds = champ.rounds || [];

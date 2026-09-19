@@ -53,6 +53,72 @@ function dmgBar(label, v) {
     '</div>';
 }
 
+// The extremes of four per-corner values, as {low: {v, i}, high: {v, i}}, or
+// null when nothing is filled. Extremes rather than a mean: the lowest corner
+// is the one that bottoms out and the pair together give the rake, both of
+// which an average reads tidier by hiding. Corners at zero are skipped rather
+// than winning the minimum — zero is unset, not a car resting on its floor,
+// and whether AMS2 fills all four is not settled. With one corner filled, low
+// and high are the same corner, which is the honest answer.
+function rideExtremes(arr) {
+  var out = null;
+  for (var i = 0; i < 4; i++) {
+    var v = arr[i];
+    if (!(v > 0)) continue;
+    if (!out) { out = { low: { v: v, i: i }, high: { v: v, i: i } }; continue; }
+    if (v < out.low.v) out.low = { v: v, i: i };
+    if (v > out.high.v) out.high = { v: v, i: i };
+  }
+  return out;
+}
+
+// ── Ride height over the run ──────────────────────────────────────────────────
+// The instantaneous reading says what the car is doing now; the lowest value it
+// ever reached is what says how much floor there was left, which is the number a
+// setup is chosen against. So the extremes are accumulated per corner across the
+// run — front and rear ride height are separate setup values, so an overall
+// minimum alone would not say which end to lower.
+//
+// `min`/`max` hold 0 for "nothing recorded", the same unset convention the rest
+// of the panel uses.
+var rideSeen = null;
+// The session the readings belong to. A new track is a new run, and carrying a
+// figure across one would quietly answer a question about Monza with a lap of
+// Bathurst.
+var rideSeenKey = null;
+
+function resetRideSeen() {
+  rideSeen = null;
+  rideSeenKey = null;
+}
+
+// Fold one on-track sample into the run's extremes. Called from the point where
+// the last on-track reading is kept — deliberately before the panel's
+// visibility check, because these accumulate while the driver is driving rather
+// than while the tab happens to be open.
+function recordRideHeight(d, tel) {
+  var key = (d.track_location || '') + '|' + (d.track_variation || '');
+  if (key !== rideSeenKey) {
+    rideSeen = { min: [0, 0, 0, 0], max: [0, 0, 0, 0] };
+    rideSeenKey = key;
+  }
+  for (var i = 0; i < 4; i++) {
+    var v = tel.ride_height[i];
+    if (!(v > 0)) continue;
+    if (!(rideSeen.min[i] > 0) || v < rideSeen.min[i]) rideSeen.min[i] = v;
+    if (v > rideSeen.max[i]) rideSeen.max[i] = v;
+  }
+}
+
+// One label/value pair for a corner reading, with the corner name as a dimmed
+// qualifier on the value rather than a pair of its own.
+function rideHeightPair(label, c) {
+  return '<span class="dmg-contact-lbl">' + esc(label) + '</span>' +
+    '<span class="dmg-contact-val">' +
+      (c ? c.v.toFixed(2) + ' cm <span class="dmg-corner">' + DMG_WHEELS[c.i] + '</span>' : '&mdash;') +
+    '</span>';
+}
+
 function buildDamagePanel(tel, frozen) {
   var crash = tel.crash_state || 0;
   var crashTxt = CRASH_STATES[crash] || ('Unknown (' + crash + ')');
@@ -63,6 +129,14 @@ function buildDamagePanel(tel, frozen) {
   // participant slot — the live table is sorted by position, so it is shown as
   // the number the game gives rather than resolved to a name.
   var hitIdx = tel.last_collision_index;
+  // Sits with the damage figures because it is read for the same reason they
+  // are: how much car is left. The per-corner values stay on the tyre cards.
+  var rh = rideExtremes(tel.ride_height);
+  // The run's extremes: the lowest any corner has been, and the highest. Taken
+  // from the two recorded arrays rather than one, so "lowest" is the deepest
+  // any corner reached and "highest" the most any corner ever had.
+  var seenLow = rideSeen ? (rideExtremes(rideSeen.min) || {}).low : null;
+  var seenHigh = rideSeen ? (rideExtremes(rideSeen.max) || {}).high : null;
 
   return '<h3 class="tel-section">Damage</h3>' +
     '<div class="dmg-head">' +
@@ -90,6 +164,16 @@ function buildDamagePanel(tel, frozen) {
       '<span class="dmg-contact-val">' + (hitIdx >= 0 ? 'car #' + hitIdx : 'none') + '</span>' +
       '<span class="dmg-contact-lbl">magnitude</span>' +
       '<span class="dmg-contact-val">' + (tel.last_collision_magnitude || 0).toFixed(2) + '</span>' +
+      rideHeightPair('Ride height now', rh && rh.low) +
+      rideHeightPair('to', rh && rh.high) +
+    '</div>' +
+    '<div class="dmg-contact">' +
+      '<span class="dmg-contact-lbl">Lowest this run</span>' +
+      '<span class="dmg-contact-val dmg-seen-low">' +
+        (seenLow ? seenLow.v.toFixed(2) + ' cm <span class="dmg-corner">' + DMG_WHEELS[seenLow.i] + '</span>' : '&mdash;') +
+      '</span>' +
+      rideHeightPair('highest', seenHigh) +
+      '<button type="button" class="dmg-reset" data-ride-reset="1">Reset</button>' +
     '</div>';
 }
 
@@ -102,6 +186,9 @@ function updateSetupPanel(d) {
     panel.innerHTML = '<div class="setup-no-data">Connect to AMS2 to see telemetry.</div>';
     dmgLastOnTrack = null;
     dmgFrozenLabel = null;
+    // The run ended with the connection, and the next one is a different car on
+    // a different setup.
+    resetRideSeen();
     return;
   }
 
@@ -119,7 +206,12 @@ function updateSetupPanel(d) {
   }
   var onTrack = !!viewed && !viewed.in_pits && (d.pit_mode || 0) === 0;
   var frozenWhy = onTrack ? null : (PIT_MODES[d.pit_mode || 0] || 'In pits');
-  if (onTrack) dmgLastOnTrack = tel;
+  if (onTrack) {
+    dmgLastOnTrack = tel;
+    // Before the visibility check below on purpose: the extremes are a record
+    // of the run, and a lap driven with the Live tab closed is still a lap.
+    recordRideHeight(d, tel);
+  }
 
   // Nothing has been read on track yet, so there is no reading to hold.
   var shown = onTrack ? tel : dmgLastOnTrack;
@@ -212,6 +304,13 @@ function tyreCard(tel, i) {
     '<div class="tel-group">Corner</div>' +
     telRow('Brake temp', Math.round(tel.brake_temp[i]) + '°C', !(tel.brake_temp[i] > 0)) +
     telRow('Ride height', (tel.ride_height[i]).toFixed(2) + ' cm', false) +
+    // This corner's own extremes. The overall figures on the damage panel say
+    // how much floor was left; these say at which end, which is what decides
+    // whether it is the front or the rear ride height that can come down.
+    telRow('Seen this run',
+      rideSeen && rideSeen.min[i] > 0
+        ? rideSeen.min[i].toFixed(2) + ' &ndash; ' + rideSeen.max[i].toFixed(2) + ' cm'
+        : '', !(rideSeen && rideSeen.min[i] > 0)) +
     telRow('Susp. travel', (tel.suspension_travel[i] * 1000).toFixed(1) + ' mm', false) +
     telRow('Susp. velocity', tel.suspension_velocity[i].toFixed(3) + ' m/s', false) +
     telRow('Wheel Y', tel.wheel_local_position_y[i].toFixed(4), false) +
@@ -235,3 +334,15 @@ function buildTyrePanel(tel) {
     '<div class="tel-obsolete"><span class="tel-obs-lbl">Obsolete in the PCars2 header (FL / FR / RL / RR)</span>' +
       obsolete + '</div>';
 }
+
+// Reset the run's ride-height record. Delegated from document because the panel
+// is rebuilt on every poll while the car is on track, so a listener bound to the
+// button would be thrown away with it. Clearing dmgFrozenLabel forces the next
+// poll to repaint: the button is most useful in the box between runs, and that
+// is exactly when the panel is held and would otherwise not redraw.
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest && e.target.closest('[data-ride-reset]');
+  if (!btn) return;
+  resetRideSeen();
+  dmgFrozenLabel = null;
+});

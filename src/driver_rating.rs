@@ -92,7 +92,13 @@ pub enum Gates {
 
 /// The tunable half of the rating. [`Default`] reproduces the behaviour these numbers were
 /// hard-coded to before they were configurable, so an untouched config changes nothing.
-#[derive(Clone, Copy, Debug, PartialEq)]
+///
+/// Serialisable because a career **stamps these when it is created** and then runs on its own
+/// copy — see `CareerData::rating_params`. The container-level `#[serde(default)]` is what makes
+/// that safe to store: a stamp hand-edited to drop a field falls back to that field's shipped
+/// value rather than to zero, which for `starting_rating` would put every driver on the floor.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RatingParams {
     /// Where a driver with no results sits, 0–100. The shrinkage below pulls a thin record
     /// toward this rather than toward the midpoint, so a low value means starting unproven and

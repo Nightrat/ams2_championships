@@ -25,7 +25,7 @@ function applyCareerMode() {
     // Never leave the user looking at a tab that has just disappeared.
     if (hide && btn.classList.contains('tab-active')) showTab('live');
   });
-  var contracts = document.querySelector('.sub-tab-btn[data-career-sub="contracts"]');
+  var contracts = document.querySelector('.sub-tab-btn[data-career-sub="finances"]');
   if (contracts) {
     contracts.style.display = hide ? 'none' : '';
     if (hide && contracts.classList.contains('sub-tab-active')) {

@@ -186,6 +186,7 @@ fn make_champ(id: &str) -> Championship {
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
+        planned_rounds: None,
     }
 }
 
@@ -2449,6 +2450,7 @@ fn test_route_offers_stay_open_for_a_team_picked_without_a_contract() {
     let (root, config) = make_offer_fixture(true);
     let champ = Championship {
         player_team: Some("Osella".into()),
+        planned_rounds: None,
         ..rated_champ("c1")
     };
     let v = body_json(&offers_resp(champ, &config));
@@ -2505,6 +2507,7 @@ fn test_route_offers_shows_a_signed_deal() {
             salary: 500_000,
             objective: Some(4),
             bought_for: 0,
+            settled: None,
         });
     }
     let resp = call_with_config(
@@ -2581,6 +2584,7 @@ fn test_route_finances_pays_a_completed_season() {
             salary: 500_000,
             objective: Some(3),
             bought_for: 0,
+            settled: None,
         });
     }
     let resp = get(store, path.clone(), "/api/career/finances");
@@ -2613,6 +2617,7 @@ fn test_route_finances_withholds_an_unfinished_season() {
             salary: 500_000,
             objective: None,
             bought_for: 0,
+            settled: None,
         });
     }
     let v = body_json(&get(store, path.clone(), "/api/career/finances"));
@@ -2771,6 +2776,7 @@ fn test_route_sign_buys_a_seat_the_career_can_afford() {
             salary: 500_000,
             objective: None,
             bought_for: 0,
+            settled: None,
         });
     }
     let body = format!(r#"{{"team":"{PAY_SEAT}"}}"#);
@@ -2881,6 +2887,7 @@ fn test_route_sign_refuses_a_second_deal_for_one_season() {
             salary: 1,
             objective: None,
             bought_for: 0,
+            settled: None,
         });
     }
     let body = format!(r#"{{"team":"{OPEN_SEAT}"}}"#);
@@ -2929,6 +2936,7 @@ fn test_route_sign_replaces_a_team_picked_directly() {
     let (root, config) = make_offer_fixture(true);
     let champ = Championship {
         player_team: Some("Williams".into()),
+        planned_rounds: None,
         ..rated_champ("c1")
     };
     let (resp, store) = sign_call(
@@ -3011,6 +3019,7 @@ fn test_route_release_refused_once_the_season_has_started() {
                 session_ids: vec!["s1".into()],
             }],
             player_team: Some(OPEN_SEAT.into()),
+            planned_rounds: None,
             ..rated_champ("c1")
         };
         data.championships.push(champ);
@@ -3021,6 +3030,7 @@ fn test_route_release_refused_once_the_season_has_started() {
             salary: 500_000,
             objective: None,
             bought_for: 0,
+            settled: None,
         });
     }
     let resp = call_with_config(
@@ -3244,6 +3254,7 @@ fn test_route_offers_does_not_renew_a_seat_held_in_another_series() {
             salary: 500_000,
             objective: Some(5),
             bought_for: 0,
+            settled: None,
         });
     }
     let resp = call_with_config(
@@ -3309,7 +3320,7 @@ fn test_route_new_season_takes_the_roster_at_creation_in_singleplayer() {
         store.clone(),
         path.clone(),
         "/api/championships",
-        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#,
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml","planned_rounds":16}"#,
     );
     assert!(status_line(&resp).contains("200"), "{resp}");
     let data = store.read().unwrap();
@@ -3331,7 +3342,7 @@ fn test_route_new_season_refuses_a_roster_in_multiplayer() {
         store.clone(),
         path.clone(),
         "/api/championships",
-        br#"{"name":"Friday night","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#,
+        br#"{"name":"Friday night","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml","planned_rounds":16}"#,
     );
     assert!(status_line(&resp).contains("409"), "{resp}");
     assert!(resp.contains("races people"), "{resp}");
@@ -3344,7 +3355,7 @@ fn test_route_singleplayer_allows_only_one_season_at_a_time() {
     // before there is anything to offer against.
     let (store, path) = mode_store(CareerMode::Singleplayer);
     let body =
-        br#"{"name":"1987","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#;
+        br#"{"name":"1987","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml","planned_rounds":16}"#;
 
     let resp = post(store.clone(), path.clone(), "/api/championships", body);
     assert!(status_line(&resp).contains("409"), "{resp}");
@@ -3638,7 +3649,7 @@ fn test_route_a_singleplayer_season_is_the_current_one_from_the_moment_it_exists
         store.clone(),
         path.clone(),
         "/api/championships",
-        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#,
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml","planned_rounds":16}"#,
     );
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert_eq!(
@@ -3720,7 +3731,7 @@ fn test_route_a_fresh_singleplayer_career_shows_team_names_live() {
     // newly created season used to be Progress — so a fresh career had no Active one at all.
     let (root, config) = make_offer_fixture(true);
     let (store, data_path) = make_sp_store();
-    let body = br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#;
+    let body = br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml","planned_rounds":16}"#;
     let mut req = format!(
         "POST /api/championships HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
         body.len()
@@ -3742,4 +3753,744 @@ fn test_route_a_fresh_singleplayer_career_shows_team_names_live() {
         "the roster's team names should be live immediately: {resp}"
     );
     std::fs::remove_dir_all(&root).ok();
+}
+
+// ── Finishing a season closes its books ──────────────────────────────────────
+
+/// A request with a body, as raw bytes — `call_with_config` and `call_full` take the whole
+/// request, and the `post`/`patch` helpers above build their own connection without a config.
+fn req_bytes(method: &str, path: &str, body: &str) -> Vec<u8> {
+    let mut req = format!(
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    req
+}
+
+/// An offer fixture whose prize money is named explicitly, so a test can move it and see.
+fn sealing_fixture(champion: i64, floor: i64) -> (std::path::PathBuf, std::path::PathBuf) {
+    offer_fixture(
+        true,
+        &format!(r#","champion_prize":{champion},"last_place_prize":{floor}"#),
+    )
+}
+
+/// A championship with one race already assigned — a season there is something to finish.
+fn raced_champ(id: &str, status: ChampionshipStatus) -> Championship {
+    Championship {
+        status,
+        rounds: vec![Round {
+            session_ids: vec!["s1".into()],
+        }],
+        ..rated_champ(id)
+    }
+}
+
+fn finances_of(
+    store: &ams2_championship::data_store::SharedStore,
+    data_path: &std::path::Path,
+    config: &std::path::Path,
+) -> serde_json::Value {
+    body_json(&call_with_config(
+        store.clone(),
+        data_path.to_path_buf(),
+        b"GET /api/career/finances HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config.to_path_buf()),
+    ))
+}
+
+#[test]
+fn test_route_finishing_a_season_seals_its_payout_against_the_config_tab() {
+    // The whole point of sealing: once a season is over, retuning the economy must not reach
+    // back into it. Before this, `champion_prize` re-paid every finished season in the career.
+    let (root, config) = sealing_fixture(1_000_000, 100_000);
+    let (store, data_path) = make_sp_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships
+            .push(raced_champ("c1", ChampionshipStatus::Active));
+        data.sessions.push(win_session("s1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: OPEN_SEAT.into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: Some(3),
+            bought_for: 0,
+            settled: None,
+        });
+    }
+
+    let resp = call_with_config(
+        store.clone(),
+        data_path.clone(),
+        req_bytes("PATCH", "/api/championships/c1", r#"{"status":"Final"}"#),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let at_close = finances_of(&store, &data_path, &config);
+    let paid = at_close["seasons"][0]["prize"].as_i64().unwrap();
+    assert_eq!(paid, 1_000_000, "a win pays the champion rate");
+    assert_eq!(at_close["seasons"][0]["complete"], true);
+    assert!(
+        store.read().unwrap().contracts[0].settled.is_some(),
+        "finishing stamped the payout onto the contract"
+    );
+
+    // Now move the economy, exactly as the Config tab does.
+    std::fs::write(
+        &config,
+        std::fs::read_to_string(&config)
+            .unwrap()
+            .replace("1000000", "9000000"),
+    )
+    .unwrap();
+    let after = finances_of(&store, &data_path, &config);
+    assert_eq!(
+        after["seasons"][0]["prize"].as_i64().unwrap(),
+        paid,
+        "a finished season is closed: {after}"
+    );
+    assert_eq!(after["balance"], at_close["balance"]);
+
+    let _ = std::fs::remove_file(&data_path);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_reopening_a_season_takes_its_settlement_back() {
+    // Reopening has always taken the payout back. Sealing must not quietly make it permanent,
+    // so the transition out of `Final` tears the stamp up again.
+    let (root, config) = sealing_fixture(1_000_000, 100_000);
+    // Not a singleplayer career: there, a finished season stays finished by design.
+    let (store, data_path) = make_test_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships
+            .push(raced_champ("c1", ChampionshipStatus::Active));
+        data.sessions.push(win_session("s1"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: OPEN_SEAT.into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: Some(3),
+            bought_for: 0,
+            settled: None,
+        });
+    }
+    for body in [r#"{"status":"Final"}"#, r#"{"status":"Active"}"#] {
+        let resp = call_with_config(
+            store.clone(),
+            data_path.clone(),
+            req_bytes("PATCH", "/api/championships/c1", body),
+            Some(config.clone()),
+        );
+        assert!(status_line(&resp).contains("200"), "{resp}");
+    }
+    assert!(
+        store.read().unwrap().contracts[0].settled.is_none(),
+        "an open season carries no settlement"
+    );
+
+    // Finishing it again takes a fresh stamp, at whatever the economy is now.
+    std::fs::write(
+        &config,
+        std::fs::read_to_string(&config)
+            .unwrap()
+            .replace("1000000", "9000000"),
+    )
+    .unwrap();
+    let resp = call_with_config(
+        store.clone(),
+        data_path.clone(),
+        req_bytes("PATCH", "/api/championships/c1", r#"{"status":"Final"}"#),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = finances_of(&store, &data_path, &config);
+    assert_eq!(v["seasons"][0]["prize"].as_i64().unwrap(), 9_000_000, "{v}");
+
+    let _ = std::fs::remove_file(&data_path);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_a_season_finished_before_sealing_is_stamped_when_its_career_is_activated() {
+    // The one-time upgrade. A career whose seasons were finished before settlements existed is
+    // sealed as it is loaded, at the payout it was already showing — so the numbers do not move
+    // on the upgrade, and stop moving afterwards.
+    let (root, config) = sealing_fixture(1_000_000, 100_000);
+    let saves_dir = root.join("championships");
+    let legacy_dir = saves_dir.join("legacy");
+    std::fs::create_dir_all(&legacy_dir).unwrap();
+
+    let mut legacy = CareerData {
+        mode: ams2_championship::data_store::CareerMode::Singleplayer,
+        ..CareerData::default()
+    };
+    legacy
+        .championships
+        .push(raced_champ("c1", ChampionshipStatus::Final));
+    legacy.sessions.push(win_session("s1"));
+    legacy
+        .contracts
+        .push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: OPEN_SEAT.into(),
+            signed_at: 1,
+            salary: 500_000,
+            objective: Some(3),
+            bought_for: 0,
+            settled: None,
+        });
+    let career = legacy_dir.join("career.json");
+    std::fs::write(&career, serde_json::to_string(&legacy).unwrap()).unwrap();
+
+    // Activating loads it, which is where the upgrade runs.
+    let (store, data_path) = make_sp_store();
+    let resp = call_full(
+        store.clone(),
+        data_path.clone(),
+        saves_dir.clone(),
+        req_bytes("POST", "/api/saves/activate", r#"{"name":"legacy"}"#),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let sealed = store.read().unwrap().contracts[0].settled.clone();
+    let sealed = sealed.expect("activation seals a career finished before settlements existed");
+    assert_eq!(
+        sealed.prize, 1_000_000,
+        "stamped at what it was already paying"
+    );
+    assert_eq!(sealed.at, 0, "no record of when it was actually finished");
+
+    // Written through, not just held in memory.
+    let on_disk: CareerData =
+        serde_json::from_str(&std::fs::read_to_string(&career).unwrap()).unwrap();
+    assert_eq!(on_disk.contracts[0].settled, Some(sealed));
+
+    let _ = std::fs::remove_file(&data_path);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+// ── The career's own rating tuning ───────────────────────────────────────────
+
+/// An offer fixture whose starting rating is named explicitly, so a test can move it and see.
+fn rating_fixture(starting: i32) -> (std::path::PathBuf, std::path::PathBuf) {
+    offer_fixture(true, &format!(r#","starting_rating":{starting}"#))
+}
+
+/// Rewrites a fixture's starting rating, standing in for an edit in the Config tab.
+///
+/// Goes through the JSON rather than a string replacement: creating a career rewrites config
+/// via `config::save`, which pretty-prints, so the spelling of the field differs between the
+/// file the fixture wrote and the one the server left behind.
+fn retune(config: &std::path::Path, to: f64) {
+    let mut v: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(config).unwrap()).unwrap();
+    v["starting_rating"] = serde_json::json!(to);
+    std::fs::write(config, serde_json::to_string(&v).unwrap()).unwrap();
+}
+
+fn reputation_of(
+    store: &ams2_championship::data_store::SharedStore,
+    data_path: &std::path::Path,
+    config: &std::path::Path,
+) -> f64 {
+    let resp = call_with_config(
+        store.clone(),
+        data_path.to_path_buf(),
+        b"GET /api/championships/c1/team-eligibility HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config.to_path_buf()),
+    );
+    let v = body_json(&resp);
+    assert_eq!(v["rated"], true, "{resp}");
+    v["reputation"]["value"].as_f64().unwrap()
+}
+
+#[test]
+fn test_route_a_new_career_records_the_rating_tuning_it_was_created_with() {
+    let (root, config) = rating_fixture(20);
+    let (store, path) = make_saves_dir("rating_stamp");
+    let resp = call_with_config(
+        store.clone(),
+        path.clone(),
+        req_bytes(
+            "POST",
+            "/api/saves",
+            r#"{"name":"Stamped","mode":"singleplayer"}"#,
+        ),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let stamped = store
+        .read()
+        .unwrap()
+        .rating_params
+        .expect("stamped at creation");
+    assert_eq!(stamped.starting_rating, 20.0);
+
+    // Written into the save, not just held in memory.
+    let on_disk = ams2_championship::data_store::load_data(&ams2_championship::saves::save_path(
+        path.parent().unwrap(),
+        "Stamped",
+    ));
+    assert_eq!(on_disk.rating_params, Some(stamped));
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_retuning_the_rating_does_not_reach_into_an_existing_career() {
+    // The point of the stamp: which seats a career was ever allowed to take must not be
+    // rewritten backwards by an edit in Config.
+    let (root, config) = rating_fixture(20);
+    let (store, path) = make_saves_dir("rating_keep");
+    let resp = call_with_config(
+        store.clone(),
+        path.clone(),
+        req_bytes(
+            "POST",
+            "/api/saves",
+            r#"{"name":"Kept","mode":"singleplayer"}"#,
+        ),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    store.write().unwrap().championships.push(rated_champ("c1"));
+
+    let before = reputation_of(&store, &path, &config);
+    assert!(
+        (before - 20.0).abs() < 0.001,
+        "an unraced driver starts at the starting rating: {before}"
+    );
+
+    retune(&config, 80.0);
+    let after = reputation_of(&store, &path, &config);
+    assert!(
+        (after - before).abs() < 0.001,
+        "the career kept its own tuning: {after}"
+    );
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_adopting_moves_the_career_onto_the_current_settings() {
+    // The deliberate exception. Retuning difficulty mid-career has to be possible; it just must
+    // not happen as a side effect of editing a form.
+    let (root, config) = rating_fixture(20);
+    let (store, path) = make_saves_dir("rating_adopt");
+    let resp = call_with_config(
+        store.clone(),
+        path.clone(),
+        req_bytes(
+            "POST",
+            "/api/saves",
+            r#"{"name":"Adopt","mode":"singleplayer"}"#,
+        ),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    store.write().unwrap().championships.push(rated_champ("c1"));
+    retune(&config, 80.0);
+
+    let save = ams2_championship::saves::save_path(path.parent().unwrap(), "Adopt");
+    let resp = call_with_config(
+        store.clone(),
+        save.clone(),
+        req_bytes("POST", "/api/career/rating/adopt", ""),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(body_json(&resp)["starting_rating"], 80.0);
+
+    let after = reputation_of(&store, &save, &config);
+    assert!((after - 80.0).abs() < 0.001, "{after}");
+    // Persisted, so the change survives a restart rather than lasting until the next load.
+    assert_eq!(
+        ams2_championship::data_store::load_data(&save)
+            .rating_params
+            .unwrap()
+            .starting_rating,
+        80.0
+    );
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_config_says_when_the_career_is_not_on_the_settings_shown() {
+    // The Config tab shows config.json, but the career runs on its own copy. Without this the
+    // tab would quietly imply the numbers on screen are the ones in force.
+    let (root, config) = rating_fixture(20);
+    let (store, path) = make_saves_dir("rating_diverge");
+    let resp = call_with_config(
+        store.clone(),
+        path.clone(),
+        req_bytes(
+            "POST",
+            "/api/saves",
+            r#"{"name":"Diverge","mode":"singleplayer"}"#,
+        ),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let matched = call_with_config(
+        store.clone(),
+        path.clone(),
+        b"GET /api/config HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config.clone()),
+    );
+    assert_eq!(body_json(&matched)["career_rating_matches"], true);
+
+    retune(&config, 80.0);
+    let diverged = call_with_config(
+        store.clone(),
+        path.clone(),
+        b"GET /api/config HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config.clone()),
+    );
+    let v = body_json(&diverged);
+    assert_eq!(v["career_rating_matches"], false, "{diverged}");
+    // The config fields still come through: the flag is added alongside them, not instead.
+    assert_eq!(v["starting_rating"], 80.0);
+    assert_eq!(v["career_rating"]["starting_rating"], 20.0);
+
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_a_career_created_before_stamping_adopts_its_tuning_when_activated() {
+    // The one-time upgrade: a career that has been judged on config all along keeps being judged
+    // on exactly those numbers, and stops moving afterwards.
+    let (root, config) = rating_fixture(20);
+    let saves_dir = root.join("championships");
+    let legacy_dir = saves_dir.join("legacy");
+    std::fs::create_dir_all(&legacy_dir).unwrap();
+
+    let mut legacy = CareerData {
+        mode: ams2_championship::data_store::CareerMode::Singleplayer,
+        ..CareerData::default()
+    };
+    legacy.championships.push(rated_champ("c1"));
+    assert!(
+        legacy.rating_params.is_none(),
+        "the state this upgrade is for"
+    );
+    let career = legacy_dir.join("career.json");
+    std::fs::write(&career, serde_json::to_string(&legacy).unwrap()).unwrap();
+
+    let (store, data_path) = make_sp_store();
+    let resp = call_full(
+        store.clone(),
+        data_path.clone(),
+        saves_dir.clone(),
+        req_bytes("POST", "/api/saves/activate", r#"{"name":"legacy"}"#),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let stamped = store
+        .read()
+        .unwrap()
+        .rating_params
+        .expect("activation stamps it");
+    assert_eq!(
+        stamped.starting_rating, 20.0,
+        "stamped at what it was already judged on"
+    );
+    assert_eq!(
+        ams2_championship::data_store::load_data(&career).rating_params,
+        Some(stamped),
+        "written through, not just held in memory"
+    );
+
+    // And from here it is the career's own, not config's.
+    retune(&config, 80.0);
+    let after = reputation_of(&store, &career, &config);
+    assert!((after - 20.0).abs() < 0.001, "{after}");
+
+    let _ = std::fs::remove_file(&data_path);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_a_stamp_missing_a_field_falls_back_to_the_shipped_value_not_zero() {
+    // `#[serde(default)]` on the container is what makes storing this safe: a hand-edited stamp
+    // that drops `starting_rating` must not put every driver on the floor.
+    let p: ams2_championship::driver_rating::RatingParams =
+        serde_json::from_str(r#"{"strictness":5.0}"#).unwrap();
+    assert_eq!(p.strictness, 5.0);
+    assert_eq!(
+        p.starting_rating,
+        ams2_championship::driver_rating::RatingParams::default().starting_rating
+    );
+}
+
+// ── Lap charts are fetched, not shipped ──────────────────────────────────────
+
+/// A folder save with a store pointed at it — the only layout that keeps charts beside itself.
+fn make_folder_store(
+    tag: &str,
+) -> (
+    ams2_championship::data_store::SharedStore,
+    std::path::PathBuf,
+) {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_laps_route_{tag}_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let career = ams2_championship::saves::save_path(&dir, "career");
+    ams2_championship::saves::prepare_save_dir(&career).unwrap();
+    let store = Arc::new(RwLock::new(CareerData::default()));
+    ams2_championship::data_store::persist(&store, &career).unwrap();
+    (store, career)
+}
+
+fn chart_entries() -> Vec<ams2_championship::data_store::LapChartEntry> {
+    vec![
+        ams2_championship::data_store::LapChartEntry {
+            lap: 1,
+            driver: "Nightrat".into(),
+            position: 1,
+        },
+        ams2_championship::data_store::LapChartEntry {
+            lap: 1,
+            driver: "Berg".into(),
+            position: 2,
+        },
+    ]
+}
+
+#[test]
+fn test_route_career_no_longer_ships_every_lap_chart() {
+    // The bug this fixes: the career payload carried a copy of every chart, so opening the tab
+    // downloaded all of them to draw one. They are the bulk of a career.
+    let (store, career) = make_folder_store("career_payload");
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.rounds = vec![Round {
+            session_ids: vec!["s1".into()],
+        }];
+        data.championships.push(champ);
+        let mut s = win_session("s1");
+        s.lap_chart = chart_entries();
+        data.sessions.push(s);
+    }
+    let resp = get(store, career.clone(), "/api/career");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(
+        !body(&resp).contains("lap_chart"),
+        "the career payload must not carry charts: {resp}"
+    );
+
+    let _ = std::fs::remove_dir_all(career.parent().unwrap().parent().unwrap());
+}
+
+#[test]
+fn test_route_lap_chart_is_served_one_session_at_a_time() {
+    let (store, career) = make_folder_store("fetch_one");
+    ams2_championship::lap_charts::write(&career, "s1", &chart_entries()).unwrap();
+    store.write().unwrap().sessions.push(win_session("s1"));
+
+    let resp = get(store, career.clone(), "/api/sessions/s1/lap-chart");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+    assert_eq!(v.as_array().unwrap().len(), 2, "{resp}");
+    assert_eq!(v[0]["driver"], "Nightrat");
+    assert_eq!(v[1]["position"], 2);
+
+    let _ = std::fs::remove_dir_all(career.parent().unwrap().parent().unwrap());
+}
+
+#[test]
+fn test_route_a_session_with_no_chart_answers_with_an_empty_one() {
+    // A practice session never has a chart. That is ordinary, not a failure.
+    let (store, career) = make_folder_store("no_chart");
+    store.write().unwrap().sessions.push(win_session("s1"));
+
+    let resp = get(store, career.clone(), "/api/sessions/s1/lap-chart");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(body_json(&resp).as_array().unwrap().len(), 0);
+
+    let _ = std::fs::remove_dir_all(career.parent().unwrap().parent().unwrap());
+}
+
+#[test]
+fn test_route_a_flat_saves_chart_still_comes_back_from_the_career() {
+    // A legacy flat save has nowhere to keep a chart beside itself, so it keeps it inline and
+    // the route has to fall back to it — those saves are never migrated.
+    let (store, path) = make_test_store();
+    {
+        let mut s = win_session("s1");
+        s.lap_chart = chart_entries();
+        store.write().unwrap().sessions.push(s);
+    }
+    let resp = get(store, path.clone(), "/api/sessions/s1/lap-chart");
+    assert_eq!(body_json(&resp).as_array().unwrap().len(), 2, "{resp}");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_purging_unassigned_sessions_takes_their_charts_too() {
+    // A chart nothing points at any more is a stray file, and charts are the big ones.
+    let (store, career) = make_folder_store("purge");
+    ams2_championship::lap_charts::write(&career, "keep", &chart_entries()).unwrap();
+    ams2_championship::lap_charts::write(&career, "drop", &chart_entries()).unwrap();
+    {
+        let mut data = store.write().unwrap();
+        let mut champ = make_champ("c1");
+        champ.rounds = vec![Round {
+            session_ids: vec!["keep".into()],
+        }];
+        data.championships.push(champ);
+        data.sessions.push(win_session("keep"));
+        data.sessions.push(win_session("drop"));
+    }
+
+    let resp = delete(store, career.clone(), "/api/sessions/unassigned");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(body_json(&resp)["removed"], 1);
+    assert_eq!(
+        ams2_championship::lap_charts::read(&career, "keep").len(),
+        2
+    );
+    assert!(ams2_championship::lap_charts::read(&career, "drop").is_empty());
+
+    let _ = std::fs::remove_dir_all(career.parent().unwrap().parent().unwrap());
+}
+
+// ── The calendar a salary is paid out across ─────────────────────────────────
+
+#[test]
+fn test_route_a_singleplayer_season_must_declare_its_calendar() {
+    // Rounds appear as they are raced, so a season in progress cannot say how far through it
+    // is. Declaring the calendar up front is what lets a wage be paid race by race instead of
+    // in one lump at the end — so wherever there is a salary, it is required.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml"}"#,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(resp.contains("how many races"), "{resp}");
+    assert!(store.read().unwrap().championships.is_empty());
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_a_zero_calendar_is_refused_like_a_missing_one() {
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml","planned_rounds":0}"#,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(store.read().unwrap().championships.is_empty());
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_the_calendar_is_recorded_on_the_season() {
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"1986","points_system":[],"manufacturer_scoring":false,"custom_ai_file":"F-Classic_Gen1.xml","planned_rounds":16}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(store.read().unwrap().championships[0].planned_rounds, Some(16));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_a_multiplayer_season_needs_no_calendar() {
+    // No contracts, so no wage to split across one. Asking for it would be a field that
+    // answers nothing.
+    let (store, path) = mode_store(CareerMode::Multiplayer);
+    store.write().unwrap().championships.clear();
+    let resp = post(
+        store.clone(),
+        path.clone(),
+        "/api/championships",
+        br#"{"name":"Friday night","points_system":[],"manufacturer_scoring":false}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(store.read().unwrap().championships[0].planned_rounds, None);
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_patch_sets_a_calendar_on_a_season_that_had_none() {
+    // The one way a season created before calendars existed starts paying per race. Not locked
+    // by the first session the way the roster and the seat are: the wage is capped and never
+    // topped up, so resizing only changes the instalments still to come.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    let id = store.read().unwrap().championships[0].id.clone();
+    assert_eq!(store.read().unwrap().championships[0].planned_rounds, None);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        &format!("/api/championships/{id}"),
+        br#"{"planned_rounds":12}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(store.read().unwrap().championships[0].planned_rounds, Some(12));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_patch_floors_a_calendar_at_one_race() {
+    // It is the denominator a wage is divided by, and config.json is not the only hand-edited
+    // file here.
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    let id = store.read().unwrap().championships[0].id.clone();
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        &format!("/api/championships/{id}"),
+        br#"{"planned_rounds":0}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(store.read().unwrap().championships[0].planned_rounds, Some(1));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_leaving_the_calendar_out_of_a_patch_keeps_it() {
+    let (store, path) = mode_store(CareerMode::Singleplayer);
+    let id = store.read().unwrap().championships[0].id.clone();
+    store.write().unwrap().championships[0].planned_rounds = Some(16);
+    let resp = patch(
+        store.clone(),
+        path.clone(),
+        &format!("/api/championships/{id}"),
+        br#"{"name":"1986 Season"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(store.read().unwrap().championships[0].planned_rounds, Some(16));
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }

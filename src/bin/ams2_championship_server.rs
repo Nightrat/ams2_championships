@@ -13,6 +13,86 @@ use ams2_championship::http::{
 use ams2_championship::spotter::Focus;
 use ams2_championship::websocket::handle_websocket;
 
+/// The rating tuning this career runs on: its own stamped copy, falling back to config only for
+/// a save written before stamping existed and not yet loaded through [`seal_career`].
+///
+/// Every rating figure in the app goes through here rather than reading config directly, so that
+/// there is one answer to "which numbers is this career being judged on".
+fn career_rating_params(
+    data: &CareerData,
+    config_path: &std::path::Path,
+) -> ams2_championship::driver_rating::RatingParams {
+    data.rating_params
+        .unwrap_or_else(|| ams2_championship::config::load_or_create(config_path).rating_params())
+}
+
+/// Seconds since the Unix epoch — when a contract was signed, and when a season was closed.
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Brings a freshly loaded career up to date: stamps the rating tuning it runs on if it has
+/// none, and stamps the payout onto any season finished before settlements existed. Writes the
+/// career back if either changed anything.
+///
+/// Called from exactly two places — startup, and `POST /api/saves/activate` — because those are
+/// the only two that *load* a career, and when this runs is the whole of its correctness. Both
+/// upgrades take their figures from the config the career has been running on, so they preserve
+/// what it was already doing; run either on the request path and it would capture whatever the
+/// settings had since been retuned to. See [`ams2_championship::contracts::seal_finished`].
+fn seal_career(
+    store: &SharedStore,
+    path: &PathBuf,
+    config_path: &std::path::Path,
+) -> Result<(), String> {
+    if path.as_os_str().is_empty() {
+        return Ok(()); // No active career — nothing loaded, nothing to seal.
+    }
+    let cfg = ams2_championship::config::load_or_create(config_path);
+    let (stamped_rating, sealed, charts) = {
+        // The guard is released before `persist` takes its own read lock: holding a write lock
+        // across the write would deadlock on the same RwLock.
+        let mut data = store.write().unwrap();
+        let d = &mut *data;
+        // A career created before the tuning was stamped adopts what it has been judged on all
+        // along, so no rating moves on the upgrade — and none moves afterwards either.
+        let stamped_rating = d.rating_params.is_none();
+        if stamped_rating {
+            d.rating_params = Some(cfg.rating_params());
+        }
+        (
+            stamped_rating,
+            ams2_championship::contracts::seal_finished(
+                &mut d.contracts,
+                &d.championships,
+                &d.sessions,
+                None,
+                &cfg.prize_params(),
+            ),
+            // A career written before lap charts were split out still carries them inline, and
+            // they are most of its bulk. Moving them out is the same shape of one-time upgrade
+            // as the two above, and belongs in the same place for the same reason.
+            ams2_championship::lap_charts::externalize(path, &mut d.sessions),
+        )
+    };
+    if sealed > 0 {
+        println!("Sealed {sealed} finished season(s) at their current payout.");
+    }
+    if stamped_rating {
+        println!("Recorded this career's driver rating settings from config.json.");
+    }
+    if charts > 0 {
+        println!("Moved {charts} lap chart(s) out of the career file into laps/.");
+    }
+    if !stamped_rating && sealed == 0 && charts == 0 {
+        return Ok(());
+    }
+    persist(store, path)
+}
+
 /// The configured Custom AI Drivers folder, if one is set and non-empty.
 fn cfg_custom_ai_dir(config_path: &std::path::Path) -> Option<PathBuf> {
     ams2_championship::config::load_or_create(config_path)
@@ -120,11 +200,12 @@ fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> V
     }
 
     let classes = load_classes(config_path);
-    let params = ams2_championship::config::load_or_create(config_path).rating_params();
-    // Only sessions committed to a championship are rated.
-    let (sessions, active) = {
+    // Only sessions committed to a championship are rated, and they are rated on the career's
+    // own tuning rather than whatever Config happens to say now.
+    let (params, sessions, active) = {
         let data = store.read().unwrap();
         (
+            career_rating_params(&data, config_path),
             driver_rating::assigned_sessions(&data.championships, &data.sessions),
             ams2_championship::data_store::active_classes(&data.championships),
         )
@@ -351,11 +432,14 @@ fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -
 ///
 /// `None` when the championship has no Custom AI file, or no folder is configured — without a
 /// roster there are no teams, no car pace figures, and nothing to rate against.
+///
+/// Takes the whole career rather than its sessions and championships, because the tuning to
+/// judge them on is part of the career too — see [`career_rating_params`]. Passing the pieces
+/// left a caller free to forget the third one.
 fn champ_eligibility(
     config_path: &std::path::Path,
     champ: &Championship,
-    champs: &[Championship],
-    sessions: &[ams2_championship::data_store::RecordedSession],
+    data: &CareerData,
 ) -> Option<(
     ams2_championship::driver_rating::Reputation,
     Vec<ams2_championship::driver_rating::TeamEligibility>,
@@ -373,8 +457,8 @@ fn champ_eligibility(
     // this particular car — while the requirement comes from this class's own grid. Only
     // sessions committed to a championship count toward it.
     let contexts: Vec<driver_rating::RatingContext> = classes.into_iter().map(|c| c.ctx).collect();
-    let rated = driver_rating::assigned_sessions(champs, sessions);
-    let params = ams2_championship::config::load_or_create(config_path).rating_params();
+    let rated = driver_rating::assigned_sessions(&data.championships, &data.sessions);
+    let params = career_rating_params(data, config_path);
     let reputation = driver_rating::compute_reputation_global_with(
         None,
         &rated,
@@ -789,6 +873,12 @@ fn handle(
             /// defined by the grid it is raced on — and refused in multiplayer.
             #[serde(default)]
             custom_ai_file: Option<String>,
+            /// How many races the season is meant to run. Required wherever contracts exist,
+            /// because it is the denominator a salary is paid out against — see
+            /// `contracts::salary_earned`. Optional elsewhere: a career with no contracts has
+            /// no wage to split.
+            #[serde(default)]
+            planned_rounds: Option<u32>,
         }
         let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
             json_err(&mut stream, "400 Bad Request", "invalid body");
@@ -812,6 +902,18 @@ fn handle(
                 "400 Bad Request",
                 "choose a Custom AI Drivers file — a singleplayer season is defined by the \
                  grid it is raced on.",
+            );
+            return;
+        }
+        // The calendar has to be declared up front because nothing else can supply it: rounds
+        // are added as they are raced, so a season in progress cannot say how far through it
+        // is. Without it a wage has no denominator and can only be paid in one lump at the end.
+        let planned = body.planned_rounds.filter(|n| *n > 0);
+        if mode.uses_contracts() && planned.is_none() {
+            json_err(
+                &mut stream,
+                "400 Bad Request",
+                "set how many races the season runs — a salary is paid out across them.",
             );
             return;
         }
@@ -857,6 +959,7 @@ fn handle(
             custom_ai_file: roster,
             // The seat is taken by signing, never by creating — see POST .../sign.
             player_team: None,
+            planned_rounds: planned,
         };
 
         let json = serde_json::to_vec(&champ).unwrap_or_default();
@@ -878,6 +981,11 @@ fn handle(
             .flat_map(|r| r.session_ids.iter().cloned())
             .collect();
         let before = data.sessions.len();
+        // Their charts go with them: a chart nothing points at any more is just a stray file.
+        let career = cur(&data_path);
+        for s in data.sessions.iter().filter(|s| !assigned.contains(&s.id)) {
+            ams2_championship::lap_charts::remove(&career, &s.id);
+        }
         data.sessions.retain(|s| assigned.contains(&s.id));
         let removed = before - data.sessions.len();
         drop(data);
@@ -891,6 +999,38 @@ fn handle(
 
     // Routes with path segments: /api/championships/:id[/...]
     let segs: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+
+    // GET /api/sessions/:id/lap-chart — one session's chart, fetched when it is opened.
+    //
+    // Charts are not in `/api/career` and not in the store: they are the bulk of a career and
+    // are looked at one session at a time, so shipping every one of them in order to draw one
+    // was the whole problem. See `lap_charts`. Answers `[]` rather than 404 for a session with
+    // no chart — a practice session never has one, and that is not an error.
+    if method == "GET"
+        && segs.len() == 4
+        && segs[0] == "api"
+        && segs[1] == "sessions"
+        && segs[3] == "lap-chart"
+    {
+        let id = url_decode(segs[2]);
+        let stored = ams2_championship::lap_charts::read(&cur(&data_path), &id);
+        // A legacy flat save has nowhere to keep a chart, so its charts are still in the career.
+        let chart = if stored.is_empty() {
+            store
+                .read()
+                .unwrap()
+                .sessions
+                .iter()
+                .find(|s| s.id == id)
+                .map(|s| s.lap_chart.clone())
+                .unwrap_or_default()
+        } else {
+            stored
+        };
+        let json = serde_json::to_vec(&chart).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
 
     // GET /api/championships/:id/teams — distinct team names from the championship's
     // assigned Custom AI Drivers file, for the "player team" picker.
@@ -945,8 +1085,7 @@ fn handle(
         let cfg = ams2_championship::config::load_or_create(&config_path);
         let enforced = cfg.enforce_team_eligibility;
         let hide_locked = cfg.hide_locked_teams;
-        let body = match champ_eligibility(&config_path, champ, &data.championships, &data.sessions)
-        {
+        let body = match champ_eligibility(&config_path, champ, &data) {
             Some((reputation, teams)) => Body {
                 enforced,
                 hide_locked,
@@ -1021,7 +1160,7 @@ fn handle(
         let open = signed.is_none() && champ.rounds.iter().all(|r| r.session_ids.is_empty());
 
         let (ledger, standing) = career_standing(&cfg, &data);
-        let rated = champ_eligibility(&config_path, champ, &data.championships, &data.sessions);
+        let rated = champ_eligibility(&config_path, champ, &data);
         let body = match &rated {
             Some((rep, eligibility)) => Body {
                 enabled: data.mode.uses_contracts(),
@@ -1132,8 +1271,7 @@ fn handle(
             return;
         }
 
-        let Some((reputation, eligibility)) =
-            champ_eligibility(&config_path, &current, &data.championships, &data.sessions)
+        let Some((reputation, eligibility)) = champ_eligibility(&config_path, &current, &data)
         else {
             json_err(
                 &mut stream,
@@ -1185,11 +1323,7 @@ fn handle(
             return;
         }
 
-        let signed_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        let mut contract = contracts::Contract::from_offer(&id, offer, signed_at);
+        let mut contract = contracts::Contract::from_offer(&id, offer, now_secs());
         contract.bought_for = offer.buy_in;
 
         if let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) {
@@ -1331,6 +1465,11 @@ fn handle(
             status: Option<ChampionshipStatus>,
             points_system: Option<Vec<i32>>,
             manufacturer_scoring: Option<bool>,
+            /// The declared calendar. Not locked by the first session the way the roster and
+            /// the seat are: under a capped, never-topped-up wage, changing it only resizes the
+            /// instalments still to come and re-derives what has been drawn. It is also the one
+            /// way a season created before calendars existed can start paying per race.
+            planned_rounds: Option<u32>,
             // Outer Option = key present or not (leave unchanged if absent);
             // inner Option = explicit null clears the assignment.
             #[serde(default, deserialize_with = "double_option")]
@@ -1358,6 +1497,11 @@ fn handle(
             json_err(&mut stream, "404 Not Found", "not found");
             return;
         };
+
+        // Whether this season was already over when the request arrived. Taken as a value
+        // rather than read off `current` later, because the mutations below need `data` mutably
+        // and would otherwise be held back by that borrow.
+        let was_final = current.status == ChampionshipStatus::Final;
 
         // The championship as it would be after this request, used by both checks below so a
         // rejection leaves it untouched.
@@ -1471,25 +1615,20 @@ fn handle(
         // switched enforcement off in Config.
         if ams2_championship::config::load_or_create(&config_path).enforce_team_eligibility {
             if let (true, Some(team)) = (changed, claimed) {
-                let refused = champ_eligibility(
-                    &config_path,
-                    &prospective,
-                    &data.championships,
-                    &data.sessions,
-                )
-                .filter(|(_, elig)| !ams2_championship::driver_rating::is_allowed(elig, &team))
-                .map(|(rep, elig)| {
-                    let need = elig
-                        .iter()
-                        .find(|e| e.team.eq_ignore_ascii_case(team.trim()))
-                        .map(|e| e.required)
-                        .unwrap_or(100.0);
-                    format!(
-                        "{team} needs a driver rating of {need:.0}; yours is {:.0}. \
+                let refused = champ_eligibility(&config_path, &prospective, &data)
+                    .filter(|(_, elig)| !ams2_championship::driver_rating::is_allowed(elig, &team))
+                    .map(|(rep, elig)| {
+                        let need = elig
+                            .iter()
+                            .find(|e| e.team.eq_ignore_ascii_case(team.trim()))
+                            .map(|e| e.required)
+                            .unwrap_or(100.0);
+                        format!(
+                            "{team} needs a driver rating of {need:.0}; yours is {:.0}. \
                              Race for a slower team first, or turn off team enforcement in Config.",
-                        rep.value
-                    )
-                });
+                            rep.value
+                        )
+                    });
                 if let Some(reason) = refused {
                     json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));
                     return;
@@ -1522,6 +1661,11 @@ fn handle(
         if let Some(ms) = body.manufacturer_scoring {
             champ.manufacturer_scoring = ms;
         }
+        // Floored at one race: a calendar of zero is not a season, and it is the denominator a
+        // wage is divided by.
+        if let Some(pr) = body.planned_rounds {
+            champ.planned_rounds = Some(pr.max(1));
+        }
         if let Some(caf) = body.custom_ai_file {
             champ.custom_ai_file = caf;
             // A player team is only meaningful against a Custom AI roster — it is what the
@@ -1538,6 +1682,31 @@ fn handle(
             };
         }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
+
+        // ── Closing a season settles what it paid ────────────────────────────
+        // Prize money stops being derived the moment the season is over, so that retuning the
+        // economy afterwards cannot reach back into seasons the career has already finished.
+        // Reopening one tears the settlement up again — the same rule read the other way, and
+        // the reason this keys off the *transition* rather than the resulting status.
+        let closed = champ.status == ChampionshipStatus::Final;
+        if closed != was_final {
+            let prizes = ams2_championship::config::load_or_create(&config_path).prize_params();
+            let d = &mut *data;
+            if closed {
+                if let Some(champ) = d.championships.iter().find(|c| c.id == id) {
+                    ams2_championship::contracts::settle(
+                        &mut d.contracts,
+                        champ,
+                        &d.sessions,
+                        None,
+                        &prizes,
+                        now_secs(),
+                    );
+                }
+            } else {
+                ams2_championship::contracts::unsettle(&mut d.contracts, id);
+            }
+        }
         drop(data);
         if !persisted(&store, &cur(&data_path), &mut stream) {
             return;
@@ -1821,13 +1990,15 @@ fn handle(
                 );
                 return;
             }
-            // The balance is recorded on the save now and never re-read from config, so a
-            // career keeps what it was founded with however the setting moves afterwards.
+            // The balance and the rating tuning are recorded on the save now and never re-read
+            // from config, so a career keeps what it was founded with however the settings move
+            // afterwards. `POST /api/career/rating/adopt` is the deliberate way to change the
+            // tuning later.
+            let founding = ams2_championship::config::load_or_create(&config_path);
             let fresh = CareerData {
                 mode: body.mode,
-                starting_balance: ams2_championship::config::load_or_create(&config_path)
-                    .starting_balance
-                    .max(0),
+                starting_balance: founding.starting_balance.max(0),
+                rating_params: Some(founding.rating_params()),
                 ..CareerData::default()
             };
             let text = serde_json::to_string_pretty(&fresh).unwrap_or_default();
@@ -1879,6 +2050,12 @@ fn handle(
             let mut active = data_path.write().unwrap();
             *store.write().unwrap() = incoming;
             *active = target.clone();
+        }
+        // The incoming career is being loaded, so it gets the same upgrade startup gives the
+        // one the app opened with — this and `main` are the only two places a career is read in.
+        if let Err(e) = seal_career(&store, &target, &config_path) {
+            json_err(&mut stream, "500 Internal Server Error", &e);
+            return;
         }
         if let Err(e) = store_active_save(&config_path, &target) {
             json_err(&mut stream, "500 Internal Server Error", &e);
@@ -1985,7 +2162,42 @@ fn handle(
     // GET /api/config
     if method == "GET" && path == "/api/config" {
         let cfg = ams2_championship::config::load_or_create(&config_path);
-        let json = serde_json::to_vec(&cfg).unwrap_or_default();
+        #[derive(serde::Serialize)]
+        struct Body {
+            #[serde(flatten)]
+            cfg: ams2_championship::config::Config,
+            /// Whether the active career is actually being judged on the rating settings shown
+            /// here. False once they have been edited without being adopted — the career keeps
+            /// the tuning it was created with, so the tab must not imply otherwise.
+            career_rating_matches: bool,
+            /// The tuning the career really runs on, so the notice can say what it would change.
+            career_rating: Option<ams2_championship::driver_rating::RatingParams>,
+        }
+        let career_rating = store.read().unwrap().rating_params;
+        let body = Body {
+            career_rating_matches: career_rating.is_none_or(|p| p == cfg.rating_params()),
+            career_rating,
+            cfg,
+        };
+        let json = serde_json::to_vec(&body).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // POST /api/career/rating/adopt — copy the current Config rating settings into this career.
+    //
+    // The deliberate exception to the stamp being permanent, and the same shape as
+    // `custom_ai::set_baseline` is to the one-time `ensure_baseline`: retuning difficulty
+    // mid-career has to be possible, but it must be an act rather than a side effect of editing
+    // a form. Every rating figure and every team bar in the career moves with it, including the
+    // ones past seasons were judged on, which is why the client confirms first.
+    if method == "POST" && path == "/api/career/rating/adopt" {
+        let adopted = ams2_championship::config::load_or_create(&config_path).rating_params();
+        store.write().unwrap().rating_params = Some(adopted);
+        if !persisted(&store, &cur(&data_path), &mut stream) {
+            return;
+        }
+        let json = serde_json::to_vec(&adopted).unwrap_or_default();
         json_ok(&mut stream, &json);
         return;
     }
@@ -2337,6 +2549,12 @@ fn main() {
         std::process::exit(1);
     }
     println!("Saves folder:   {}", champ_dir.display());
+    // A delete cannot always finish inside the run that made the folder — see
+    // `saves::sweep_empty_husks`. A fresh process can, and this is one.
+    match ams2_championship::saves::sweep_empty_husks(&champ_dir) {
+        0 => {}
+        n => println!("Cleared {n} empty folder(s) left by a previous delete."),
+    }
 
     // `None` when the folder holds no careers: the app runs without one rather than inventing a
     // save the user never asked for, and the switcher asks them to create the first. Carried as
@@ -2345,6 +2563,11 @@ fn main() {
         .unwrap_or_default();
 
     let store = ams2_championship::data_store::load_store(&career_path);
+    // A career finished before payouts were sealed still has them derived. Stamp them now,
+    // while the economy in force is still the one those seasons were paid under.
+    if let Err(e) = seal_career(&store, &career_path, &config_path) {
+        eprintln!("Could not seal finished seasons: {e}");
+    }
     if career_path.as_os_str().is_empty() {
         println!("Career data:    none yet — create a career in the app before racing");
     } else {

@@ -474,6 +474,7 @@ fn test_for_championship_finds_the_right_contract() {
         salary: 100,
         objective: None,
         bought_for: 0,
+        settled: None,
     };
     let b = Contract {
         champ_id: "c2".into(),
@@ -506,6 +507,7 @@ fn test_a_contract_round_trips() {
         salary: 750_000,
         objective: Some(4),
         bought_for: 0,
+        settled: None,
     };
     let back: Contract = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();
     assert_eq!(back, c);
@@ -751,6 +753,7 @@ fn season(id: &str, status: ChampionshipStatus, session_ids: &[&str]) -> Champio
         session_ids: vec![],
         custom_ai_file: Some("F-Classic_Gen1.xml".into()),
         player_team: Some("Osella".into()),
+        planned_rounds: None,
     }
 }
 
@@ -762,6 +765,7 @@ fn contract(champ_id: &str, salary: i64, objective: Option<u32>) -> Contract {
         salary,
         objective,
         bought_for: 0,
+        settled: None,
     }
 }
 
@@ -1148,6 +1152,10 @@ fn ledger_of_in(entries: &[(&str, &str)], missed: &[usize]) -> Finances {
             team: (*team).into(),
             class: (*class).into(),
             salary: 0,
+            salary_contracted: 0,
+            races_run: 0,
+            planned_rounds: None,
+            projected_prize: None,
             prize: 0,
             bought_for: 0,
             position: Some(1),
@@ -1782,4 +1790,387 @@ fn test_an_empty_grid_still_yields_nothing() {
     // No teams, no seat to invent. The guarantee is about a career reaching a grid, not about
     // conjuring one.
     assert!(at_balance(20.0, 1_000_000, &[]).is_empty());
+}
+
+// ── Sealing a finished season ────────────────────────────────────────────────
+
+/// A prize table nothing like the default, for asserting that a change is or is not felt.
+fn retuned_prizes() -> PrizeParams {
+    PrizeParams {
+        champion_prize: 9_000_000,
+        floor_prize: 1_000_000,
+    }
+}
+
+#[test]
+fn test_a_sealed_season_pays_what_it_paid_however_the_economy_is_retuned() {
+    let (mut c, ch, s) = won_season();
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1_700_000_000);
+    let at_close = finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].prize;
+
+    // The whole point: the Config tab moves the economy, and the finished season does not move.
+    let after = finances(&c, &ch, &s, None, 0, &retuned_prizes()).seasons[0].prize;
+    assert_eq!(after, at_close);
+    assert_eq!(at_close, prize_params().champion_prize);
+}
+
+#[test]
+fn test_an_unsealed_finished_season_is_still_derived() {
+    // Back-compat: a career finished before sealing existed behaves exactly as it did, so
+    // loading one does not silently change what it is worth before the upgrade has run.
+    let (c, ch, s) = won_season();
+    assert!(c[0].settled.is_none());
+    let after = finances(&c, &ch, &s, None, 0, &retuned_prizes()).seasons[0].prize;
+    assert_eq!(after, retuned_prizes().champion_prize);
+}
+
+#[test]
+fn test_settling_is_one_time() {
+    // The first stamp was taken under the economy the season was raced under. A second call —
+    // whether from a stray transition or a later upgrade pass — must not redefine it.
+    let (mut c, ch, s) = won_season();
+    assert!(settle(&mut c, &ch[0], &s, None, &prize_params(), 1));
+    assert!(!settle(&mut c, &ch[0], &s, None, &retuned_prizes(), 2));
+    assert_eq!(
+        c[0].settled.as_ref().unwrap().prize,
+        prize_params().champion_prize
+    );
+    assert_eq!(c[0].settled.as_ref().unwrap().at, 1);
+}
+
+#[test]
+fn test_an_unfinished_season_is_not_sealed() {
+    let (mut c, mut ch, s) = won_season();
+    ch[0].status = ChampionshipStatus::Active;
+    assert!(!settle(&mut c, &ch[0], &s, None, &prize_params(), 1));
+    assert!(c[0].settled.is_none());
+}
+
+#[test]
+fn test_a_season_with_no_contract_seals_nothing() {
+    let (_, ch, s) = won_season();
+    let mut none: Vec<Contract> = vec![];
+    assert!(!settle(&mut none, &ch[0], &s, None, &prize_params(), 1));
+}
+
+#[test]
+fn test_reopening_a_season_tears_up_its_settlement() {
+    // Reopening takes the payout back — that was true while it was derived, and the stamp
+    // records what a season paid *on closing*, so a season that is open must not carry one.
+    let (mut c, mut ch, s) = won_season();
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1);
+    assert!(unsettle(&mut c, "c1"));
+    assert!(c[0].settled.is_none());
+
+    ch[0].status = ChampionshipStatus::Active;
+    assert_eq!(
+        finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].prize,
+        0
+    );
+
+    // Finishing it again takes a fresh stamp, at whatever the economy is now.
+    ch[0].status = ChampionshipStatus::Final;
+    assert!(settle(&mut c, &ch[0], &s, None, &retuned_prizes(), 2));
+    assert_eq!(
+        finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].prize,
+        retuned_prizes().champion_prize
+    );
+}
+
+#[test]
+fn test_unsettle_on_a_season_that_was_never_sealed_does_nothing() {
+    let (mut c, _, _) = won_season();
+    assert!(!unsettle(&mut c, "c1"));
+    assert!(!unsettle(&mut c, "no-such-season"));
+}
+
+#[test]
+fn test_the_upgrade_stamps_exactly_what_the_ledger_already_showed() {
+    // `seal_finished` runs at load, against the economy the career has been running on, so
+    // every figure it writes is one the ledger was already reporting. The upgrade is invisible.
+    let (mut c, ch, s) = won_season();
+    let before = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(seal_finished(&mut c, &ch, &s, None, &prize_params()), 1);
+    let after = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(after.seasons[0].prize, before.seasons[0].prize);
+    assert_eq!(after.balance, before.balance);
+}
+
+#[test]
+fn test_the_upgrade_is_idempotent_and_skips_unfinished_seasons() {
+    let (mut c, mut ch, s) = won_season();
+    ch.push(season("c2", ChampionshipStatus::Active, &[]));
+    c.push(contract("c2", 100_000, None));
+
+    assert_eq!(seal_finished(&mut c, &ch, &s, None, &prize_params()), 1);
+    // Nothing left to do, so a second load has nothing to persist either.
+    assert_eq!(seal_finished(&mut c, &ch, &s, None, &prize_params()), 0);
+    assert!(c
+        .iter()
+        .find(|x| x.champ_id == "c2")
+        .unwrap()
+        .settled
+        .is_none());
+}
+
+#[test]
+fn test_a_sealed_season_still_reports_a_live_position() {
+    // Only the money is stamped. Position and field stay derived, because results can recover
+    // them and this module records only what they cannot.
+    let (mut c, ch, s) = won_season();
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1);
+    let led = &finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0];
+    assert_eq!(led.position, Some(1));
+    assert_eq!(led.field, 4);
+}
+
+#[test]
+fn test_a_contract_written_before_sealing_still_loads() {
+    // `settled` defaults, so every save written before this deserializes as an unsealed season.
+    let old = r#"{"champ_id":"c1","team":"Osella","signed_at":1,"salary":100,"bought_for":0}"#;
+    let back: Contract = serde_json::from_str(old).unwrap();
+    assert!(back.settled.is_none());
+}
+
+#[test]
+fn test_a_settlement_round_trips() {
+    let (mut c, ch, s) = won_season();
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1_700_000_000);
+    let back: Contract = serde_json::from_str(&serde_json::to_string(&c[0]).unwrap()).unwrap();
+    assert_eq!(back, c[0]);
+}
+
+// ── A salary is paid out across the declared calendar ────────────────────────
+
+/// A season of `planned` races with `run` of them actually raced, and the contract for it.
+fn calendar_season(
+    planned: u32,
+    run: u32,
+    status: ChampionshipStatus,
+    salary: i64,
+) -> (Vec<Contract>, Vec<Championship>, Vec<RecordedSession>) {
+    let ids: Vec<String> = (0..run).map(|i| format!("s{i}")).collect();
+    let sessions: Vec<RecordedSession> = ids
+        .iter()
+        .map(|id| race(id, &["Nightrat", "Piquet", "Mansell"], Some("Nightrat")))
+        .collect();
+    let refs: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
+    let mut champ = season("c1", status, &refs);
+    champ.planned_rounds = Some(planned);
+    (vec![contract("c1", salary, Some(3))], vec![champ], sessions)
+}
+
+#[test]
+fn test_salary_is_drawn_one_instalment_per_race() {
+    // Five of fifteen raced: a third of the season, and a third of the wage — while it is still
+    // being raced, which is the whole point of declaring a calendar.
+    let (c, ch, s) = calendar_season(15, 5, ChampionshipStatus::Active, 30_000);
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(f.seasons[0].salary, 10_000);
+    assert_eq!(f.seasons[0].races_run, 5);
+    assert_eq!(f.seasons[0].planned_rounds, Some(15));
+    // Prize money still waits for a final position, which an unfinished season does not have.
+    assert_eq!(f.seasons[0].prize, 0);
+    assert_eq!(f.earned, 10_000);
+}
+
+#[test]
+fn test_racing_the_whole_calendar_draws_the_whole_salary() {
+    let (c, ch, s) = calendar_season(10, 10, ChampionshipStatus::Active, 33_792);
+    assert_eq!(
+        finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].salary,
+        33_792
+    );
+}
+
+#[test]
+fn test_a_season_cut_short_keeps_only_what_it_raced() {
+    // Twelve of fifteen, then Final. No top-up: the wage is for races turned up to, and the
+    // contracted figure is a ceiling rather than a promise.
+    let (mut c, ch, s) = calendar_season(15, 12, ChampionshipStatus::Final, 30_000);
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1);
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(f.seasons[0].salary, 24_000);
+}
+
+#[test]
+fn test_racing_past_the_calendar_earns_nothing_extra() {
+    // Eighteen races on a fifteen-race deal. The team does not pay twice for a longer season.
+    let (c, ch, s) = calendar_season(15, 18, ChampionshipStatus::Active, 30_000);
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(f.seasons[0].salary, 30_000);
+    assert_eq!(f.seasons[0].races_run, 18);
+}
+
+#[test]
+fn test_only_a_round_that_raced_draws_a_wage() {
+    // A round that was only practised is not a race. Session type 5 is what scores points, and
+    // so what a round is paid for.
+    let (c, mut ch, mut s) = calendar_season(10, 1, ChampionshipStatus::Active, 10_000);
+    let mut practice = race("p1", &["Nightrat", "Piquet"], Some("Nightrat"));
+    practice.session_type = 1;
+    s.push(practice);
+    ch[0].rounds.push(Round {
+        session_ids: vec!["p1".into()],
+    });
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(f.seasons[0].races_run, 1);
+    assert_eq!(f.seasons[0].salary, 1_000);
+}
+
+#[test]
+fn test_a_season_with_no_calendar_still_pays_in_one_lump_at_final() {
+    // Every season written before calendars existed. `season()` leaves `planned_rounds` unset,
+    // so this is the old rule exactly: nothing while racing, the whole salary at Final.
+    let racing = (
+        vec![contract("c1", 500_000, Some(3))],
+        vec![season("c1", ChampionshipStatus::Active, &["s1"])],
+        vec![race("s1", &["Nightrat", "Piquet"], Some("Nightrat"))],
+    );
+    assert_eq!(
+        finances(&racing.0, &racing.1, &racing.2, None, 0, &prize_params()).seasons[0].salary,
+        0
+    );
+    let (c, ch, s) = won_season();
+    assert_eq!(
+        finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].salary,
+        500_000
+    );
+}
+
+#[test]
+fn test_closing_the_books_fixes_the_salary_as_well_as_the_prize() {
+    // Reassigning a session away from a closed season must not take back wages already drawn.
+    // Salary is stamped for the same reason the prize is — and, like the prize, only the money
+    // is fixed: the standings that season is shown against stay free to move.
+    let (mut c, ch, s) = calendar_season(15, 15, ChampionshipStatus::Final, 30_000);
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1);
+    assert_eq!(c[0].settled.as_ref().unwrap().salary, Some(30_000));
+
+    // Half the calendar taken away afterwards.
+    let mut stripped = ch.clone();
+    stripped[0].rounds.truncate(7);
+    assert_eq!(
+        finances(&c, &stripped, &s, None, 0, &prize_params()).seasons[0].salary,
+        30_000
+    );
+}
+
+#[test]
+fn test_reopening_a_season_takes_back_the_wage_stamp_too() {
+    let (mut c, mut ch, s) = calendar_season(15, 15, ChampionshipStatus::Final, 30_000);
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1);
+    unsettle(&mut c, "c1");
+    // Back to being derived, so a season reopened and re-raced is paid for what it then runs.
+    ch[0].status = ChampionshipStatus::Active;
+    ch[0].rounds.truncate(5);
+    assert_eq!(
+        finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].salary,
+        10_000
+    );
+}
+
+#[test]
+fn test_a_settlement_from_before_per_race_pay_still_pays_the_whole_salary() {
+    // `Settlement.salary` defaults, so a stamp taken before this existed carries none. Those
+    // seasons drew the whole salary at Final and must keep reading as having done so — the
+    // alternative is a career quietly losing money it was already paid.
+    let old = r#"{"champ_id":"c1","team":"Osella","signed_at":1,"salary":500000,
+                  "bought_for":0,"settled":{"prize":2000000,"at":0}}"#;
+    let back: Contract = serde_json::from_str(old).unwrap();
+    assert_eq!(back.settled.as_ref().unwrap().salary, None);
+    let (_, ch, s) = won_season();
+    assert_eq!(
+        finances(&[back], &ch, &s, None, 0, &prize_params()).seasons[0].salary,
+        500_000
+    );
+}
+
+#[test]
+fn test_a_championship_written_before_calendars_still_loads() {
+    let old = r#"{"id":"c1","name":"1986","status":"Final","points_system":[9,6],
+                  "manufacturer_scoring":false,"rounds":[]}"#;
+    let back: Championship = serde_json::from_str(old).unwrap();
+    assert_eq!(back.planned_rounds, None);
+}
+
+#[test]
+fn test_a_calendar_of_zero_is_not_divided_by() {
+    // Hand-editable, so the guard is real. A zero calendar reads as no calendar at all.
+    let (c, mut ch, s) = calendar_season(10, 4, ChampionshipStatus::Active, 10_000);
+    ch[0].planned_rounds = Some(0);
+    assert_eq!(
+        finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].salary,
+        0
+    );
+}
+
+// ── What a running season is on course for ───────────────────────────────────
+
+#[test]
+fn test_a_running_season_projects_what_todays_standings_would_pay() {
+    // The prize curve belongs here, not to a client: a second copy in the browser would drift
+    // from this one the moment the economy is retuned.
+    let (c, ch, s) = calendar_season(15, 5, ChampionshipStatus::Active, 30_000);
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    // The player wins every race in `calendar_season`, so today's standings have them first.
+    assert_eq!(f.seasons[0].position, Some(1));
+    assert_eq!(
+        f.seasons[0].projected_prize,
+        Some(prize(1, f.seasons[0].field, &prize_params()))
+    );
+    // Projected is not banked: `earned` counts the wage drawn and nothing else.
+    assert_eq!(f.seasons[0].prize, 0);
+    assert_eq!(f.earned, 10_000);
+}
+
+#[test]
+fn test_a_finished_season_projects_nothing() {
+    // Once it is over the prize is a fact, not a forecast, and two numbers claiming to be the
+    // payout is one too many.
+    let (mut c, ch, s) = calendar_season(15, 15, ChampionshipStatus::Final, 30_000);
+    settle(&mut c, &ch[0], &s, None, &prize_params(), 1);
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(f.seasons[0].projected_prize, None);
+    assert!(f.seasons[0].prize > 0);
+}
+
+#[test]
+fn test_a_season_that_has_scored_nothing_projects_nothing_to_win() {
+    let (c, ch, s) = calendar_season(15, 0, ChampionshipStatus::Active, 30_000);
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(f.seasons[0].position, None);
+    assert_eq!(f.seasons[0].projected_prize, Some(0));
+}
+
+#[test]
+fn test_the_contracted_wage_is_reported_beside_what_has_been_drawn() {
+    // A client showing "drawn 10,000 of 30,000" needs both, and the drawn figure alone cannot
+    // recover the deal it is drawn against.
+    let (c, ch, s) = calendar_season(15, 5, ChampionshipStatus::Active, 30_000);
+    let f = finances(&c, &ch, &s, None, 0, &prize_params());
+    assert_eq!(f.seasons[0].salary, 10_000);
+    assert_eq!(f.seasons[0].salary_contracted, 30_000);
+    // Finishing the calendar draws exactly the contracted figure, so "still to race for" is a
+    // subtraction rather than a second copy of the wage rule.
+    let full = calendar_season(15, 15, ChampionshipStatus::Active, 30_000);
+    assert_eq!(
+        finances(&full.0, &full.1, &full.2, None, 0, &prize_params()).seasons[0].salary,
+        30_000
+    );
+}
+
+#[test]
+fn test_retuning_the_economy_moves_a_projection_but_not_a_settled_season() {
+    // The same rule sealing exists for, seen from the projection side: a forecast tracks the
+    // economy in force now, precisely because it has not been paid.
+    let (c, ch, s) = calendar_season(15, 5, ChampionshipStatus::Active, 30_000);
+    let lean = PrizeParams {
+        champion_prize: 10,
+        floor_prize: 1,
+    };
+    let a = finances(&c, &ch, &s, None, 0, &prize_params()).seasons[0].projected_prize;
+    let b = finances(&c, &ch, &s, None, 0, &lean).seasons[0].projected_prize;
+    assert_ne!(a, b);
+    assert_eq!(b, Some(10));
 }
