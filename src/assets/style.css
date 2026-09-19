@@ -1272,3 +1272,46 @@ header h1 { flex: 1 1 100%; }
 /* The number a setup is chosen against — the one reading on the panel the
    driver is actually hunting for. */
 .dmg-seen-low { color: #e0e0f0; }
+
+/* ── Grid warnings: the roster a season is judged on, versus the grid raced ──
+   One palette across all three places it appears (live banner, Manage panel,
+   Career round), because it is one message — the server writes the sentence and
+   these only decide how loudly it is shown. Amber, not red: nothing here is an
+   error, and the session is still recorded, still assigned and still scored. */
+.live-grid-warning {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  margin: 0.5rem 0; padding: 0.55rem 0.75rem;
+  background: #2a2010; border: 1px solid #7a5c18; border-left-width: 3px;
+  border-radius: 4px; color: #f0c674; font-size: 0.85rem; line-height: 1.4;
+}
+.live-grid-warning-icon { flex: none; font-size: 1rem; line-height: 1.2; }
+.live-grid-warning-text { flex: 1; }
+
+.grid-box {
+  margin-top: 0.75rem; padding: 0.6rem 0.75rem;
+  border: 1px solid #2a2a4a; border-radius: 4px;
+  background: #12121f; color: #888; font-size: 0.8rem; line-height: 1.45;
+}
+.grid-box-warn { background: #2a2010; border-color: #7a5c18; color: #f0c674; }
+.grid-box-ok { color: #6a9955; }
+.grid-box-info { color: #888; }
+.grid-box-hint { margin-top: 0.35rem; color: #b89a5a; font-size: 0.76rem; }
+.grid-warn-icon { color: #f0c674; }
+
+.session-grid-note {
+  flex-basis: 100%; margin-top: 0.35rem;
+  color: #f0c674; font-size: 0.76rem; line-height: 1.4;
+}
+.session-card-flagged { border-left: 3px solid #7a5c18; }
+
+/* Career tab: the flag stays with the result, so a season's history shows which
+   races were run on the grid they are judged against. */
+.session-grid-badge {
+  color: #f0c674; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.04em; cursor: help;
+}
+.round-session-grid-note {
+  margin: 0.2rem 0 0.4rem; color: #f0c674;
+  font-size: 0.74rem; line-height: 1.4;
+}
+.round-session-flagged { border-left: 3px solid #7a5c18; padding-left: 0.5rem; }

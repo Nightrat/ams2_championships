@@ -1377,3 +1377,129 @@ fn test_baseline_operations_refuse_a_file_that_is_not_there() {
     assert!(set_baseline(&missing).is_err());
     assert!(reset_from_baseline(&missing).is_err());
 }
+
+// ── GridFit: the grid raced against the grid it is judged on ─────────────────
+
+/// [`ROSTER`] holds ten entries but nine cars: Brabham #8 is listed twice, once per driver who
+/// sat in it that season. Counting liveries would call it a ten-car grid and report every full
+/// one as short.
+#[test]
+fn test_seats_counts_cars_not_entries() {
+    let seats = parse_seats_str(ROSTER);
+    assert_eq!(seats.len(), 10);
+    assert_eq!(distinct_seats(&seats), 9);
+}
+
+/// The whole roster on track, with the player in one of its cars.
+fn full_grid<'a>() -> Vec<(&'a str, &'a str, bool)> {
+    vec![
+        ("Nigel Mansell", M1, false),
+        ("Nelson Piquet", M1, false),
+        ("Riccardo Patrese", M1, false),
+        ("Derek Warwick", M1, false),
+        ("Alain Prost", M1, false),
+        ("Thierry Boutsen", M1, false),
+        ("Christian Danner", M1, false),
+        ("Allan Berg", M1, false),
+        ("Me", M1, true),
+    ]
+}
+
+#[test]
+fn test_a_full_grid_has_nothing_to_report() {
+    let seats = parse_seats_str(ROSTER);
+    let rows = full_grid();
+    let fit = GridFit::measure(&seats, &grid(&rows));
+
+    assert_eq!(fit.cars, 9);
+    assert_eq!(fit.seats, 9);
+    assert!(fit.is_full());
+    assert_eq!(fit.note(), None);
+}
+
+#[test]
+fn test_a_short_grid_says_so_and_names_both_numbers() {
+    let seats = parse_seats_str(ROSTER);
+    let rows: Vec<(&str, &str, bool)> = full_grid().into_iter().take(4).collect();
+    let fit = GridFit::measure(&seats, &grid(&rows));
+
+    assert_eq!(fit.short_by(), 5);
+    assert_eq!(fit.stock_fill(), 0);
+    let note = fit.note().expect("a short grid is worth saying");
+    assert!(note.contains("4 cars"), "{note}");
+    assert!(note.contains("9"), "{note}");
+}
+
+#[test]
+fn test_stock_ai_padding_is_reported_separately_from_a_short_grid() {
+    let seats = parse_seats_str(ROSTER);
+    let mut rows = full_grid();
+    rows.push(("Stock Driver 1", M1, false));
+    rows.push(("Stock Driver 2", M1, false));
+    let fit = GridFit::measure(&seats, &grid(&rows));
+
+    assert_eq!(fit.stock_fill(), 2);
+    assert_eq!(fit.short_by(), 0);
+    assert!(!fit.is_full());
+    let note = fit.note().expect("cars outside the roster are worth saying");
+    assert!(note.contains("2 cars"), "{note}");
+    assert!(note.contains("stock AI"), "{note}");
+}
+
+/// The case that matters most: the session was not run on this roster at all, so nothing can be
+/// derived from it. Said first, because a short grid is beside the point when the grid is
+/// somebody else's.
+#[test]
+fn test_a_grid_that_is_mostly_strangers_is_not_this_roster() {
+    let seats = parse_seats_str(ROSTER);
+    let rows = vec![
+        ("Nigel Mansell", M1, false),
+        ("Stranger A", M1, false),
+        ("Stranger B", M1, false),
+        ("Stranger C", M1, false),
+        ("Me", M1, true),
+    ];
+    let fit = GridFit::measure(&seats, &grid(&rows));
+
+    assert!(fit.not_roster());
+    let note = fit.note().expect("a foreign grid is worth saying");
+    assert!(note.contains("Not raced on this roster"), "{note}");
+    assert!(note.contains("rating"), "{note}");
+}
+
+/// The same majority test [`infer_player_seat`] uses, so the two cannot disagree about whether
+/// a session identifies its roster.
+#[test]
+fn test_not_roster_uses_the_same_threshold_as_seat_inference() {
+    let seats = parse_seats_str(ROSTER);
+    // Four of eight AI in the roster: exactly half, which is not a minority.
+    let rows = vec![
+        ("Nigel Mansell", M1, false),
+        ("Nelson Piquet", M1, false),
+        ("Riccardo Patrese", M1, false),
+        ("Derek Warwick", M1, false),
+        ("Stranger A", M1, false),
+        ("Stranger B", M1, false),
+        ("Stranger C", M1, false),
+        ("Stranger D", M1, false),
+        ("Me", M1, true),
+    ];
+    let g = grid(&rows);
+    assert!(!GridFit::measure(&seats, &g).not_roster());
+    assert!(!matches!(
+        infer_player_seat(&seats, &g),
+        PlayerSeat::RosterNotDetected { .. }
+    ));
+}
+
+/// Nothing to measure against is not the same as a clean grid — the caller must be able to tell
+/// "no roster" from "all fine", or it would report a career with no rosters as perfect.
+#[test]
+fn test_no_roster_means_no_verdict() {
+    let rows = full_grid();
+    let fit = GridFit::measure(&[], &grid(&rows));
+    assert_eq!(fit.seats, 0);
+    assert!(!fit.is_full());
+    assert!(!fit.not_roster());
+    assert_eq!(fit.note(), None);
+}

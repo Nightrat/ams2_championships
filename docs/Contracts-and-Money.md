@@ -2,6 +2,8 @@
 
 *Singleplayer careers only. A multiplayer career races people, so it has no seats to be offered and no money; the Finances page and all of this are hidden there.*
 
+> **The grid the terms come from is the Custom AI Drivers roster**, so contracts need the same three things the rating does: the class's **custom liveries installed**, a **Custom AI file naming them**, and the season raced **with that roster active**. Without a roster the season shows *“Assign a Custom AI Drivers file to see what the grid will offer”* and there is nothing to sign; with one that the races were not actually run on, your rating never moves, so the offers never improve. See [What a singleplayer career needs](Getting-Started.md#what-a-singleplayer-career-needs).
+
 Every season in a singleplayer career is raced for a team, on terms the grid decides. You are offered seats your [driver rating](Rating-and-Performance.md) has earned, paid for the races you turn up to, and paid again on where you finish the championship.
 
 ## Seats on offer
@@ -19,7 +21,7 @@ Each row shows:
 | **Terms** | Salary for the season, and the finishing position they expect |
 | **Price** | Sponsorship you must bring, for a seat you are buying into |
 
-The teams that make no offer are the ones missing from the list. Under the heading you will find your rating, your balance, and the seat you held last season.
+Teams the roster names but AMS2 has no livery for never reach a grid at all, so they are not among the seats on offer — the Car Performance tab marks them **no livery**. The teams that make no offer are otherwise simply the ones missing from the list. Under the heading you will find your rating, your balance, and the seat you held last season.
 
 ### Salary
 

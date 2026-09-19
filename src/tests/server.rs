@@ -2160,7 +2160,7 @@ fn two_seasons() -> Vec<Championship> {
 #[test]
 fn test_live_teams_come_from_the_active_championship() {
     let dir = make_live_teams_dir();
-    let out = resolve_live_teams(&dir, &two_seasons());
+    let out = resolve_live_teams(&dir, &two_seasons(), &[], false);
 
     assert_eq!(out.player_team.as_deref(), Some("Brabham"));
     assert_eq!(
@@ -2186,7 +2186,7 @@ fn test_live_teams_follow_the_active_flag_when_it_moves() {
     champs[1].status = ChampionshipStatus::Active;
     champs[1].player_team = Some("March".into());
 
-    let out = resolve_live_teams(&dir, &champs);
+    let out = resolve_live_teams(&dir, &champs, &[], false);
     assert_eq!(out.player_team.as_deref(), Some("March"));
     assert_eq!(
         out.teams.get("Dan Delta").map(String::as_str),
@@ -2204,7 +2204,7 @@ fn test_live_teams_empty_when_no_championship_is_active() {
     let mut champs = two_seasons();
     champs[0].status = ChampionshipStatus::Progress;
 
-    let out = resolve_live_teams(&dir, &champs);
+    let out = resolve_live_teams(&dir, &champs, &[], false);
     assert!(out.teams.is_empty());
     assert_eq!(out.player_team, None);
 
@@ -2217,7 +2217,7 @@ fn test_live_teams_empty_when_the_active_championship_has_no_roster() {
     let mut champs = two_seasons();
     champs[0].custom_ai_file = None;
 
-    let out = resolve_live_teams(&dir, &champs);
+    let out = resolve_live_teams(&dir, &champs, &[], false);
     assert!(out.teams.is_empty());
     assert_eq!(
         out.player_team, None,
@@ -2233,7 +2233,7 @@ fn test_live_teams_treats_a_blank_player_team_as_unset() {
     let mut champs = two_seasons();
     champs[0].player_team = Some("   ".into());
 
-    let out = resolve_live_teams(&dir, &champs);
+    let out = resolve_live_teams(&dir, &champs, &[], false);
     assert!(!out.teams.is_empty(), "the roster still resolves");
     assert_eq!(out.player_team, None);
 
@@ -4493,4 +4493,234 @@ fn test_route_leaving_the_calendar_out_of_a_patch_keeps_it() {
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert_eq!(store.read().unwrap().championships[0].planned_rounds, Some(16));
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+// ── GET /api/championships/:id/grid-check ────────────────────────────────────
+//
+// The Manage tab's half of the grid warning: which of a season's recorded sessions were
+// actually raced on the roster the season is judged against. [`OFFER_ROSTER`] is a four-car
+// grid — two Williams, two Osella — so a session with fewer cars is short, and one carrying
+// names the roster does not know is padded with stock AI.
+
+/// A recorded race with `names` as the AI and the player added on the end.
+fn grid_session(id: &str, names: &[&str]) -> RecordedSession {
+    let driver = |name: &str, pos: u32, is_player: bool| SessionResult {
+        name: name.into(),
+        car_name: String::new(),
+        car_class: "F-Classic_Gen1".into(),
+        race_position: pos,
+        laps_completed: 10,
+        fastest_lap: 90.0,
+        last_lap: 90.0,
+        dnf: false,
+        is_player,
+    };
+    let mut results: Vec<SessionResult> = names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| driver(n, i as u32 + 1, false))
+        .collect();
+    results.push(driver("Nightrat", names.len() as u32 + 1, true));
+    RecordedSession {
+        id: id.into(),
+        recorded_at: 1,
+        track: "Monza".into(),
+        track_variation: String::new(),
+        car_name: String::new(),
+        car_class: "F-Classic_Gen1".into(),
+        session_type: 5,
+        results,
+        lap_chart: vec![],
+    }
+}
+
+/// A season on [`OFFER_ROSTER`] holding `sessions`, each in its own round.
+fn grid_check_resp(sessions: Vec<RecordedSession>, config: &std::path::Path) -> String {
+    let (store, data_path) = make_sp_store();
+    let mut champ = rated_champ("c1");
+    champ.rounds = sessions
+        .iter()
+        .map(|s| ams2_championship::data_store::Round {
+            session_ids: vec![s.id.clone()],
+        })
+        .collect();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(champ);
+        data.sessions = sessions;
+    }
+    call_with_config(
+        store,
+        data_path,
+        "GET /api/championships/c1/grid-check HTTP/1.1\r\nHost: localhost\r\n\r\n"
+            .to_string()
+            .into_bytes(),
+        Some(config.to_path_buf()),
+    )
+}
+
+#[test]
+fn test_route_grid_check_passes_a_session_that_raced_the_whole_roster() {
+    let (root, config) = make_offer_fixture(true);
+    let full = grid_session(
+        "s1",
+        &["Nigel Mansell", "Nelson Piquet", "Piercarlo Ghinzani"],
+    );
+    let resp = grid_check_resp(vec![full], &config);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+
+    assert_eq!(v["checked"], true);
+    assert_eq!(v["seats"], 4);
+    // A clean season says nothing rather than reassuring at length.
+    assert!(v["summary"].is_null(), "{v}");
+    assert!(v["sessions"][0]["note"].is_null(), "{v}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_route_grid_check_flags_a_short_grid_and_counts_it_in_the_summary() {
+    let (root, config) = make_offer_fixture(true);
+    let short = grid_session("s1", &["Nigel Mansell"]);
+    let resp = grid_check_resp(vec![short], &config);
+    let v = body_json(&resp);
+
+    assert_eq!(v["checked"], true);
+    let note = v["sessions"][0]["note"].as_str().unwrap_or_default();
+    assert!(note.contains("Short grid"), "{v}");
+    let summary = v["summary"].as_str().unwrap_or_default();
+    assert!(summary.starts_with("1 of 1"), "{summary}");
+    assert!(summary.contains("4-car"), "{summary}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_route_grid_check_flags_a_session_raced_on_another_roster() {
+    let (root, config) = make_offer_fixture(true);
+    let foreign = grid_session("s1", &["Someone Else", "Another One", "A Third"]);
+    let resp = grid_check_resp(vec![foreign], &config);
+    let v = body_json(&resp);
+
+    let note = v["sessions"][0]["note"].as_str().unwrap_or_default();
+    assert!(note.contains("Not raced on this roster"), "{v}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Practice is not rated, so a short practice grid is a choice rather than a mistake. Leaving
+/// it in would warn about the one session type the warning cannot apply to.
+#[test]
+fn test_route_grid_check_ignores_practice() {
+    let (root, config) = make_offer_fixture(true);
+    let mut practice = grid_session("s1", &["Nigel Mansell"]);
+    practice.session_type = ams2_championship::data_store::SESSION_PRACTICE;
+    let resp = grid_check_resp(vec![practice], &config);
+    let v = body_json(&resp);
+
+    assert_eq!(v["checked"], true);
+    assert_eq!(v["sessions"].as_array().unwrap().len(), 0, "{v}");
+    assert!(v["summary"].is_null(), "{v}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Nothing to check against must not read as a clean bill of health.
+#[test]
+fn test_route_grid_check_without_a_roster_says_why() {
+    let (store, path) = make_test_store();
+    store.write().unwrap().championships.push(make_champ("c1"));
+    let resp = get(store, path.clone(), "/api/championships/c1/grid-check");
+    let v = body_json(&resp);
+
+    assert_eq!(v["checked"], false);
+    assert!(!v["reason"].as_str().unwrap_or_default().is_empty(), "{v}");
+    assert!(v["summary"].is_null(), "{v}");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_grid_check_unknown_championship_is_404() {
+    let (store, path) = make_test_store();
+    let resp = get(store, path.clone(), "/api/championships/nope/grid-check");
+    assert!(status_line(&resp).contains("404"));
+    let _ = std::fs::remove_file(&path);
+}
+
+// ── The live banner ──────────────────────────────────────────────────────────
+//
+// The live tab is the only place a grid problem can still be fixed, so this is the one warning
+// that interrupts.
+
+fn live_grid<'a>(names: &'a [(&'a str, bool)]) -> Vec<ams2_championship::custom_ai::GridEntry<'a>> {
+    names
+        .iter()
+        .map(|(name, is_player)| ams2_championship::custom_ai::GridEntry {
+            name,
+            car_name: "",
+            is_player: *is_player,
+        })
+        .collect()
+}
+
+#[test]
+fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
+    let dir = make_live_teams_dir();
+    let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
+    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true);
+
+    let warning = out.warning.expect("a short grid is worth interrupting for");
+    assert!(warning.contains("Short grid"), "{warning}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Only a career judged on a roster is nagged about one: multiplayer races people.
+#[test]
+fn test_live_warning_is_silent_for_a_career_with_no_roster() {
+    let dir = make_live_teams_dir();
+    let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
+    let out = resolve_live_teams(&dir, &two_seasons(), &grid, false);
+
+    assert!(out.warning.is_none());
+    // The team names still resolve — nothing about the warning switches those off.
+    assert!(!out.teams.is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_live_warning_when_no_championship_is_active() {
+    let dir = make_live_teams_dir();
+    let mut champs = two_seasons();
+    for c in &mut champs {
+        c.status = ChampionshipStatus::Progress;
+    }
+    let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
+    let out = resolve_live_teams(&dir, &champs, &grid, true);
+
+    let warning = out.warning.expect("no Active season is worth saying");
+    assert!(warning.contains("Active"), "{warning}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// An empty grid is the menu, not a bad grid — warning there would leave the banner on screen
+/// whenever the app is open.
+#[test]
+fn test_live_warning_says_nothing_before_a_session_loads() {
+    let dir = make_live_teams_dir();
+    let out = resolve_live_teams(&dir, &two_seasons(), &[], true);
+
+    assert!(out.warning.is_none());
+    assert!(out.fit.is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The served page must actually carry the elements the scripts fill in. They are wired by id
+/// across three files — markup in `championship_html.rs`, the fetch in one asset, the render in
+/// another — so a rename that misses one would leave a warning that is computed and never seen.
+#[test]
+fn test_the_page_carries_the_hooks_the_grid_warning_needs() {
+    let html = ams2_championship::championship_html::build_base_html();
+    for id in [
+        "live-grid-warning",   // live banner, filled by live.js
+        "champ-grid-panel",    // Manage tab season panel, filled by manage.js
+    ] {
+        assert!(html.contains(id), "the page is missing #{id}");
+    }
 }

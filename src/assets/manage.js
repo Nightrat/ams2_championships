@@ -186,7 +186,8 @@ function renderChampDetail(id) {
 
         var sessionCards = roundSessions.map(function (s) {
           var typeLabel = SESSION_TYPE_LABELS[s.session_type] || '?';
-          return '<div class="session-card">' +
+          // Filled in by loadGridCheck once the check comes back; the id is what it keys on.
+          return '<div class="session-card" data-grid-session="' + esc(s.id) + '">' +
             '<div class="session-card-info">' +
               '<span class="session-type-badge">' + typeLabel + '</span>' +
               '<span class="session-track">' + fmtTrack(s) + '</span>' +
@@ -197,6 +198,7 @@ function renderChampDetail(id) {
             '</div>' +
             '<button class="manage-btn manage-btn-danger session-remove-btn"' +
               ' data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '" data-sid="' + esc(s.id) + '">Remove</button>' +
+            '<div class="session-grid-note" hidden></div>' +
             '</div>';
         }).join('') || '<div class="manage-empty">No sessions in this round.</div>';
 
@@ -249,6 +251,9 @@ function renderChampDetail(id) {
     // Filled by loadOffers when contracts are switched on; empty otherwise, so the team picker
     // above stays the whole story for anyone not using them.
     '<div id="champ-contract-panel"></div>' +
+    // Whether this season's recorded sessions were actually raced on its roster. Empty when
+    // there is nothing to say, so a season raced properly shows no panel at all.
+    '<div id="champ-grid-panel"></div>' +
     '<div class="champ-rounds-header">' +
       '<span>Rounds&nbsp;(' + rounds.length + ')</span>' +
       '<button class="manage-btn manage-btn-primary add-round-btn" data-cid="' + esc(champ.id) + '">+ Add Round</button>' +
@@ -297,6 +302,7 @@ function renderChampDetail(id) {
   });
   loadPlayerTeamOptions(champ.id);
   loadOffers(champ.id);
+  loadGridCheck(champ.id);
   right.querySelector('.champ-delete-btn').addEventListener('click', function () {
     if (!confirm('Delete "' + champ.name + '"?')) return;
     fetch('/api/championships/' + champ.id, { method: 'DELETE' }).then(function () {
@@ -567,6 +573,65 @@ if (purgeBtn) {
       .then(function (r) { return r.json(); })
       .then(function () { loadManage(); });
   });
+}
+
+
+// ── Did this season race the grid it is judged on? ────────────────────────────
+//
+// The rating compares a finish against where the car ranks across the whole roster, so a
+// session raced on a short grid — or on stock AI — is measured against a field that was not
+// there. The server decides all of that and writes the sentences; this only places them.
+
+function loadGridCheck(champId) {
+  var panel = document.getElementById('champ-grid-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  fetch('/api/championships/' + champId + '/grid-check')
+    .then(function (r) { return r.json(); })
+    .then(function (data) { renderGridCheck(data); })
+    .catch(function () {});
+}
+
+function renderGridCheck(data) {
+  var panel = document.getElementById('champ-grid-panel');
+  if (!panel || !data) return;
+
+  // Nothing to check against is worth saying once, quietly: it is a setup gap, not a mistake
+  // in this season.
+  if (!data.checked) {
+    panel.innerHTML = data.reason
+      ? '<div class="grid-box grid-box-info">' + esc(data.reason) + '</div>'
+      : '';
+    return;
+  }
+
+  (data.sessions || []).forEach(function (row) {
+    var card = document.querySelector('[data-grid-session="' + cssEscapeId(row.id) + '"]');
+    if (!card) return;
+    var box = card.querySelector('.session-grid-note');
+    if (!box) return;
+    if (!row.note) { box.hidden = true; box.textContent = ''; return; }
+    box.hidden = false;
+    box.className = 'session-grid-note';
+    box.innerHTML = '<span class="grid-warn-icon">&#9888;</span> ' + esc(row.note);
+    card.classList.add('session-card-flagged');
+  });
+
+  panel.innerHTML = data.summary
+    ? '<div class="grid-box grid-box-warn">' +
+        '<span class="grid-warn-icon">&#9888;</span> ' + esc(data.summary) +
+        '<div class="grid-box-hint">Race this class with ' + data.seats +
+          ' cars on track — one per livery the roster can field — so every result is judged ' +
+          'on the grid it was run against.</div>' +
+      '</div>'
+    : '<div class="grid-box grid-box-ok">Every recorded session raced the full ' +
+        data.seats + '-car roster.</div>';
+}
+
+// Session ids are unix timestamps today, but a hand-edited career can hold anything, and this
+// goes into a selector. Quotes are the only character that could break out of one here.
+function cssEscapeId(id) {
+  return String(id).replace(/["\]/g, '\$&');
 }
 
 document.querySelectorAll('.tab-btn').forEach(function (btn) {

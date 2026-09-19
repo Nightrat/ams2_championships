@@ -21,6 +21,10 @@ What it offers depends on the kind of career you are in. A **singleplayer** seas
 
 A season is defined by the grid it is raced on, so the roster is picked when the season is created rather than attached afterwards — everything that judges you, from team requirements to the terms you are offered, is measured against that grid. It locks once the season has its first recorded session.
 
+**Race it at full grid size.** Set the opponent count so every car in the roster is on track — the rating measures your finish against where your car ranks in the *whole* roster, so a short grid compares two different things. See [Set the grid size to the roster](Getting-Started.md#set-the-grid-size-to-the-roster).
+
+**The roster has to be one AMS2 actually uses.** A Custom AI Drivers file only binds names and pace to liveries the game already owns, so the class's custom skins must be installed, and the season must be raced with that roster active. A season raced on stock AI records its results and scores its points as normal, but it tells the app nothing about who you were racing — so no rating, no team requirements and no offers. See [What a singleplayer career needs](Getting-Started.md#what-a-singleplayer-career-needs).
+
 The race count is the season's **calendar**. Rounds are added as you race them, so without a declared length there is no way to tell whether you are an eighth or a fifteenth of the way through a season — and that is exactly what a salary has to be paid out against. It is a plan, not a commitment: you can stop short of it or run past it, and you can change it later.
 
 A multiplayer career has no roster, no team and no contracts, so it is asked for none of this.
@@ -34,7 +38,21 @@ A multiplayer career has no roster, no team and no contracts, so it is asked for
 
 A round can contain multiple sessions (e.g. a qualifying session and a race). Only race sessions contribute points to the standings — and only race sessions draw a salary instalment.
 
-In a singleplayer season that has both a roster and a team, a session that could not have been yours is listed with the reason — for example *"you declared Brabham but the only free seat was Osella"*. The check reads the recorded grid against the roster: if every seat in the roster was filled by an AI, or the only free one was not your team's, you were not driving for that team in that session.
+In a singleplayer season that has both a roster and a team, sessions that could not have been yours are **left out of the picker**, with a line saying how many were hidden. The check reads the recorded grid against the roster: if every seat in the roster was filled by an AI, or the only free one was not your team's, you were not driving for that team in that session.
+
+A session raced on a different roster entirely is *not* hidden — it cannot contradict a seat it never had. You can assign it; it simply will not tell the rating anything, and the season's grid check below will say so.
+
+## Was this season raced on its own grid?
+
+Under the season's settings, a singleplayer season shows how its recorded sessions lined up with the roster it is judged against, and each session card carries its own note when something is off:
+
+- **Not raced on this roster** — barely any of that grid is in the Custom AI file, so the session cannot count towards your rating.
+- **Short grid** — fewer cars raced than the roster can field. Your finish is judged against where your car ranks in the *whole* roster, so a smaller field flatters it.
+- **Cars not in the roster** — the opponent count was above what the roster can field, so AMS2 filled the rest with stock AI.
+
+A season raced properly says so in one line and nothing more. If there is nothing to check against — no Custom AI folder, or no roster on this season — it says that instead, rather than reporting all clear.
+
+The same warnings appear in two other places: live in the [Live Session](Live-Session.md#grid-warning) tab while you can still fix them, and on the affected sessions in the [Career](Career.md#round-results) tab afterwards.
 
 ## Editing a championship
 

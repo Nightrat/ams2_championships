@@ -333,6 +333,16 @@ struct LiveTeams {
     teams: std::collections::HashMap<String, String>,
     /// Manual override for the player's row — their profile name won't be in the file.
     player_team: Option<String>,
+    /// Why the grid on track will not be judged the way the user expects, or `None` when there
+    /// is nothing to say. The live tab is the only place a grid problem can still be *fixed* —
+    /// quit to the menu, set the opponent count, start again — so it is worth interrupting for.
+    ///
+    /// Server-side, like every other user-facing sentence about the roster: the same text is
+    /// shown by the Manage and Career tabs, and three copies would drift.
+    warning: Option<String>,
+    /// How the live grid measures up, when a roster could be found. Carried alongside the
+    /// sentence so the tab can show the counts without re-deriving them.
+    fit: Option<ams2_championship::custom_ai::GridFit>,
 }
 
 /// Team names for the live timing grid, taken from the **active** championship.
@@ -349,19 +359,47 @@ struct LiveTeams {
 ///
 /// Empty when no championship is active or the active one has no Custom AI file assigned; the grid
 /// then falls back to the car names AMS2 reports.
-fn resolve_live_teams(dir: &std::path::Path, champs: &[Championship]) -> LiveTeams {
+fn resolve_live_teams(
+    dir: &std::path::Path,
+    champs: &[Championship],
+    grid: &[ams2_championship::custom_ai::GridEntry],
+    sp: bool,
+) -> LiveTeams {
     let Some(champ) = champs
         .iter()
         .find(|c| c.status == ChampionshipStatus::Active)
     else {
-        return LiveTeams::default();
+        return LiveTeams {
+            // Only a singleplayer career is judged on a roster, so only it is nagged about one.
+            warning: sp.then(|| {
+                "No championship is Active, so this session has no season to belong to — its \
+                 result will not be judged against any grid. Mark one Active in the Manage tab."
+                    .to_string()
+            }),
+            ..Default::default()
+        };
     };
     let Some(file) = champ.custom_ai_file.as_deref() else {
-        return LiveTeams::default();
+        return LiveTeams {
+            warning: sp.then(|| {
+                format!(
+                    "“{}” has no Custom AI Drivers file, so team names, your rating and any \
+                     contract have nothing to be measured against.",
+                    champ.name
+                )
+            }),
+            ..Default::default()
+        };
     };
+    let seats = roster_seats(dir, file);
+    // An empty grid is the menu, not a problem with the grid.
+    let fit = (!grid.is_empty() && !seats.is_empty())
+        .then(|| ams2_championship::custom_ai::GridFit::measure(&seats, grid));
     LiveTeams {
         teams: ams2_championship::custom_ai::parse_driver_teams(&dir.join(file)),
         player_team: champ.player_team.clone().filter(|t| !t.trim().is_empty()),
+        warning: if sp { fit.and_then(|f| f.note()) } else { None },
+        fit,
     }
 }
 
@@ -594,9 +632,32 @@ fn handle(
     // active championship's Custom AI file. See `resolve_live_teams`. Without a Custom AI folder
     // there is no roster at all, and the grid falls back to the car names AMS2 reports.
     if method == "GET" && path == "/api/live-teams" {
+        let data = store.read().unwrap();
+        let sp = data.mode.uses_roster();
         let best = match cfg_custom_ai_dir(&config_path) {
-            Some(dir) => resolve_live_teams(&dir, &store.read().unwrap().championships),
-            None => LiveTeams::default(),
+            Some(dir) => {
+                let live = read_live_session();
+                let grid: Vec<ams2_championship::custom_ai::GridEntry> = live
+                    .participants
+                    .iter()
+                    .map(|p| ams2_championship::custom_ai::GridEntry {
+                        name: &p.name,
+                        car_name: &p.car_name,
+                        is_player: p.is_player,
+                    })
+                    .collect();
+                resolve_live_teams(&dir, &data.championships, &grid, sp)
+            }
+            // Nothing can be resolved without the folder, and in a singleplayer career that is
+            // the first thing to fix rather than something to discover from an empty column.
+            None => LiveTeams {
+                warning: sp.then(|| {
+                    "No Custom AI Drivers folder is set, so the grid cannot be resolved to teams \
+                     and nothing can be rated. Set it in the Config tab."
+                        .to_string()
+                }),
+                ..Default::default()
+            },
         };
         let json = serde_json::to_vec(&best).unwrap_or_default();
         json_ok(&mut stream, &json);
@@ -1403,6 +1464,133 @@ fn handle(
     // GET /api/championships/:id/session-eligibility — which recorded sessions may join this
     // championship. `enforced` is false unless a Custom AI file *and* a player team are both
     // set; the session picker only hides anything when it is true.
+    // GET /api/championships/:id/grid-check — how each of this season's recorded sessions lined
+    // up with the roster it is raced on.
+    //
+    // Its own route rather than a field on the championship: it reads every assigned session's
+    // grid against the roster, which is work the Manage tab should pay for only when it is
+    // showing a season, and `/api/championships` is fetched on every mutation.
+    if method == "GET"
+        && segs.len() == 4
+        && segs[0] == "api"
+        && segs[1] == "championships"
+        && segs[3] == "grid-check"
+    {
+        use ams2_championship::custom_ai::GridFit;
+
+        #[derive(serde::Serialize)]
+        struct SessionRow {
+            id: String,
+            track: String,
+            session_type: u32,
+            fit: GridFit,
+            note: Option<String>,
+        }
+        #[derive(serde::Serialize)]
+        struct Body {
+            /// False when there is nothing to check against — no folder, no roster, or a file
+            /// that would not parse. The tab then says why rather than reporting all clear.
+            checked: bool,
+            /// Why it could not be checked, when it could not.
+            reason: Option<String>,
+            /// Cars the roster can field, which is the grid size to race it at.
+            seats: usize,
+            /// One line for the season as a whole, or `None` when every session was clean.
+            summary: Option<String>,
+            sessions: Vec<SessionRow>,
+        }
+
+        let id = segs[2];
+        let data = store.read().unwrap();
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+
+        let dir = cfg_custom_ai_dir(&config_path);
+        let mut body = Body {
+            checked: false,
+            reason: None,
+            seats: 0,
+            summary: None,
+            sessions: Vec::new(),
+        };
+        let seats = match (&dir, champ.custom_ai_file.as_deref()) {
+            (None, _) => {
+                body.reason = Some("No Custom AI Drivers folder is set in Config.".into());
+                Vec::new()
+            }
+            (Some(_), None) => {
+                body.reason =
+                    Some("This season has no Custom AI Drivers file, so there is no grid to check against.".into());
+                Vec::new()
+            }
+            (Some(d), Some(file)) => roster_seats(d, file),
+        };
+        if body.reason.is_none() && seats.is_empty() {
+            body.reason = Some("That Custom AI Drivers file lists no cars this install can field.".into());
+        }
+        body.checked = !seats.is_empty();
+        body.seats = seats.len();
+
+        if body.checked {
+            let assigned: Vec<&str> = champ
+                .rounds
+                .iter()
+                .flat_map(|r| r.session_ids.iter().map(String::as_str))
+                .collect();
+            let mut flagged = 0usize;
+            let mut rated = 0usize;
+            for sid in assigned {
+                let Some(s) = data.sessions.iter().find(|s| s.id == sid) else {
+                    continue;
+                };
+                // Practice is excluded for the same reason the career view excludes it: nothing
+                // is derived from it, so a short practice grid is a choice, not a mistake.
+                if s.session_type == ams2_championship::data_store::SESSION_PRACTICE {
+                    continue;
+                }
+                rated += 1;
+                let grid: Vec<ams2_championship::custom_ai::GridEntry> = s
+                    .results
+                    .iter()
+                    .map(|r| ams2_championship::custom_ai::GridEntry {
+                        name: &r.name,
+                        car_name: &r.car_name,
+                        is_player: r.is_player,
+                    })
+                    .collect();
+                let fit = GridFit::measure(&seats, &grid);
+                let note = fit.note();
+                if note.is_some() {
+                    flagged += 1;
+                }
+                body.sessions.push(SessionRow {
+                    id: s.id.clone(),
+                    track: s.track.clone(),
+                    session_type: s.session_type,
+                    fit,
+                    note,
+                });
+            }
+            body.summary = (flagged > 0).then(|| {
+                format!(
+                    "{flagged} of {rated} recorded session{} {} not raced on the full {}-car \
+                     roster, so what {} say about your driving is measured against a grid that \
+                     was not on track.",
+                    if rated == 1 { "" } else { "s" },
+                    if flagged == 1 { "was" } else { "were" },
+                    seats.len(),
+                    if flagged == 1 { "it can" } else { "they can" },
+                )
+            });
+        }
+
+        let json = serde_json::to_vec(&body).unwrap_or_default();
+        json_ok(&mut stream, &json);
+        return;
+    }
+
     if method == "GET"
         && segs.len() == 4
         && segs[0] == "api"

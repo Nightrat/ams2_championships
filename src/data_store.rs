@@ -64,6 +64,10 @@ pub struct Round {
 /// so the one that counts a round as raced.
 pub const SESSION_RACE: u32 = 5;
 
+/// `session_type` of a practice session. Nothing is derived from practice — it scores no
+/// points and feeds no rating — which is why the grid check leaves it alone.
+pub const SESSION_PRACTICE: u32 = 1;
+
 /// Lifecycle state of a championship.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "PascalCase")]
@@ -351,6 +355,14 @@ pub struct SessionView {
     pub track_variation: String,
     pub session_type: u32,
     pub results: Vec<SessionResultView>,
+    /// Why this session's grid was not the roster its championship is raced on, when it was
+    /// not. `None` covers both "nothing wrong" and "nothing to check against", which the
+    /// Career tab treats alike: it can only flag what it can prove.
+    ///
+    /// Carried per session rather than per championship because a season can be raced half on
+    /// the roster and half not, and the half that counts is the point.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_note: Option<String>,
 }
 
 /// Round with sessions already resolved from IDs.
@@ -617,7 +629,42 @@ fn constructors(
 /// Resolve the driver-name -> team/livery-name map for a championship's assigned
 /// Custom AI Driver file, if any. Returns an empty map when no file is assigned,
 /// no directory is configured, or the file can't be parsed.
-fn resolve_team_map(champ: &Championship, ai_dir: Option<&Path>) -> HashMap<String, String> {
+/// Seats a championship's roster can field, or an empty list when there is nothing to check
+/// against — no folder configured, no file assigned, or a file that will not parse.
+fn roster_seats_of(champ: &Championship, ai_dir: Option<&Path>) -> Vec<crate::custom_ai::SeatEntry> {
+    let (Some(dir), Some(file)) = (ai_dir, champ.custom_ai_file.as_deref()) else {
+        return Vec::new();
+    };
+    let installed = crate::liveries::installed_livery_names(dir);
+    crate::custom_ai::without_phantom_seats(
+        crate::custom_ai::parse_seats(&dir.join(file)),
+        installed.as_ref(),
+    )
+}
+
+/// The grid warning for one recorded session, if it has one.
+///
+/// Practice is left alone: nothing derives anything from it, so a short practice grid is a
+/// choice rather than a mistake and flagging it would be noise on the one session type where it
+/// does not matter.
+fn grid_note_for(s: &RecordedSession, seats: &[crate::custom_ai::SeatEntry]) -> Option<String> {
+    if seats.is_empty() || s.session_type == SESSION_PRACTICE {
+        return None;
+    }
+    let grid: Vec<crate::custom_ai::GridEntry> = s
+        .results
+        .iter()
+        .map(|r| crate::custom_ai::GridEntry {
+            name: &r.name,
+            car_name: &r.car_name,
+            is_player: r.is_player,
+        })
+        .collect();
+    crate::custom_ai::GridFit::measure(seats, &grid).note()
+}
+
+fn resolve_team_map(
+champ: &Championship, ai_dir: Option<&Path>) -> HashMap<String, String> {
     match (ai_dir, &champ.custom_ai_file) {
         (Some(dir), Some(file)) => crate::custom_ai::parse_driver_teams(&dir.join(file)),
         _ => HashMap::new(),
@@ -689,6 +736,10 @@ pub fn compute_career_full(
 
     for champ in champs {
         let team_map = resolve_team_map(champ, ai_dir);
+        // The seats this season's roster can actually field, for the grid check below. Phantom
+        // liveries are dropped first: a car AMS2 cannot spawn was never going to be on the grid,
+        // so counting it would make every full grid look short.
+        let seats = roster_seats_of(champ, ai_dir);
         let driver_standings = standings_with(champ, sessions, &team_map);
         let constructor_standings = constructors(champ, sessions, &team_map);
 
@@ -783,6 +834,7 @@ pub fn compute_career_full(
                     track_variation: s.track_variation.clone(),
                     session_type: s.session_type,
                     results: result_views,
+                    grid_note: grid_note_for(s, &seats),
                 });
             }
             rounds.push(RoundView {

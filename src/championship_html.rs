@@ -58,6 +58,10 @@ fn generate_html() -> String {
         <span class="live-dot"></span>
         <span id="live-status-text">Not connected — start AMS2 and open this page via the server</span>
       </div>
+      <!-- Filled by live.js from /api/live-teams. This is the one moment a grid problem can
+           still be fixed — quit to the menu, set the opponent count, start again — so it sits
+           above the timing table rather than in a tab the user would have to go looking in. -->
+      <div id="live-grid-warning" class="live-grid-warning" hidden></div>
       <div id="live-info" class="live-info">
         <span id="live-session-type"></span>
         <span id="live-race-state"></span>
@@ -205,7 +209,7 @@ fn generate_html() -> String {
         <div class="config-group">
           <label class="config-label" for="cfg-custom-ai-dir">Custom AI Drivers folder</label>
           <input class="config-input config-input-wide" id="cfg-custom-ai-dir" name="custom_ai_dir" type="text" placeholder="e.g. D:\SteamLibrary\steamapps\common\Automobilista 2\UserData\CustomAIDrivers" />
-          <span class="config-hint">Folder with AMS2 Custom AI Driver XML files. Assign one to a championship (Manage tab) to show team/livery names instead of the AMS2 car class.</span>
+          <span class="config-hint">Folder with AMS2 Custom AI Driver XML files. Assign one to a championship (Manage tab) to show team/livery names instead of the AMS2 car class. A roster only works where the class&rsquo;s custom liveries are installed &mdash; AMS2 silently ignores an entry naming a livery it does not own. In a singleplayer career the rating, every team&rsquo;s requirement and every contract are derived from the season&rsquo;s roster, so a season raced on stock AI scores its points but cannot be judged. Race it at full grid size too: set as many opponents as the roster has cars, since your finish is judged against where your car ranks across the whole roster.</span>
         </div>
         <div class="config-group">
           <label class="config-label" for="cfg-poll-ms">Poll interval (ms)</label>

@@ -1635,3 +1635,133 @@ fn test_constructor_standings_use_the_same_countback() {
     assert_eq!(cs[0].points, cs[1].points);
     assert_eq!(cs[0].name, "Lotus");
 }
+
+// ── The career view flags a session raced on the wrong grid ──────────────────
+//
+// The Career tab's copy of the grid warning. It is attached per session rather than per season
+// because a season can be raced half on its roster and half not, and which half counts is the
+// whole point.
+
+/// A four-car roster, written where a championship can point at it.
+fn grid_roster_dir() -> PathBuf {
+    let ns = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("ams2_grid_note_{ns}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("grid.xml"),
+        r#"<custom_ai_drivers>
+    <driver livery_name="1986 Williams #5 - N. Mansell"><name>Nigel Mansell</name></driver>
+    <driver livery_name="1986 Williams #6 - N. Piquet"><name>Nelson Piquet</name></driver>
+    <driver livery_name="1986 Osella #21 - P. Ghinzani"><name>Piercarlo Ghinzani</name></driver>
+    <driver livery_name="1986 Osella #22 - A. Berg"><name>Allan Berg</name></driver>
+</custom_ai_drivers>"#,
+    )
+    .unwrap();
+    dir
+}
+
+fn grid_note_session(id: &str, session_type: u32, names: &[(&str, bool)]) -> RecordedSession {
+    RecordedSession {
+        id: id.into(),
+        recorded_at: 1_700_000_000,
+        track: "Monza".into(),
+        track_variation: String::new(),
+        car_name: "Formula Classic Gen1".into(),
+        car_class: "F-Classic_Gen1".into(),
+        session_type,
+        results: names
+            .iter()
+            .enumerate()
+            .map(|(i, (name, is_player))| SessionResult {
+                name: (*name).into(),
+                car_name: "Formula Classic Gen1".into(),
+                car_class: "F-Classic_Gen1".into(),
+                race_position: i as u32 + 1,
+                laps_completed: 10,
+                fastest_lap: 90.0,
+                last_lap: 90.0,
+                dnf: false,
+                is_player: *is_player,
+            })
+            .collect(),
+        lap_chart: vec![],
+    }
+}
+
+fn grid_note_champ(ids: &[&str]) -> Championship {
+    let mut champ = sample_championship();
+    champ.custom_ai_file = Some("grid.xml".into());
+    champ.rounds = vec![Round {
+        session_ids: ids.iter().map(|s| (*s).to_string()).collect(),
+    }];
+    champ.session_ids = ids.iter().map(|s| (*s).to_string()).collect();
+    champ
+}
+
+#[test]
+fn test_career_view_flags_a_race_that_did_not_fill_the_roster() {
+    let dir = grid_roster_dir();
+    let short = grid_note_session("r1", SESSION_RACE, &[("Nigel Mansell", false), ("Me", true)]);
+    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[short], Some(&dir));
+
+    let note = view.championships[0].rounds[0].sessions[0]
+        .grid_note
+        .as_deref()
+        .expect("two cars of a four-car roster is a short grid");
+    assert!(note.contains("Short grid"), "{note}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_career_view_leaves_a_full_grid_unflagged() {
+    let dir = grid_roster_dir();
+    let full = grid_note_session(
+        "r1",
+        SESSION_RACE,
+        &[
+            ("Nigel Mansell", false),
+            ("Nelson Piquet", false),
+            ("Piercarlo Ghinzani", false),
+            ("Me", true),
+        ],
+    );
+    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[full], Some(&dir));
+
+    assert!(view.championships[0].rounds[0].sessions[0]
+        .grid_note
+        .is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Nothing is derived from practice, so a short practice grid is a choice rather than a
+/// mistake — flagging it would put a warning on the one session type it cannot affect.
+#[test]
+fn test_career_view_does_not_flag_practice() {
+    let dir = grid_roster_dir();
+    let practice = grid_note_session(
+        "p1",
+        SESSION_PRACTICE,
+        &[("Nigel Mansell", false), ("Me", true)],
+    );
+    let view = compute_career_full(&[grid_note_champ(&["p1"])], &[practice], Some(&dir));
+
+    assert!(view.championships[0].rounds[0].sessions[0]
+        .grid_note
+        .is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// With no roster there is nothing to compare against, and silence is the only honest answer —
+/// the same reason the Manage tab says why instead of reporting all clear.
+#[test]
+fn test_career_view_says_nothing_without_a_roster() {
+    let short = grid_note_session("r1", SESSION_RACE, &[("Nigel Mansell", false), ("Me", true)]);
+    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[short], None);
+
+    assert!(view.championships[0].rounds[0].sessions[0]
+        .grid_note
+        .is_none());
+}

@@ -21,6 +21,22 @@ Use this if you have auto-recording turned off for a session type (e.g. practice
 
 > **Watching a replay?** The recorder freezes while one plays, and so does this button (saving is refused with a message). A replay refills the live timing data with a race that is already over, so what is on screen is not the session — recording it would file a mid-race picture as the result. Everything picks up where it was when you leave the replay.
 
+## Grid warning
+
+In a singleplayer career, a banner appears above the timing table when the grid on track is not the one your season is judged against:
+
+| Banner | Meaning |
+|---|---|
+| *Not raced on this roster* | Hardly any of the AI on track are in the season's Custom AI file, so nothing from this session can count towards your rating |
+| *Short grid* | Fewer cars are running than the roster can field — your finish will be judged against the full roster, which a smaller field flatters |
+| *N cars not in the roster* | The opponent count is above what the roster can field, so AMS2 has filled the rest with its own AI |
+| *No championship is Active* | Nothing marks which season you are racing, so the session has no grid to be judged against |
+| *No Custom AI Drivers file / folder* | There is no roster to resolve team names from, or to rate against |
+
+This is the one place a grid problem can still be **fixed**: quit to the menu, set the opponent count to match the roster, and start again. Afterwards the same message follows the session into the Manage and Career tabs, where it can only explain rather than prevent.
+
+Nothing is blocked by it — the session still records, still assigns and still scores championship points. A multiplayer career never shows it: it has no roster to race.
+
 ## Timing table
 
 | Column | Description |
@@ -48,11 +64,15 @@ AMS2's shared memory has no team or livery field — every car reports only its 
 
 Anything the roster does not name — and your row when **My Team** is unset — falls back to the AMS2 car model.
 
+> **Cars beyond the roster show as car models.** If you set more opponents than the roster has liveries, AMS2 fills the rest with its own AI, which the roster cannot name. Matching the opponent count to the roster keeps the whole column on real team names.
+
+> **This needs the custom skins, not just the file.** A Custom AI Drivers file binds a name to a livery the game already owns; if the class's livery mod is not installed, AMS2 ignores those entries and fills the grid with its own AI, whose names the roster does not know. The column then shows car models. Nothing is misconfigured in the app — the race simply was not run on that roster.
+
 > **Two seasons sharing one roster file?** Historic packs often reuse a single `.xml` across several seasons, so the file alone cannot say which season you are in. Only the **Active** flag can. If the live grid shows the wrong team, check that the season you are racing is the one marked Active.
 
 The names refresh when the session moves to a new track, and immediately whenever you change anything in the Manage tab — so switching which championship is Active updates the live grid without a page reload.
 
-If no championship is Active, or the Active one has no Custom AI file assigned, the whole column falls back to car models.
+If no championship is Active, or the Active one has no Custom AI file assigned, the whole column falls back to car models. A multiplayer career has no roster at all, so it always shows car models.
 
 ## Track map
 

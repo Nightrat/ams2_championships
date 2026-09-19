@@ -27,8 +27,9 @@ A motorsport career tracker for Automobilista 2. It records race results directl
 - **Career statistics** — aggregated stats across all championships: race starts, podium splits (1st/2nd/3rd), top-10 finishes, average finishing position, DNFs, qualifying results (pole/2nd/3rd/top-10), and championship standings finishes (1st/2nd/3rd)
 - **Track statistics** — per-track summary across all recorded sessions: race and qualifying counts, best lap time with record holder name and car, last visited date
 - **Multiple careers** — every career is a separate save folder with its own championships, sessions and stats; switch between them from the header without restarting. Each career is either **singleplayer** or **multiplayer**, chosen when it is created
-- **Driver rating** — a 0–100 rating derived from your recorded results, re-derived on every request and never stored. Each team on the grid has a requirement built from car pace and the skill of the driver already in the seat
+- **Driver rating** — a 0–100 rating derived from your recorded results, measured against what the car should have done so a slow car is no handicap. Re-derived on every request and never stored. Each team on the grid has a requirement built from car pace and the skill of the driver already in the seat — all of it read from the season's Custom AI Drivers roster, so a session not raced on that roster is skipped rather than guessed at
 - **Contracts and money** (singleplayer) — teams offer seats on terms your rating has earned: a salary scaled by car pace, a season objective, renewals for delivering, and back-of-the-grid seats that ask for sponsorship instead. Salary is paid one instalment per race; prize money is paid when a season is marked Final
+- **Grid checks** — warns when the grid raced is not the one a season is judged against: a roster that was not used, a short grid, or one padded with stock AI. Shown live while it can still be fixed, on the season in Manage, and flagged on the affected races in Career. It never blocks anything
 - **Car & Driver Performance tabs** — edit the performance scalars and driver skills in your AMS2 Custom AI Drivers rosters in place, with a one-time backup per class to reset to
 - **Live session overlay** — real-time timing table pushed over WebSocket from AMS2 shared memory: position, laps, race interval, gap to fastest lap, sector times, best/last lap, car/team, and tyre compound for the player
 - **Historic team names** — AMS2 exposes no livery field, so the live grid resolves each driver to their real team from the **active** championship Custom AI Drivers file, and your own row from that championship **My Team** setting; anything unmatched falls back to the AMS2 car model
@@ -42,6 +43,8 @@ A motorsport career tracker for Automobilista 2. It records race results directl
 
 - [Rust](https://www.rust-lang.org/tools/install) (stable, 2021 edition)
 - Windows (the session recorder and live overlay read the `$pcars2$` named shared memory, which is Windows-only)
+
+**For a singleplayer career** you also need, for each class you race: the **custom liveries (skin mod) installed in AMS2**, a **Custom AI Drivers file that names those liveries**, and `custom_ai_dir` pointed at your `UserData/CustomAIDrivers` folder — then the season raced with that roster active **and with the opponent count set so the grid fills the roster** — one installed livery is one car, and the rating compares your finish against where your car ranks across the whole roster, so a short grid measures you on the wrong scale while an over-long one pads the grid with stock AI. Historic team names, the driver rating, team requirements, contracts and the whole Finances page are all derived from the recorded grid matching that file, so a season raced on stock AI records its results and scores its points but tells the career nothing: no rating movement, no offers, no money. A Custom AI entry whose `livery_name` AMS2 does not own is silently ignored by the game, and the Car and Driver Performance tabs mark those rows **no livery**. A multiplayer career needs none of this and cannot use it. See [What a singleplayer career needs](docs/Getting-Started.md#what-a-singleplayer-career-needs).
 
 ## Build
 
@@ -217,6 +220,7 @@ Track layout data is stored as JSON files in `championships/track_layouts/`, one
 | `GET` | `/api/championships/:id/teams` | Teams on that championship's roster |
 | `GET` | `/api/championships/:id/team-eligibility` | Per-team requirement, and whether the rating has earned it |
 | `GET` | `/api/championships/:id/session-eligibility` | Which recorded sessions may be assigned, and why not |
+| `GET` | `/api/championships/:id/grid-check` | How each of the season's recorded sessions lined up with its roster |
 | `GET` | `/api/championships/:id/offers` | Seat offers for the season, re-derived on every request |
 | `POST` | `/api/championships/:id/sign` | Sign for a team; the terms are regenerated server-side |
 | `DELETE` | `/api/championships/:id/sign` | Tear up an unraced contract and clear the seat it came with |
@@ -242,7 +246,7 @@ Track layout data is stored as JSON files in `championships/track_layouts/`, one
 | `GET` | `/api/spotter/voices` | TTS voices installed on this PC |
 | `GET` | `/api/track-layout/:track` | Load saved track radar points for a track |
 | `POST` | `/api/track-layout/:track` | Save track radar points for a track |
-| `GET` | `/api/live-teams` | Driver → team names for the live grid, from the active championship's Custom AI Drivers file, plus that championship's player team |
+| `GET` | `/api/live-teams` | Driver → team names for the live grid, from the active championship's Custom AI Drivers file, plus that championship's player team and any grid warning |
 | `GET` | `/live` | Current AMS2 session state snapshot (JSON) |
 | `WS` | `/ws` | WebSocket endpoint — pushes live session JSON at the configured poll interval |
 
@@ -262,7 +266,7 @@ Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
 cargo test
 ```
 
-Around 635 tests live in `src/tests/`, wired into their parent modules with `#[path = "tests/…"]` so they can reach `pub(crate)` items:
+Around 657 tests live in `src/tests/`, wired into their parent modules with `#[path = "tests/…"]` so they can reach `pub(crate)` items:
 
 - `data_store.rs` — JSON persistence round-trips, standings and the countback tiebreak, constructor scoring, `compute_career` aggregation, track stats
 - `session_recorder.rs` — session capture, `should_capture`, and the recorder state machine driven one poll at a time (replay freeze, restarts, disconnects)

@@ -70,12 +70,30 @@ function applyLiveSort() {
 
 var liveTeams   = { teams: {}, player_team: null }; // driver → historic team name, from the Custom AI file
 var liveTeamsKey = null; // track at the last lookup, used to refresh the team names
+// Cars on track at the last lookup. The warning is about how many of them there are, so it has
+// to be re-asked when that changes — a lobby fills up, and an AI grid is only complete once the
+// session loads.
+var liveGridSize = -1;
 
 function loadLiveTeams() {
   fetch('/api/live-teams')
     .then(function (r) { return r.json(); })
-    .then(function (t) { liveTeams = { teams: t.teams || {}, player_team: t.player_team }; })
+    .then(function (t) {
+      liveTeams = { teams: t.teams || {}, player_team: t.player_team };
+      renderGridWarning(t.warning);
+    })
     .catch(function () {});
+}
+
+// The banner above the timing table. The sentence is the server's — the same one the Manage and
+// Career tabs show — so this only decides whether it is on screen.
+function renderGridWarning(msg) {
+  var box = document.getElementById('live-grid-warning');
+  if (!box) return;
+  if (!msg) { box.hidden = true; box.textContent = ''; return; }
+  box.hidden = false;
+  box.innerHTML = '<span class="live-grid-warning-icon">&#9888;</span>' +
+    '<span class="live-grid-warning-text">' + esc(msg) + '</span>';
 }
 
 var SESSION_NAMES = ['', 'Practice', 'Test', 'Qualify', 'Formation Lap', 'Race', 'Time Attack'];
@@ -94,6 +112,8 @@ function processLiveData(d) {
       if (!statusEl || !liveBody) return;
 
       if (!d.connected || d.game_state < 2) {
+        renderGridWarning(null);
+        liveGridSize = -1;
         statusEl.className = 'live-status live-disconnected';
         statusTxt.textContent = 'Not connected \u2014 start AMS2 to see live data';
         infoEl.style.visibility = 'hidden';
@@ -127,8 +147,9 @@ function processLiveData(d) {
       // Resolved server-side from the active championship's Custom AI Driver file; refreshed when
       // the session moves to another track, since that is when the active championship is likely
       // to have been switched too.
-      if (liveTeamsKey !== d.track_location) {
+      if (liveTeamsKey !== d.track_location || liveGridSize !== d.participants.length) {
         liveTeamsKey = d.track_location;
+        liveGridSize = d.participants.length;
         loadLiveTeams();
       }
 

@@ -154,12 +154,22 @@ function careerRoundsHtml(champ) {
       }).join('');
 
       var ptsHeader = isRace ? '<th>Pts</th>' : '';
-      return '<div class="round-session">' +
+      // A season's history should show which races were run on the grid they are judged
+      // against — the badge marks it, the sentence underneath is the server's own wording.
+      var gridBadge = s.grid_note
+        ? ' <span class="session-grid-badge" title="' + esc(s.grid_note) + '">&#9888; grid</span>'
+        : '';
+      var gridNote = s.grid_note
+        ? '<div class="round-session-grid-note">' + esc(s.grid_note) + '</div>'
+        : '';
+      return '<div class="round-session' + (s.grid_note ? ' round-session-flagged' : '') + '">' +
         '<div class="round-session-label"><span class="session-type-badge">' + typeLabel + '</span> ' + typeName +
           ' <span class="session-track">' + fmtTrack(s) + '</span>' +
           ' <span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
           ' <span class="session-drivers">' + s.results.length + ' drivers</span>' +
+          gridBadge +
         '</div>' +
+        gridNote +
         '<table class="standings-table"><thead><tr><th>Pos</th><th>Driver</th>' + ptsHeader + '<th>Laps</th><th>Best</th></tr></thead>' +
         '<tbody>' + resultRows + '</tbody></table>' +
         (isRace ? lapChartHtml(s) : '') +

@@ -267,7 +267,9 @@ function renderDriverPerformance(data) {
     '<code>livery_name</code> AMS2 owns no car for, so it is silently ignored and that driver ' +
     'never reaches a grid — a roster can name more drivers than the class has cars. This is ' +
     'checked against the livery manifests your livery mods install; a class no mod covers reads ' +
-    'as “liveries not verifiable” rather than guessing. ' +
+    'as “liveries not verifiable” rather than guessing. The entries that do have a livery are ' +
+    'the cars this class can field, so their count is the grid size to race it at — one fewer ' +
+    'opponent than that, since one of the seats is yours. ' +
     'Rating is a 0–100 composite of the entry’s own attributes, weighted toward race pace — ' +
     'hover the column for the exact weights. It is a summary of what the file declares, not a ' +
     'measure of results, so it is not the same quantity as the driver ratings in the Car ' +

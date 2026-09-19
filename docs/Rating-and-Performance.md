@@ -2,6 +2,8 @@
 
 *Singleplayer careers only. A multiplayer career hides all of this — it has no roster to be judged against.*
 
+> **None of this works without the rosters, and the rosters do not work without the skins.** Your rating is measured against the pace scalars in the season's Custom AI Drivers file, and the app can only tell which car you were in by matching the recorded grid against that file. So you need the class's **custom liveries installed**, a **Custom AI Drivers file that names them**, and the season raced **with that roster active**. See [What a singleplayer career needs](Getting-Started.md#what-a-singleplayer-career-needs).
+
 ## The driver rating
 
 Your driver rating is a number from 0 to 100 that says how good a drive you are giving, relative to the car you are giving it in. It is what decides which seats the grid will offer you.
@@ -25,6 +27,17 @@ Some things that follow from how it is built:
 - **A thin record is pulled toward the starting rating** so two lucky afternoons cannot unlock a front-running seat. By around twenty races your own results have taken over entirely.
 - **Only races count as evidence.** A career of qualifying sessions with no race, or one where every race ended in a retirement, stays exactly on the starting rating. Races are what a seat is earned in.
 - **AI difficulty and field size are never assumed.** They are read from, or cancelled out of, each session.
+- **A session not raced on the roster contributes nothing.** If fewer than half the AI on the recorded grid appear in the Custom AI file, the app concludes the session was run on stock AI and skips it rather than guessing — so it moves neither your rating nor the seats you are offered. The session is still recorded and still scores championship points; it simply says nothing about how good a drive it was. A career that never races on its roster stays on the starting rating for ever.
+
+### Race the full grid
+
+**Set the AMS2 opponent count so the grid fills the roster** — one livery is one car, so a class with 22 installed liveries wants 21 opponents.
+
+This matters because of how the rating is worked out. What your car *should* do is its rank among **every team in the roster**: a back-marker belongs around P18 of 22. What you *did* is your finishing position in the field that actually raced. Those two numbers are only comparable when the field is the roster.
+
+Race ten opponents on a 22-car roster and your car is still expected to finish around P18, but P18 does not exist in an eleven-car race — so merely finishing looks like a heroic drive and the rating climbs on nothing. Race more opponents than the roster has cars and AMS2 fills the rest with its own AI; once those outnumber the roster cars the session is skipped entirely.
+
+Count the cars the roster can really field, not the drivers it lists: entries whose livery AMS2 does not own never appear, and are tagged **no livery** in the Driver Performance tab.
 
 ## What a team asks for
 
@@ -55,6 +68,14 @@ When you do want to retune the career you are playing, save your changes and the
 The per-class performance scalars from your AMS2 Custom AI Drivers rosters, in a table you can edit. Changes are written straight back to the roster XML, so AMS2 uses them the next time it loads.
 
 These scalars are what the rating measures your results against, and they are also what decides which teams are quick — so editing them moves both the pace order of the grid and the bars every team asks for.
+
+### Entries marked “no livery”
+
+A Custom AI Drivers file cannot create a car. Each entry binds a name, skills and scalars to a livery the game **already owns**, matched on `livery_name` — and an entry naming a livery AMS2 does not have is **silently ignored**. No error, no warning: that driver simply never reaches a grid, and a roster can happily name more drivers than the class has cars.
+
+Rows in that state are tagged **no livery** in the Car and Driver Performance tabs, and a team whose every entry is a phantom has no seat to earn. Editing such a row changes nothing in game.
+
+The check reads the livery manifests your **livery mods** install, which is the only list of livery names that can be read — the game's own livery data is sealed inside its pak files. That makes the check partial by nature: a class no livery mod covers reads as *liveries not verifiable* rather than being guessed at, so an unmodded class is never wrongly condemned.
 
 The scalars affect **your** car too, not only the AI: you occupy a seat in a livery like everyone else.
 

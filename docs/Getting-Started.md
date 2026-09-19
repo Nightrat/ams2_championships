@@ -55,6 +55,50 @@ The server does not invent a career for you — naming it, and choosing what kin
 
 > A career created by an older version has no kind recorded. The switcher asks you to pick one the first time you use it; that choice is also permanent.
 
+## What a singleplayer career needs
+
+> **A singleplayer career is built on your Custom AI Drivers rosters — and a roster only works if the liveries it names are installed.** This is one requirement, not several, but almost everything in a singleplayer career depends on it: historic team names in the live grid, your driver rating, what teams ask of you, the seats you are offered, your salary and the whole Finances page.
+
+You need three things, and they have to agree with each other:
+
+1. **The custom skins (livery mods) installed in AMS2** for the class you are racing.
+2. **A Custom AI Drivers file** for that class, naming those liveries — `<driver livery_name="1986 Williams #5 - N. Mansell">` has to match a livery the game actually owns.
+3. **The Custom AI Drivers folder set in Config** (`custom_ai_dir`, usually `…\Automobilista 2\UserData\CustomAIDrivers`), and that file chosen when you create the season.
+
+Then race the season **with that roster active in AMS2**, and — just as important — **with the opponent count set so the grid fills the roster**. Everything the app knows about who you were racing comes from the recorded grid matching the file.
+
+### Set the grid size to the roster
+
+> **Opponents = the number of cars the roster can field, minus your own.** One livery is one seat, so a class with 22 installed liveries is a 22-car grid: set 21 opponents and race the field the season was designed around.
+
+The number that matters is **how many of the roster's entries have a livery AMS2 owns**, not how many drivers the file lists. A roster naming 24 drivers for 22 liveries fields 22 cars; the extra two are ignored by the game and tagged **no livery** in the Driver Performance tab, which is where to count them.
+
+Getting it wrong breaks nothing, but it quietly costs you the things the roster was for:
+
+| Grid size | What it does |
+|---|---|
+| **Fewer opponents than seats** | AMS2 fields only part of the roster. Your rating is then scored against what your car should do **across the whole grid** — a car that belongs around P18 of 22 — while you actually finished inside a field of, say, ten. Those are not the same scale, so the score flatters you and the rating drifts up on nothing. Most of the roster also looks unraced, which makes it harder for the app to work out which seat was yours |
+| **More opponents than seats** | AMS2 makes up the difference with its own stock AI. Those cars are not in the roster, so they show as car models in the live grid — and if they outnumber the roster cars, the session counts as not having used the roster at all and is skipped by the rating |
+| **Exactly the roster** | Every team is on track, every expected finishing position means what it says, and your own seat is unambiguous |
+
+This is the same reason a season's roster locks once it has a recorded session: the grid is the yardstick everything is measured with, so it has to stay the same grid all season.
+
+**You will be told.** The app checks the grid against the roster and says so in three places: a banner in the Live Session tab while you are on track and can still fix it, a panel on the season in the Manage tab, and a flag on the affected races in the Career tab. Nothing is ever blocked — the session records, assigns and scores as normal; the message only says what it can and cannot be judged on.
+
+### What happens when a piece is missing
+
+| Missing | What you get |
+|---|---|
+| The livery a roster entry names | AMS2 **silently ignores that entry** — no error, the driver never appears. The app marks such rows **no livery** in the Car and Driver Performance tabs. A roster can name more drivers than the class has cars |
+| The whole livery pack for a class | Nothing in the roster spawns, so the race runs on stock AMS2 AI |
+| The Custom AI file (or the folder setting) | The live grid shows car models instead of team names, and the season has no grid to judge you against: no ratings, no team requirements and no offers |
+| A race actually run on stock AI | That session **does not count towards your rating** — the app can see that fewer than half the grid is in the roster and skips it rather than guessing. Nothing is broken and nothing is lost; the session is still recorded and still scores championship points |
+| A full grid (opponents set below the roster size) | Results are recorded and scored as normal, but the rating is measured against the wrong-sized field — see [Set the grid size to the roster](#set-the-grid-size-to-the-roster) |
+
+A career whose races never match its roster therefore sits on the starting rating for ever: it can still sign for whatever an unproven driver is offered, and still draws that salary, but it never improves its way up the grid. That is the system working as designed rather than a fault — but it is not much of a career, so it is worth getting the three pieces lined up before the first season.
+
+> **A multiplayer career needs none of this**, and cannot use it: it races people, so a season takes no roster and no team. The live grid shows the car models AMS2 reports, and there is nothing to rate or to sign.
+
 ## Configuration
 
 On first run `config.json` is created next to the executable with all default values. You can edit it in a text editor or use the **Config** tab in the browser UI.
@@ -108,7 +152,7 @@ Settings marked with *restart required* in the Config tab — port, host, save f
 
 ## First race
 
-1. Start AMS2 and enter a race session.
+1. Start AMS2 and enter a race session. In a singleplayer career, race it on the season's Custom AI Drivers roster with the opponent count set to fill the grid — see [Set the grid size to the roster](#set-the-grid-size-to-the-roster).
 2. Finish the race (or let it reach the results screen).
 3. The server detects the session end automatically and saves the results.
 4. Switch to the browser and go to the **Manage** tab to assign the recorded session to a championship.

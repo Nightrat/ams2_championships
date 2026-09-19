@@ -179,7 +179,9 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 
 ### Driver rating (`src/driver_rating.rs`)
 
-- No rating is persisted — the rating and every team requirement are re-derived from the assigned sessions on each request. What *is* persisted is the **tuning**, stamped onto the career (see below), so the derivation is stable rather than following whatever Config says today.
+- **The grid raced must be the roster: `expected` is a rank within the roster, `field` is the size of the recorded session.** `expected_positions` ranks every seat the roster can field (phantoms already removed) and `positional_score` divides by `s.results.len()`, so the two agree only when AMS2 fielded the whole roster. Race 10 opponents on a 22-seat roster and a back-marker is still expected around P18 in an 11-car result — the score is inflated to the clamp. Nothing here can correct for it: which seats AMS2 left out is not recorded, and rescaling `expected` to the raced field would assume the absent cars were spread evenly through the order, which is exactly what it cannot know. It is therefore a **documented user requirement** (`docs/Getting-Started.md`, "Set the grid size to the roster"), not a code fix. The opposite case is self-correcting: a grid padded with stock AI trips `RosterNotDetected` once they outnumber the roster cars, and the session is skipped.
+- No rating is persisted
+ — the rating and every team requirement are re-derived from the assigned sessions on each request. What *is* persisted is the **tuning**, stamped onto the career (see below), so the derivation is stable rather than following whatever Config says today.
 
 **The tuning belongs to the career, not to config**
 
@@ -193,6 +195,30 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - **`offer_margin` is how far below a bar a driver is still offered the seat** (default 10). It is the width of the whole middle tier: inside it a seat is `OfferPossible` and paid for normally, outside it the team is `Locked` and only a back-of-the-grid one will sell it. Zero removes the tier — every bar must be cleared outright. Distinct from `strictness`: that moves the bars, this moves how far short of them a team will look, and `test_the_margin_moves_how_far_short_is_looked_at_not_the_bar` pins the difference.
 - `Config::rating_params()` clamps on the way out and `PATCH /api/config` clamps on the way in — config.json is hand-edited often enough that neither side can be trusted alone. New rating fields need a non-zero serde default (`#[serde(default = "…")]`), or a form that omits them silently resets every driver.
 - A championship's Custom AI file and player team are both locked once it has its first assigned session. This is a championship integrity rule: `enforce_team_eligibility` does **not** disable it.
+
+### A roster only exists if the liveries do (`src/liveries.rs`)
+
+**Everything singleplayer is downstream of the Custom AI file actually being the grid AMS2 ran.** The rating scores results against the roster's pace scalars, team requirements come from the same place, and contracts are priced off those requirements — so a season raced on stock AI produces no rating movement, no offers and no money, and the live grid falls back to car models. This is one dependency, not four, and the docs say so in those terms.
+
+- A `CustomAIDrivers` file **cannot create a car**. It binds a name, skills and scalars to a livery the game already owns, matched on `livery_name`. A name matching nothing is **silently ignored** — no error, the driver simply never spawns. The 1978 roster shipped 24 entries against 22 real liveries, so two seats looked permanently empty to the seat accounting.
+- Livery data is sealed in Oodle-compressed `*_livery.bff` paks, so it cannot be read. What *can* be read is the override manifest a **livery mod** installs at `<install>/Vehicles/Textures/CustomLiveries/Overrides/<model>/<model>.xml`, whose `<LIVERY_OVERRIDE NAME="…">` entries are exactly the strings a `livery_name` must match. `overrides_dir` derives it from `custom_ai_dir` by the same two-level climb `known_class_names` uses.
+- That makes the index **partial**: it covers modded models and nothing else. `phantom_liveries` therefore returns `Option`, and `None` means *cannot verify* — callers must read it as **no** phantoms rather than all of them. Two cases look identical from there and are both common: the manifests are unreadable, and not one entry matches because the class has no livery mod at all (an unmodded Formula Renault file is exactly this).
+- **`roster_seats_with` is the one way to ask what seats a roster offers**, and it subtracts the phantoms. Both enforcement paths and every rating context go through it: a phantom seat can never be occupied by an AI, so leaving it in makes it look free in every session forever — which corrupts the elimination `infer_player_seat` depends on — and inflates the field size every expected finishing position is derived from. It takes the installed set rather than reading it, so a caller looping over classes scans the manifests once.
+- The Car and Driver Performance tabs surface it per row (`no livery`), and `mark_phantom_entries` carries the tri-state through: `true` ignored by AMS2, `false` fine, `null` not checkable — which the tabs must not report as a clean bill of health.
+- Separately, `infer_player_seat` gives up with `RosterNotDetected` when **fewer than half** the AI on a recorded grid are named in the file. That is the "this session did not use it" case, and it is a *skip*, never a failure: it means the session was run on stock AI, which is not something to accuse the user of.
+
+### Telling the user the grid was wrong (`GridFit`)
+
+The dependency above is invisible from inside the game, so the app says it out loud. `custom_ai::GridFit` is the whole of the reasoning and **the only place the wording lives** — the live banner, the Manage panel and the Career flag all print the same sentence, and three copies would drift.
+
+- It reports **counts, not a verdict** (`cars`, `seats`, `ai`, `matched`), because the problems are not exclusive: a grid can be short *and* padded with stock AI. `note()` picks what to lead with — "not raced on this roster" first, since a short grid is beside the point when the grid is somebody else's.
+- **`seats` counts distinct `seat` values** (team + car number), which is what `driver_rating::expected_positions` ranks. Counting liveries would over-count a season roster that lists two drivers for one car, and a warning derived from a different number than the thing it warns about would contradict it. Phantom seats are already gone — the callers pass a filtered list.
+- `not_roster()` reuses **the same majority test** `infer_player_seat` gives up on. Two thresholds could disagree about the same session, and the user would get a warning that the rating did not act on, or the reverse.
+- **`seats == 0` is "nothing to check against", not "all clear".** `note()` returns `None` and `is_full()` is false, so a caller cannot report a career with no rosters as perfect. Every surface says *why* instead.
+- Three surfaces, one check: `GET /api/live-teams` carries `warning` + `fit` (computed only for a career whose `mode.uses_roster()`, and only when a grid is actually loaded — an empty grid is the menu); `GET /api/championships/:id/grid-check` carries a row per assigned session plus a season summary, for the Manage tab; `SessionView.grid_note` rides `/api/career` for the Career tab's per-race flag.
+- **Practice is never flagged**, in either the route or the career view: nothing is derived from it, so a short practice grid is a choice rather than a mistake, and flagging it would put a warning on the one session type the warning cannot apply to.
+- Nothing here blocks anything — unlike `check_player_team`, which hides contradicting sessions from the picker. A grid warning is about what a result can *mean*, not about whether it may be recorded, assigned or scored.
+- `resolve_live_teams` takes `&[GridEntry]` rather than the shared-memory rows, so the resolver has no use for the other forty fields and a test can hand it a grid without fabricating sentinel values for them.
 
 ### Roster baselines (`custom_ai.rs`)
 

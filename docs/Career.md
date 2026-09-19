@@ -30,6 +30,8 @@ Each session within a round shows:
 - Points awarded per driver (race sessions only)
 - DNF indicators (race sessions only)
 
+A session raced on something other than the season's own grid carries a **⚠ grid** badge and a line saying what was different — a short grid, stock AI filling it out, or a roster that was not used at all. The flag stays with the result, so a season's history shows which races were run on the grid they are judged against. See [Set the grid size to the roster](Getting-Started.md#set-the-grid-size-to-the-roster).
+
 ### Lap charts
 
 Each recorded race carries a **Lap Chart** — every driver's position at the end of every lap. It sits collapsed under the round's results; click it to open, and the chart is fetched at that moment rather than downloaded with the rest of the page. Practice sessions have none, which is not an error.
@@ -65,6 +67,8 @@ A per-track summary across all recorded sessions. Click any column header to sor
 ## Finances sub-tab
 
 What the career is worth and how it got there. Everything on this page is derived from your results and your contracts on each visit — there is no separate set of books to go out of date. See [Contracts & Money](Contracts-and-Money.md) for how the terms are decided.
+
+There is nothing to show until you have signed for a team, and you can only be offered a seat on a season raced on a Custom AI Drivers roster whose liveries AMS2 actually has — see [What a singleplayer career needs](Getting-Started.md#what-a-singleplayer-career-needs).
 
 Four sections:
 

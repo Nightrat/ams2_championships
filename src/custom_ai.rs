@@ -1182,6 +1182,126 @@ fn seat_list(seats: &[Seat]) -> String {
         .join(", ")
 }
 
+/// How a grid — recorded or live — lines up with the roster it was meant to be raced on.
+///
+/// The rating measures a finish against where the car ranks across the **whole** roster, while
+/// the finish itself is a position within the field that actually raced. Those two agree only
+/// when AMS2 fielded the roster, so a grid that did not is worth saying out loud rather than
+/// being scored quietly on the wrong scale. Nothing here rejects anything: it reports.
+///
+/// Counts rather than a verdict, because the problems are not exclusive — a grid can be short
+/// *and* padded with stock AI at once, and the caller decides which to lead with.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct GridFit {
+    /// Cars on track, the player included. A full grid has one per seat.
+    pub cars: usize,
+    /// Seats the roster can actually field — phantom liveries already removed, since a car AMS2
+    /// cannot spawn was never going to be on the grid.
+    pub seats: usize,
+    /// AI on track, i.e. everyone but the player.
+    pub ai: usize,
+    /// AI whose name appears in the roster.
+    pub matched: usize,
+}
+
+impl GridFit {
+    /// Measures a grid against a roster. `seats` must already be phantom-filtered.
+    pub fn measure(seats: &[SeatEntry], grid: &[GridEntry]) -> Self {
+        let by_key: HashSet<String> = seats.iter().map(|e| name_key(&e.driver)).collect();
+        let ai = grid.iter().filter(|g| !g.is_player).count();
+        let matched = grid
+            .iter()
+            .filter(|g| !g.is_player && by_key.contains(&name_key(g.name)))
+            .count();
+        Self {
+            cars: grid.len(),
+            seats: distinct_seats(seats),
+            ai,
+            matched,
+        }
+    }
+
+    /// The roster was not what AMS2 ran. The same majority test [`infer_player_seat`] gives up
+    /// on, deliberately: a session either identifies its roster well enough to reason about or
+    /// it does not, and two thresholds could disagree about the same session.
+    pub fn not_roster(&self) -> bool {
+        self.seats > 0 && self.matched * 2 < self.ai
+    }
+
+    /// AI on track the roster does not name — stock cars filling out an over-long grid.
+    pub fn stock_fill(&self) -> usize {
+        self.ai - self.matched
+    }
+
+    /// Seats the roster could have filled and did not.
+    pub fn short_by(&self) -> usize {
+        self.seats.saturating_sub(self.cars)
+    }
+
+    /// Nothing to report: every seat raced, and nothing else did.
+    pub fn is_full(&self) -> bool {
+        self.seats > 0 && self.stock_fill() == 0 && self.short_by() == 0 && self.cars <= self.seats
+    }
+
+    /// One sentence for the user, or `None` when the grid is what it should have been.
+    ///
+    /// The wording lives here rather than in the browser so the live banner, the Manage tab and
+    /// the Career tab cannot drift apart — the discipline `offerWhy()` already follows. A
+    /// session that did not use the roster at all is said first, because the other two are then
+    /// beside the point.
+    pub fn note(&self) -> Option<String> {
+        if self.seats == 0 {
+            return None;
+        }
+        if self.not_roster() {
+            return Some(format!(
+                "Not raced on this roster — only {} of {} AI are in it, so it cannot count towards your rating.",
+                self.matched, self.ai
+            ));
+        }
+        let (short, stock) = (self.short_by(), self.stock_fill());
+        if short > 0 && stock > 0 {
+            return Some(format!(
+                "Short grid: {} cars against the roster's {}, {} of them stock AI. Your finish is judged against the full {}-car roster, so it is measured on the wrong scale.",
+                self.cars, self.seats, stock, self.seats
+            ));
+        }
+        if short > 0 {
+            return Some(format!(
+                "Short grid: {} cars against the roster's {}. Your finish is judged against where your car ranks in the full {}-car roster, so a smaller field flatters it.",
+                self.cars, self.seats, self.seats
+            ));
+        }
+        if stock > 0 {
+            return Some(format!(
+                "{} car{} on this grid {} not in the roster: the opponent count is above the {} it can field, so AMS2 filled the rest with stock AI.",
+                stock,
+                if stock == 1 { "" } else { "s" },
+                if stock == 1 { "is" } else { "are" },
+                self.seats
+            ));
+        }
+        None
+    }
+}
+
+/// Cars a roster can put on the grid: distinct `seat` values, i.e. team plus car number.
+///
+/// **This must agree with `driver_rating::expected_positions`**, which ranks the same distinct
+/// seats to decide where a car is expected to finish. A warning derived from a different count
+/// than the thing it warns about would contradict it.
+///
+/// Counting liveries instead would over-count: a season roster lists every driver who ever sat
+/// in a car, so Brabham #8 can appear twice with two skins and is still one car on track.
+/// Per-track override rows never reach here — [`parse_seats`] keeps only primary blocks.
+fn distinct_seats(seats: &[SeatEntry]) -> usize {
+    seats
+        .iter()
+        .map(|e| e.seat.as_str())
+        .collect::<HashSet<&str>>()
+        .len()
+}
+
 /// Checks a recorded grid against the team the player declared for a championship.
 ///
 /// Only ever rejects on positive evidence — a contradiction between the declared team and what
