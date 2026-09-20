@@ -923,6 +923,72 @@ fn handle(
 
     // PATCH /api/driver-performance — write one attribute of one driver entry back to its XML.
     // Nothing else in the table derives from it, so only the edited row comes back.
+    // DELETE /api/driver-performance/track-entries — clear a class's per-track entries at once.
+    //
+    // Sits beside the per-row delete rather than replacing it: one is for the entry that is in
+    // the way, the other for a roster being made uniform before a season. Both go through the
+    // same `.xml.bak`, so both are undone by Reset to baseline.
+    if method == "DELETE" && path == "/api/driver-performance/track-entries" {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            class: String,
+        }
+        let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
+            json_err(&mut stream, "400 Bad Request", "invalid body");
+            return;
+        };
+        let file = match class_file(&config_path, &body.class) {
+            Ok(f) => f,
+            Err((status, msg)) => {
+                json_err(&mut stream, status, &msg);
+                return;
+            }
+        };
+        if let Err(e) = ams2_championship::custom_ai::remove_track_entries(&file) {
+            json_err(&mut stream, "400 Bad Request", &e);
+            return;
+        }
+        let json = driver_performance_json(&config_path, &store);
+        json_ok(&mut stream, &json);
+        return;
+    }
+
+    // DELETE /api/driver-performance — drop one per-track entry from a roster.
+    //
+    // Answers with the whole class again rather than the removed row: every index below the
+    // deleted one has just shifted, and the table the client is holding addresses rows by
+    // index. Handing back one row would leave it pointing at the wrong blocks.
+    if method == "DELETE" && path == "/api/driver-performance" {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            class: String,
+            /// Position among the file's `<driver>` blocks, from the GET payload.
+            index: usize,
+            /// The name that position is listed under — a stale-index guard.
+            driver: String,
+        }
+        let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
+            json_err(&mut stream, "400 Bad Request", "invalid body");
+            return;
+        };
+        let file = match class_file(&config_path, &body.class) {
+            Ok(f) => f,
+            Err((status, msg)) => {
+                json_err(&mut stream, status, &msg);
+                return;
+            }
+        };
+        if let Err(e) =
+            ams2_championship::custom_ai::remove_driver_entry(&file, body.index, &body.driver)
+        {
+            json_err(&mut stream, "400 Bad Request", &e);
+            return;
+        }
+        let json = driver_performance_json(&config_path, &store);
+        json_ok(&mut stream, &json);
+        return;
+    }
+
     if method == "PATCH" && path == "/api/driver-performance" {
         #[derive(serde::Deserialize)]
         struct Body {

@@ -1676,3 +1676,85 @@ fn test_a_grid_is_either_worth_warning_about_or_worth_confirming() {
     assert_eq!(nothing.note(), None);
     assert_eq!(nothing.confirmation(), None);
 }
+
+// ── Removing per-track entries ───────────────────────────────────────────────
+
+#[test]
+fn test_removing_a_per_track_entry_leaves_the_rest_of_the_file_alone() {
+    let out = remove_driver_entry_str(STAND_IN_ROSTER, 1, "Tino Brambilla").unwrap();
+    let rows = parse_driver_attributes_str(&out);
+
+    assert_eq!(rows.len(), 4, "one entry fewer");
+    assert!(
+        !rows.iter().any(|r| r.driver == "Tino Brambilla"),
+        "the stand-in is gone"
+    );
+    // The car he stood in for is untouched, and still a car.
+    let seats = parse_seats_str(&out);
+    assert_eq!(car_count(&seats), 3);
+    assert_eq!(
+        parse_team_skills_str(&out).get("Ferrari"),
+        Some(&0.73),
+        "removing a stand-in cannot move the bar, which was never his"
+    );
+}
+
+/// The entry that only retunes its driver — the kind that has no name of its own. It is listed
+/// under the driver it modifies, so that is the name the guard is given.
+#[test]
+fn test_removing_an_unnamed_per_track_entry_works_too() {
+    let out = remove_driver_entry_str(STAND_IN_ROSTER, 4, "John Surtees").unwrap();
+    let rows = parse_driver_attributes_str(&out);
+
+    assert_eq!(rows.len(), 4);
+    assert!(rows.iter().all(|r| r.tracks.as_deref() != Some("Silverstone_1975_No_Chicane")));
+    // Surtees himself is still there, on his own value.
+    let him = rows.iter().find(|r| r.driver == "John Surtees").unwrap();
+    assert_eq!(him.attrs.get("race_skill"), Some(&0.85));
+}
+
+/// The rule that makes this safe to offer at all: a regular entry is a car on the grid, and
+/// removing one would shrink the field every expected finishing position is derived from.
+#[test]
+fn test_a_regular_entry_cannot_be_removed() {
+    let err = remove_driver_entry_str(STAND_IN_ROSTER, 0, "Chris Amon")
+        .expect_err("Amon holds a seat");
+    assert!(err.contains("per-track"), "{err}");
+}
+
+#[test]
+fn test_removing_checks_the_driver_at_that_position() {
+    let err = remove_driver_entry_str(STAND_IN_ROSTER, 1, "Chris Amon")
+        .expect_err("position 1 is the stand-in, not Amon");
+    assert!(err.contains("Tino Brambilla"), "{err}");
+}
+
+#[test]
+fn test_removing_leaves_no_blank_line_behind() {
+    let out = remove_driver_entry_str(STAND_IN_ROSTER, 1, "Tino Brambilla").unwrap();
+    assert!(!out.contains("\n\n"), "a hole was left in the file:\n{out}");
+}
+
+#[test]
+fn test_clearing_a_class_removes_every_per_track_entry_and_nothing_else() {
+    let (out, removed) = remove_track_entries_str(STAND_IN_ROSTER);
+    assert_eq!(removed, 2);
+
+    let rows = parse_driver_attributes_str(&out);
+    assert_eq!(rows.len(), 3);
+    assert!(rows.iter().all(|r| r.tracks.is_none()));
+    // Every car and every regular driver survives, which is what makes it safe to offer as one
+    // click: the grid is the grid it was.
+    assert_eq!(car_count(&parse_seats_str(&out)), 3);
+    assert_eq!(
+        rows.iter().map(|r| r.driver.as_str()).collect::<Vec<_>>(),
+        vec!["Chris Amon", "Pedro Rodriguez", "John Surtees"]
+    );
+}
+
+#[test]
+fn test_clearing_a_class_with_nothing_to_clear_changes_nothing() {
+    let (out, removed) = remove_track_entries_str(ROSTER);
+    assert_eq!(removed, 0);
+    assert_eq!(out, ROSTER);
+}

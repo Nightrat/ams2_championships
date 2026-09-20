@@ -1322,3 +1322,14 @@ header h1 { flex: 1 1 100%; }
   background: #14231a; border-color: #2f5d3a; color: #8fc79a;
 }
 .live-grid-ok .live-grid-warning-icon { color: #6a9955; }
+
+/* Dropping a per-track entry. The row button is a quiet × inside the Tracks cell — the entry it
+   removes is named right beside it, so the button needs no label of its own. */
+.driverperf-drop {
+  margin-left: 0.35rem; padding: 0 0.3rem;
+  background: transparent; border: 1px solid #3a3a5a; border-radius: 3px;
+  color: #888; font-size: 0.7rem; line-height: 1.4; cursor: pointer;
+}
+.driverperf-drop:hover { color: #e74c3c; border-color: #c0392b; }
+.driverperf-drop:disabled { opacity: 0.4; cursor: default; }
+.driverperf-drop-all { margin-left: 0.5rem; font-size: 0.72rem; }

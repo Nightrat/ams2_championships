@@ -814,17 +814,9 @@ pub fn set_driver_attr_str(
     let range = span.range.clone();
     let block = &xml[range.clone()];
     // An override with no `<name>` is shown under the name of the entry it modifies, so that is
-    // what comes back — resolve it the same way the reader did rather than reading an empty
-    // string and rejecting every edit to those rows.
-    let found = match element_text(block, "name") {
-        Some(name) => name.to_string(),
-        None => spans
-            .iter()
-            .find(|d| d.tracks.is_none() && d.named && d.livery == span.livery)
-            .and_then(|d| element_text(&xml[d.range.clone()], "name"))
-            .unwrap_or_default()
-            .to_string(),
-    };
+    // what comes back — [`driver_name_at`] resolves it exactly as the reader did, and the
+    // removal guard uses the same one.
+    let found = driver_name_at(xml, &spans, index).unwrap_or_default();
     if found != expect_driver.trim() {
         return Err(format!(
             "entry {index} is {found}, not {expect_driver} - reload the tab, the file changed"
@@ -836,6 +828,132 @@ pub fn set_driver_attr_str(
     out.push_str(&updated);
     out.push_str(&xml[range.end..]);
     Ok(out)
+}
+
+/// Deletes the per-track `<driver>` entry at `index`, returning the new file text.
+///
+/// **Only a per-track block may go.** A regular entry is a car on the grid: removing one would
+/// shrink the field, move every expected finishing position derived from it, and leave a livery
+/// with nobody in it — a thing the user would have to hand-edit back. An override carries no
+/// car of its own, so deleting it only takes the tuning it applied at those circuits, which is
+/// exactly what someone wants gone before a season: an entry that quietly hands one driver a
+/// different skill at one round is a result that cannot be compared with the others.
+///
+/// Guarded like [`set_driver_attr_str`], and for the same reason — the index comes from a table
+/// the client loaded earlier, and deleting the wrong row is worse than retuning one.
+///
+/// The block is taken with the whitespace that led up to it, so the file does not accumulate
+/// blank lines where entries used to be.
+pub fn remove_driver_entry_str(
+    xml: &str,
+    index: usize,
+    expect_driver: &str,
+) -> Result<String, String> {
+    let spans = driver_spans(xml);
+    let Some(span) = spans.get(index) else {
+        return Err(format!("this file has no driver entry at position {index}"));
+    };
+    if span.tracks.is_none() {
+        return Err(
+            "only a per-track entry can be removed — a regular one is a car on the grid".into(),
+        );
+    }
+    let found = driver_name_at(xml, &spans, index).unwrap_or_default();
+    if found != expect_driver.trim() {
+        return Err(format!(
+            "entry {index} is {found}, not {expect_driver} - reload the tab, the file changed"
+        ));
+    }
+    // Back up over the indentation on the block's own line, and the newline before it.
+    let mut start = span.range.start;
+    while start > 0 && matches!(xml.as_bytes()[start - 1], b' ' | b'\t') {
+        start -= 1;
+    }
+    if start > 0 && xml.as_bytes()[start - 1] == b'\n' {
+        start -= 1;
+        if start > 0 && xml.as_bytes()[start - 1] == b'\r' {
+            start -= 1;
+        }
+    }
+    let mut out = String::with_capacity(xml.len());
+    out.push_str(&xml[..start]);
+    out.push_str(&xml[span.range.end..]);
+    Ok(out)
+}
+
+/// Deletes **every** per-track entry in a file, returning the new text and how many went.
+///
+/// A roster can carry a lot of them — F-Retro_Gen1 has 17 — and removing them one at a time
+/// from the table means every remaining index shifts under the client after each one. Doing the
+/// whole sweep in one pass here is both safer and what someone clearing a roster before a
+/// season actually wants.
+///
+/// Regular entries are untouched, so the grid is exactly the grid it was.
+pub fn remove_track_entries_str(xml: &str) -> (String, usize) {
+    let spans = driver_spans(xml);
+    let mut doomed: Vec<std::ops::Range<usize>> = spans
+        .iter()
+        .filter(|d| d.tracks.is_some())
+        .map(|d| d.range.clone())
+        .collect();
+    if doomed.is_empty() {
+        return (xml.to_string(), 0);
+    }
+    let removed = doomed.len();
+    // Back to front, so each cut leaves the earlier offsets valid.
+    doomed.sort_by_key(|r| std::cmp::Reverse(r.start));
+    let mut out = xml.to_string();
+    for range in doomed {
+        let mut start = range.start;
+        while start > 0 && matches!(out.as_bytes()[start - 1], b' ' | b'\t') {
+            start -= 1;
+        }
+        if start > 0 && out.as_bytes()[start - 1] == b'\n' {
+            start -= 1;
+            if start > 0 && out.as_bytes()[start - 1] == b'\r' {
+                start -= 1;
+            }
+        }
+        out.replace_range(start..range.end, "");
+    }
+    (out, removed)
+}
+
+/// Applies [`remove_track_entries_str`] to a file on disk. Writes nothing when there was
+/// nothing to remove, so a second click does not take a pointless backup or touch the mtime.
+pub fn remove_track_entries(path: &Path) -> Result<usize, String> {
+    let xml =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let (updated, removed) = remove_track_entries_str(&xml);
+    if removed > 0 {
+        write_with_backup(path, &updated)?;
+    }
+    Ok(removed)
+}
+
+/// The driver a span is listed under: its own `<name>`, or the one it inherits from the regular
+/// entry for the same livery. The reader shows the inherited name, so the guards compare
+/// against the same thing.
+fn driver_name_at(xml: &str, spans: &[DriverSpan], index: usize) -> Option<String> {
+    let span = spans.get(index)?;
+    let block = &xml[span.range.clone()];
+    if let Some(name) = element_text(block, "name") {
+        return Some(name.to_string());
+    }
+    spans
+        .iter()
+        .find(|d| d.tracks.is_none() && d.named && d.livery == span.livery)
+        .and_then(|d| element_text(&xml[d.range.clone()], "name"))
+        .map(str::to_string)
+}
+
+/// Applies [`remove_driver_entry_str`] to a file on disk, keeping the same one-time `.xml.bak`
+/// every other writer takes — so **Reset to baseline** brings a removed entry back.
+pub fn remove_driver_entry(path: &Path, index: usize, expect_driver: &str) -> Result<(), String> {
+    let xml =
+        fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let updated = remove_driver_entry_str(&xml, index, expect_driver)?;
+    write_with_backup(path, &updated)
 }
 
 /// Applies [`set_driver_attr_str`] to a file on disk, keeping the same one-time `.xml.bak` that

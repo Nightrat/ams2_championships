@@ -4745,3 +4745,137 @@ fn test_live_says_so_when_the_grid_is_the_roster() {
     assert!(status.text.contains('3'), "it names the size: {status:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+// ── Removing per-track entries through the tab ───────────────────────────────
+
+/// Two cars, each with a per-track entry: one that retunes its own driver and one that fields
+/// a stand-in, which are the two kinds a roster carries.
+const TRACK_ENTRY_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<custom_ai_drivers>
+    <driver livery_name="Williams #5 N. Mansell">
+        <name>Nigel Mansell</name>
+        <race_skill>0.95</race_skill>
+    </driver>
+    <driver livery_name="Williams #5 N. Mansell" tracks="Monza_1991">
+        <race_skill>0.98</race_skill>
+    </driver>
+    <driver livery_name="AGS #31 I. Capelli">
+        <name>Ivan Capelli</name>
+        <race_skill>0.70</race_skill>
+    </driver>
+    <driver livery_name="AGS #31 I. Capelli" tracks="Interlagos_Historic">
+        <name>Stand In</name>
+        <race_skill>0.60</race_skill>
+    </driver>
+</custom_ai_drivers>
+"#;
+
+fn make_track_entry_fixture() -> (std::path::PathBuf, std::path::PathBuf) {
+    let (dir, config) = make_perf_fixture();
+    std::fs::write(dir.join("F-Test.xml"), TRACK_ENTRY_XML).unwrap();
+    (dir, config)
+}
+
+fn delete_driver_perf(path: &str, body: &str, config: &std::path::Path) -> String {
+    let (store, data_path) = make_test_store();
+    let mut req = format!(
+        "DELETE {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    call_with_config(store, data_path, req, Some(config.to_path_buf()))
+}
+
+#[test]
+fn test_route_removes_one_per_track_entry_and_returns_the_whole_class() {
+    let (dir, config) = make_track_entry_fixture();
+    let resp = delete_driver_perf(
+        "/api/driver-performance",
+        r#"{"class":"F-Test","index":1,"driver":"Nigel Mansell"}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    // The whole class, because every index below the removed row has just shifted.
+    let drivers = body_json(&resp)["classes"][0]["drivers"].clone();
+    let rows = drivers.as_array().unwrap();
+    assert_eq!(rows.len(), 3);
+    assert!(
+        rows.iter().all(|r| r["tracks"] != "Monza_1991"),
+        "{drivers}"
+    );
+    // Mansell keeps his own value and his car.
+    assert_eq!(rows[0]["driver"], "Nigel Mansell");
+    assert_eq!(body_json(&resp)["classes"][0]["cars"], 2);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The guard that makes the button safe to put next to a driver: it cannot delete the driver.
+#[test]
+fn test_route_refuses_to_remove_a_regular_entry() {
+    let (dir, config) = make_track_entry_fixture();
+    let resp = delete_driver_perf(
+        "/api/driver-performance",
+        r#"{"class":"F-Test","index":0,"driver":"Nigel Mansell"}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    assert!(
+        body_json(&resp)["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("per-track"),
+        "{resp}"
+    );
+    // Nothing was written.
+    let xml = std::fs::read_to_string(dir.join("F-Test.xml")).unwrap();
+    assert!(xml.contains("Nigel Mansell"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_refuses_a_stale_index() {
+    let (dir, config) = make_track_entry_fixture();
+    let resp = delete_driver_perf(
+        "/api/driver-performance",
+        r#"{"class":"F-Test","index":1,"driver":"Somebody Else"}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_clears_every_per_track_entry_in_a_class() {
+    let (dir, config) = make_track_entry_fixture();
+    let resp = delete_driver_perf(
+        "/api/driver-performance/track-entries",
+        r#"{"class":"F-Test"}"#,
+        &config,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    let cls = body_json(&resp)["classes"][0].clone();
+    let rows = cls["drivers"].as_array().unwrap().clone();
+    assert_eq!(rows.len(), 2, "{cls}");
+    assert!(rows.iter().all(|r| r["tracks"].is_null()), "{cls}");
+    // The grid is the grid it was: both cars, both regular drivers.
+    assert_eq!(cls["cars"], 2);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The roster is backed up before the first write, so the Car Performance tab's reset undoes
+/// this like any other edit.
+#[test]
+fn test_removing_takes_the_same_one_time_backup_every_writer_does() {
+    let (dir, config) = make_track_entry_fixture();
+    let _ = delete_driver_perf(
+        "/api/driver-performance/track-entries",
+        r#"{"class":"F-Test"}"#,
+        &config,
+    );
+    let backup = std::fs::read_to_string(dir.join("F-Test.xml.bak")).unwrap();
+    assert!(backup.contains("Monza_1991"), "the baseline still has them");
+    let _ = std::fs::remove_dir_all(&dir);
+}

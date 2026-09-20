@@ -83,6 +83,16 @@ function driverPerfCell(field, value) {
     '</td>';
 }
 
+// Per-track entries are the ones worth being able to delete: they hand one driver different
+// values at certain circuits, which is a result that cannot be compared with the rest of a
+// season. The baseline makes it reversible, so the confirm says so rather than warning.
+var DRIVERPERF_DROP_TITLE = 'Remove this per-track entry, so these values are not applied ' +
+  'at those circuits. Reset to baseline in the Car Performance tab brings it back.';
+
+var DRIVERPERF_DROP_ALL_TITLE = 'Remove every per-track entry in this class, so the same ' +
+  'values apply at every circuit. Regular entries are untouched — the grid stays the size it ' +
+  'was. Reset to baseline in the Car Performance tab brings them all back.';
+
 var DRIVERPERF_PHANTOM_TITLE = 'AMS2 has no livery matching this entry’s livery_name, ' +
   'so this driver can never appear on a grid. Editing the values changes nothing in game.';
 
@@ -131,16 +141,30 @@ function renderDriverPerfClass(cls, idx, attrs) {
       '<td class="stat-name" title="' + esc(d.livery || '') + '">' + esc(d.driver) + mark + '</td>' +
       '<td class="stat-name driverperf-team">' + esc(d.team) + '</td>' +
       '<td class="stat-name driverperf-tracks" title="' + esc(d.tracks || '') + '">' +
-        esc(d.tracks || '') + '</td>' +
+        esc(d.tracks || '') +
+        (d.tracks
+          ? ' <button type="button" class="driverperf-drop" title="' + esc(DRIVERPERF_DROP_TITLE) +
+            '" data-class="' + esc(cls.class) + '" data-index="' + d.index +
+            '" data-driver="' + esc(d.driver) + '" data-tracks="' + esc(d.tracks) + '">&#10005;</button>'
+          : '') +
+        '</td>' +
       driverPerfRatingCell(d.rating) +
       attrs.map(function (f) { return driverPerfCell(f, a[f]); }).join('') +
       '</tr>';
   }).join('');
+  var perTrack = drivers.filter(function (d) { return d.tracks; }).length;
   return '<section class="carperf-class" data-carperf-class="' + esc(cls.class) + '">' +
     '<h3 class="carperf-heading">' + carPerfClassLabel(cls) +
     ' <span class="carperf-year">(' + drivers.length + ' entries, ' +
       (cls.cars || 0) + ' cars)</span> ' +
-    driverPerfHeadingNote(drivers) + '</h3>' +
+    driverPerfHeadingNote(drivers) +
+    (perTrack
+      ? ' <button type="button" class="manage-btn driverperf-drop-all" data-class="' +
+        esc(cls.class) + '" data-count="' + perTrack + '" title="' +
+        esc(DRIVERPERF_DROP_ALL_TITLE) + '">Remove ' + perTrack + ' per-track ' +
+        (perTrack === 1 ? 'entry' : 'entries') + '</button>'
+      : '') +
+    '</h3>' +
     '<div class="driverperf-scroll">' +
     '<table class="stats-table sortable driverperf-table" id="' + tableId + '">' +
     '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table>' +
@@ -298,6 +322,12 @@ function renderDriverPerformance(data) {
     input.dataset.stored = input.value;
     input.addEventListener('change', function () { driverPerfSave(input); });
   });
+  document.querySelectorAll('.driverperf-drop').forEach(function (btn) {
+    btn.addEventListener('click', function () { driverPerfDrop(btn); });
+  });
+  document.querySelectorAll('.driverperf-drop-all').forEach(function (btn) {
+    btn.addEventListener('click', function () { driverPerfDropAll(btn); });
+  });
   document.querySelectorAll('.driverperf-filter-input').forEach(function (input) {
     input.addEventListener('change', driverPerfApplyFilter);
   });
@@ -310,6 +340,65 @@ function renderDriverPerformance(data) {
   if (noneBtn) noneBtn.addEventListener('click', function () {
     document.querySelectorAll('.driverperf-filter-input').forEach(function (i) { i.checked = false; });
     driverPerfApplyFilter();
+  });
+}
+
+// Delete one per-track entry. The whole class comes back rather than the one row, because the
+// rows below it have all shifted up and the table addresses them by index.
+function driverPerfDrop(btn) {
+  var d = btn.dataset;
+  if (!confirm('Remove the ' + d.tracks + ' entry for ' + d.driver + '?\n\n' +
+      'Those values stop being applied at those circuits. Reset to baseline brings it back.')) {
+    return;
+  }
+  btn.disabled = true;
+  fetch('/api/driver-performance', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ class: d.class, index: +d.index, driver: d.driver }),
+  }).then(function (r) {
+    return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+  }).then(function (r) {
+    if (!r.ok) {
+      btn.disabled = false;
+      alert(r.body.error || 'Could not remove that entry.');
+      return;
+    }
+    renderDriverPerformance(r.body || {});
+  }).catch(function () {
+    btn.disabled = false;
+    alert('Could not remove that entry.');
+  });
+}
+
+// Clear a whole class of per-track entries. One request rather than a loop: each removal shifts
+// every index below it, so a client looping would be addressing stale rows by the second call.
+function driverPerfDropAll(btn) {
+  var d = btn.dataset;
+  var n = +d.count;
+  if (!confirm('Remove all ' + n + ' per-track ' + (n === 1 ? 'entry' : 'entries') +
+      ' from ' + d.class + '?\n\n' +
+      'The same values then apply at every circuit. Drivers and cars are untouched, and ' +
+      'Reset to baseline brings them back.')) {
+    return;
+  }
+  btn.disabled = true;
+  fetch('/api/driver-performance/track-entries', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ class: d.class }),
+  }).then(function (r) {
+    return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+  }).then(function (r) {
+    if (!r.ok) {
+      btn.disabled = false;
+      alert(r.body.error || 'Could not remove those entries.');
+      return;
+    }
+    renderDriverPerformance(r.body || {});
+  }).catch(function () {
+    btn.disabled = false;
+    alert('Could not remove those entries.');
   });
 }
 

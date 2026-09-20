@@ -102,4 +102,11 @@ A roster may give a car different values at certain circuits, and the **Tracks**
 
 Editing such a row changes that circuit only; the driver's main entry is untouched, and vice versa.
 
+**Removing them.** Per-track entries are the reason one round of a season can be raced on different numbers from the rest, which makes that round's result hard to compare with the others. Two ways to get rid of them:
+
+- the **×** in a row's Tracks cell removes that one entry;
+- **Remove N per-track entries** in the class heading clears the whole class at once.
+
+Either way, only per-track entries go. Regular entries are refused outright — one of those is a car on the grid, and deleting it would shrink the field every expected finishing position is measured against. Both go through the same backup as any other edit, so **Reset to baseline** in the Car Performance tab brings them back.
+
 A stand-in is **not** treated as one of the team's drivers: they add no car to the grid, and the bar their team asks of you comes from the driver who actually holds the seat. A one-race substitute is nobody's incumbent.
