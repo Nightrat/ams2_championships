@@ -1030,6 +1030,18 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
 .driverperf-table { min-width: 100%; }
 .driverperf-table th { white-space: nowrap; }
 .driverperf-team { color: #bbb; }
+/* The car this entry drives — see .carperf-car for why the box is fixed. Smaller again: this
+   table already has twenty columns and a horizontal scrollbar. */
+.driverperf-car {
+  width: 80px;
+  height: 30px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 0.45rem;
+}
+/* The picture and the name share the first cell, and a wrapped name doubles the height of every
+   row. Widening the column instead is free here: the table is already in a scroller. */
+.driverperf-table td:first-child { white-space: nowrap; }
 .driverperf-tracks {
   color: #888; font-size: 0.85em;
   max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1045,6 +1057,13 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
 .driverperf-attr.driverperf-saving { opacity: 0.5; }
 /* An entry AMS2 owns no livery for: still editable, but it can never reach a grid. */
 .driverperf-phantom { opacity: 0.55; }
+/* Rows for entries AMS2 ignores, hidden unless asked for — see SHOW_PHANTOM_ENTRIES in
+   utils.js. `.carperf-class` is the section wrapper on *both* performance tabs, so one rule
+   covers them both and neither can drift into showing what the other hides. */
+body.hide-phantom-entries .carperf-class tr.driverperf-phantom { display: none; }
+/* The Driver Performance heading counts them, so it has to say when they are not on screen —
+   otherwise "26 entries" against 22 visible rows reads as a miscount. */
+body.hide-phantom-entries .driverperf-phantom-count::after { content: ' (hidden)'; }
 .driverperf-phantom td:first-child { border-left: 2px solid #b0603a; }
 .driverperf-phantom-tag {
   display: inline-block; margin-left: 0.35rem; padding: 0 0.3rem;

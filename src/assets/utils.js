@@ -26,6 +26,50 @@ function liveryImg(path, cls) {
     ' src="/api/livery-preview/' + encodeURIComponent(path) + '">';
 }
 
+// ── Entries AMS2 will never field ─────────────────────────────────────────────
+// A `livery_name` the game owns no car for is silently ignored, so the entry exists in the
+// roster file and nowhere else. Both performance tabs mark those rows "no livery", and both
+// hide them by default: they are noise in a table about how the grid performs, and the person
+// who wants to see them is the one repairing the roster.
+//
+// One preference asked twice, not two preferences: the checkbox appears in each tab's filter
+// bar and they are kept in step, because both tabs are showing the same entries.
+//
+// Hiding is done with a class on <body> rather than per row, so one rule covers both tabs and
+// a table rebuilt after an edit comes back in whatever state was already chosen.
+var SHOW_PHANTOM_ENTRIES = false;
+
+var PHANTOM_TOGGLE_TITLE = 'These entries name a livery AMS2 does not own, so the game ignores ' +
+  'them: they never reach a grid, and nothing about them affects a result. Show them to fix ' +
+  'the roster.';
+
+// `any` only decides whether the control is worth drawing — a checkbox that would hide nothing
+// is worse than no checkbox. The count belongs on each class heading, not here: this tab-wide
+// control would otherwise quote a total dominated by classes the class filter has hidden.
+function phantomToggleHtml(label, any) {
+  if (!any) return '';
+  return '<label class="carperf-filter-check" title="' + esc(PHANTOM_TOGGLE_TITLE) + '">' +
+    '<input type="checkbox" class="phantom-toggle-input"' +
+    (SHOW_PHANTOM_ENTRIES ? ' checked' : '') + '> ' + esc(label) + '</label>';
+}
+
+function applyPhantomFilter() {
+  document.body.classList.toggle('hide-phantom-entries', !SHOW_PHANTOM_ENTRIES);
+}
+
+function initPhantomToggles() {
+  document.querySelectorAll('.phantom-toggle-input').forEach(function (input) {
+    input.addEventListener('change', function () {
+      SHOW_PHANTOM_ENTRIES = input.checked;
+      document.querySelectorAll('.phantom-toggle-input').forEach(function (other) {
+        other.checked = SHOW_PHANTOM_ENTRIES;
+      });
+      applyPhantomFilter();
+    });
+  });
+  applyPhantomFilter();
+}
+
 // ── Shared utilities ──────────────────────────────────────────────────────────
 function esc(str) {
   return String(str)

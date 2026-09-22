@@ -5161,3 +5161,29 @@ fn test_route_offers_carry_an_empty_picture_map_without_a_livery_mod() {
     assert_eq!(v["previews"].as_object().unwrap().len(), 0, "{v}");
     std::fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn test_route_driver_performance_carries_a_picture_per_livery() {
+    let (dir, config) = make_preview_fixture();
+    let cls = body_json(&get_with_config("/api/driver-performance", &config))["classes"][0].clone();
+    // Keyed by livery, not by team: a row here is one entry bound to one livery.
+    assert_eq!(
+        cls["previews"]["Williams #5 N. Mansell"],
+        "williams_fw14/Previews/five.dds"
+    );
+    assert!(
+        cls["previews"]["AGS #31 I. Capelli"].is_null(),
+        "{}",
+        cls["previews"]
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_driver_performance_previews_are_empty_without_manifests() {
+    let (dir, config) = make_perf_fixture();
+    let cls = body_json(&get_with_config("/api/driver-performance", &config))["classes"][0].clone();
+    assert!(cls["previews"].is_object(), "{cls}");
+    assert_eq!(cls["previews"].as_object().unwrap().len(), 0, "{cls}");
+    std::fs::remove_dir_all(&dir).ok();
+}

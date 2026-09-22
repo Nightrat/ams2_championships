@@ -569,6 +569,11 @@ fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -
         /// stand-ins and second liveries add entries without adding a car. Sent from here
         /// because only the server knows which liveries are actually installed.
         cars: usize,
+        /// Each entry's picture, keyed by **livery name** rather than by team — every row here
+        /// binds to one livery of its own, so unlike the Car Performance table this needs no
+        /// "first car of the team" fallback. A row whose livery is absent from the map has no
+        /// picture, which is the same thing `phantom` reports for a different reason.
+        previews: std::collections::HashMap<String, String>,
         drivers: Vec<custom_ai::DriverAttributes>,
     }
     #[derive(serde::Serialize)]
@@ -590,19 +595,31 @@ fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -
         Some((dir, years)) => {
             // Read once for the whole payload: the manifests cover every car model at once, and
             // a livery belongs to a model rather than to a class.
-            let installed = ams2_championship::liveries::installed_livery_names(&dir);
+            let installed = ams2_championship::liveries::installed_liveries(&dir);
+            let names = installed.as_ref().map(|l| l.names());
             custom_ai::class_performance_with(&dir, &years)
                 .into_iter()
                 .map(|c| {
                     let file = format!("{}.xml", c.class);
                     let mut drivers = custom_ai::parse_driver_attributes(&dir.join(&file));
-                    custom_ai::mark_phantom_entries(&mut drivers, installed.as_ref());
-                    let cars = custom_ai::car_count(&roster_seats_with(
-                        &dir,
-                        &file,
-                        installed.as_ref(),
-                    ));
+                    custom_ai::mark_phantom_entries(&mut drivers, names.as_ref());
+                    let cars =
+                        custom_ai::car_count(&roster_seats_with(&dir, &file, names.as_ref()));
+                    // Deduped: which model declares a shared name is settled by how much of the
+                    // roster it declares, and a livery repeated by a dozen per-track entries is
+                    // still one livery's worth of evidence.
+                    let roster: Vec<String> = {
+                        let mut seen: Vec<String> =
+                            drivers.iter().map(|d| d.livery.clone()).collect();
+                        seen.sort();
+                        seen.dedup();
+                        seen
+                    };
                     ClassRow {
+                        previews: installed
+                            .as_ref()
+                            .map(|l| l.previews_for(&roster))
+                            .unwrap_or_default(),
                         drivers,
                         cars,
                         class: c.class,

@@ -71,7 +71,7 @@ These scalars are what the rating measures your results against, and they are al
 
 ### The picture beside each team
 
-Each row shows the car, taken from the same livery mod the game itself takes it from: the preview image a mod installs alongside its skins, which is what AMS2 shows in its own car picker. Nothing to set up — if the mod ships previews, they appear. The seats on offer in the Manage tab show the same pictures.
+Each row shows the car, taken from the same livery mod the game itself takes it from: the preview image a mod installs alongside its skins, which is what AMS2 shows in its own car picker. Nothing to set up — if the mod ships previews, they appear. The Driver Performance tab and the seats on offer in the Manage tab show the same pictures.
 
 Some rows will have none, and that is normal rather than a fault. A class with no livery mod has no previews to show, and a mod is free to install a skin without one. Where a livery is shared by two cars a generation apart, the app works out which is yours from the rest of the grid.
 
@@ -90,6 +90,8 @@ The year is a label and a sort order and nothing else — no rating, contract, r
 A Custom AI Drivers file cannot create a car. Each entry binds a name, skills and scalars to a livery the game **already owns**, matched on `livery_name` — and an entry naming a livery AMS2 does not have is **silently ignored**. No error, no warning: that driver simply never reaches a grid, and a roster can happily name more drivers than the class has cars.
 
 Rows in that state are tagged **no livery** in the Car and Driver Performance tabs, and a team whose every entry is a phantom has no seat to earn. Editing such a row changes nothing in game.
+
+**They are hidden by default.** A row the game ignores tells you nothing about how the grid performs — and on a roster like F-Junior there are hundreds of them. Tick **Show cars with no livery** (Car Performance) or **Show entries with no livery** (Driver Performance) to bring them back; it is one setting and the two tabs follow each other. Each class heading counts the ones it is hiding, so a short table always says why it is short.
 
 The check reads the livery manifests your **livery mods** install, which is the only list of livery names that can be read — the game's own livery data is sealed inside its pak files. That makes the check partial by nature: a class no livery mod covers reads as *liveries not verifiable* rather than being guessed at, so an unmodded class is never wrongly condemned.
 

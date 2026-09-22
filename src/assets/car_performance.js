@@ -118,6 +118,7 @@ function renderCarPerformanceClass(cls, idx, best) {
   }).join('');
   return '<section class="carperf-class" data-carperf-class="' + esc(cls.class) + '">' +
     '<h3 class="carperf-heading">' + carPerfClassLabel(cls) +
+      carPerfPhantomNote(cars) +
       carPerfBaselineHtml(cls) +
     '</h3>' +
     '<table class="stats-table sortable" id="' + tableId + '">' +
@@ -146,6 +147,24 @@ function carPerfPreselected(classes, active) {
   return any ? wanted : null;
 }
 
+// Teams AMS2 will never field, across every class in the payload — whether the tab-wide toggle
+// is worth drawing at all.
+function carPerfPhantomCount(classes) {
+  return classes.reduce(function (n, cls) {
+    return n + (cls.cars || []).filter(function (c) { return c.phantom; }).length;
+  }, 0);
+}
+
+// How many of this class's teams are missing from the table, said on the class's own heading.
+// Without it a class would quietly show fewer cars than its roster names. Reuses the Driver
+// Performance tab's badge class so the "(hidden)" suffix is one CSS rule for both tabs.
+function carPerfPhantomNote(cars) {
+  var n = cars.filter(function (c) { return c.phantom; }).length;
+  if (!n) return '';
+  return ' <span class="driverperf-phantom-count" title="' + esc(CARPERF_NO_SEAT_TITLE) + '">' +
+    n + (n === 1 ? ' car with no livery' : ' cars with no livery') + '</span>';
+}
+
 function carPerfFilterBarHtml(classes, preselect) {
   var options = classes.map(function (cls) {
     var on = !preselect || preselect[cls.class];
@@ -160,7 +179,8 @@ function carPerfFilterBarHtml(classes, preselect) {
       '<button type="button" class="manage-btn" id="carperf-filter-all">All</button>' +
       '<button type="button" class="manage-btn" id="carperf-filter-none">None</button>' +
     '</div>' +
-    '<div class="carperf-filter-checks">' + options + '</div>' +
+    '<div class="carperf-filter-checks">' + options +
+      phantomToggleHtml('Show cars with no livery', carPerfPhantomCount(classes)) + '</div>' +
     '<span id="carperf-status" class="carperf-status"></span>' +
     '</div>';
 }
@@ -372,6 +392,8 @@ function renderCarPerformance(data) {
     document.querySelectorAll('.carperf-filter-input').forEach(function (i) { i.checked = false; });
     carPerfApplyFilter();
   });
+  // Deliberately not touched by All/None: those pick classes, this picks what counts as a car.
+  initPhantomToggles();
 }
 
 function loadCarPerformance() {

@@ -130,6 +130,9 @@ function renderDriverPerfClass(cls, idx, attrs) {
     th('stat-num', 'num', 'Rating', driverPerfRatingTitle) +
     attrs.map(function (f) { return th('stat-num', 'num', driverPerfLabel(f), f); }).join('') +
     '</tr>';
+  // Keyed by livery rather than by team: every entry binds to one livery of its own, so a
+  // per-track stand-in shows the car it actually drives that weekend.
+  var previews = cls.previews || {};
   var tbody = drivers.map(function (d) {
     var a = d.attrs || {};
     var phantom = d.phantom === true;
@@ -138,7 +141,8 @@ function renderDriverPerfClass(cls, idx, attrs) {
       : '';
     return '<tr data-index="' + d.index + '" data-driver="' + esc(d.driver) + '"' +
       (phantom ? ' class="driverperf-phantom"' : '') + '>' +
-      '<td class="stat-name" title="' + esc(d.livery || '') + '">' + esc(d.driver) + mark + '</td>' +
+      '<td class="stat-name" title="' + esc(d.livery || '') + '">' +
+        liveryImg(previews[d.livery], 'driverperf-car') + esc(d.driver) + mark + '</td>' +
       '<td class="stat-name driverperf-team">' + esc(d.team) + '</td>' +
       '<td class="stat-name driverperf-tracks" title="' + esc(d.tracks || '') + '">' +
         esc(d.tracks || '') +
@@ -185,9 +189,18 @@ function driverPerfFilterBarHtml(classes, preselect) {
       '<button type="button" class="manage-btn" id="driverperf-filter-all">All</button>' +
       '<button type="button" class="manage-btn" id="driverperf-filter-none">None</button>' +
     '</div>' +
-    '<div class="carperf-filter-checks">' + options + '</div>' +
+    '<div class="carperf-filter-checks">' + options +
+      phantomToggleHtml('Show entries with no livery', driverPerfTotalPhantoms(classes)) +
+      '</div>' +
     '<span id="driverperf-status" class="carperf-status"></span>' +
     '</div>';
+}
+
+// Whether any class has an entry AMS2 will never field — all the tab-wide toggle needs to know.
+function driverPerfTotalPhantoms(classes) {
+  return classes.reduce(function (n, cls) {
+    return n + driverPerfPhantomCount(cls.drivers || []);
+  }, 0);
 }
 
 function driverPerfApplyFilter() {
@@ -341,6 +354,8 @@ function renderDriverPerformance(data) {
     document.querySelectorAll('.driverperf-filter-input').forEach(function (i) { i.checked = false; });
     driverPerfApplyFilter();
   });
+  // Deliberately not touched by All/None: those pick classes, this picks what counts as an entry.
+  initPhantomToggles();
 }
 
 // Delete one per-track entry. The whole class comes back rather than the one row, because the
