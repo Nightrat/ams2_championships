@@ -193,3 +193,84 @@ fn test_the_missing_roster_folder_warning_is_wired_to_real_elements() {
     assert!(CSS.contains(".tab-warn {"), "the badge has no styling");
     assert!(CSS.contains(".config-warn {"), "the notice has no styling");
 }
+
+/// The stylesheet with `/* … */` removed, so a rule's selector is not preceded by the comment
+/// that introduces it.
+fn strip_css_comments(css: &str) -> String {
+    let mut out = String::with_capacity(css.len());
+    let mut rest = css;
+    while let Some(open) = rest.find("/*") {
+        out.push_str(&rest[..open]);
+        match rest[open + 2..].find("*/") {
+            Some(close) => rest = &rest[open + 2 + close + 2..],
+            None => return out,
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Every class on a `hidden` element that the stylesheet gives a `display` to, and whether it
+/// opts back out for `[hidden]`.
+///
+/// Returns `(class, has_opt_out)` per class found, so the test can name the ones that fail.
+fn hidden_classes_needing_an_opt_out() -> Vec<(String, bool)> {
+    let html = build_base_html();
+    // Comments go first: rules are found by splitting on `}`, which otherwise leaves the *next*
+    // rule's leading comment glued to the front of its selector, and nothing ever matches.
+    let css = strip_css_comments(CSS);
+    let mut out = Vec::new();
+    // Only the `hidden` *attribute* counts. A class merely spelled `…-hidden` is the other
+    // mechanism — a class the script adds and removes — and it has no conflict to resolve.
+    for tag in html.split('<').filter(|t| {
+        t.split('>')
+            .next()
+            .is_some_and(|open| open.trim_end().ends_with(" hidden"))
+    }) {
+        let Some(classes) = tag.split("class=\"").nth(1).and_then(|c| c.split('"').next()) else {
+            continue;
+        };
+        for class in classes.split_whitespace() {
+            if out.iter().any(|(c, _): &(String, bool)| c == class) {
+                continue;
+            }
+            // A `display` anywhere in a rule whose selector names this class on its own —
+            // `.foo` or `.foo` inside a comma list, but not `.foo .bar` or `.foo[hidden]`.
+            let sets_display = css.split('}').any(|rule| {
+                let (selector, body) = rule.split_once('{').unwrap_or((rule, ""));
+                selector.split(',').any(|s| s.trim() == format!(".{class}"))
+                    && body.contains("display:")
+            });
+            if sets_display {
+                out.push((class.to_string(), css.contains(&format!(".{class}[hidden]"))));
+            }
+        }
+    }
+    out
+}
+
+/// An author-level `display` outranks the UA stylesheet's `[hidden] { display: none }`, so an
+/// element given both is **never hidden** — it just renders empty, which for a bordered warning
+/// box is a stray strip and for a badge is a permanent alarm.
+///
+/// This has now bitten three times: the collapsed `<details>` on the lap charts, the live grid
+/// warning, and the `!` on the Config tab. Scanning for it is cheaper than remembering it, and it
+/// fails on the *next* one rather than on these.
+#[test]
+fn test_nothing_hidden_by_attribute_is_kept_visible_by_its_own_display_rule() {
+    let found = hidden_classes_needing_an_opt_out();
+    assert!(
+        !found.is_empty(),
+        "the scan found no hidden element with a display rule — it has stopped looking"
+    );
+    let missing: Vec<&str> = found
+        .iter()
+        .filter(|(_, ok)| !ok)
+        .map(|(c, _)| c.as_str())
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "these classes set `display` on an element that is hidden by attribute, so `hidden` \
+         does nothing — add `.<class>[hidden] {{ display: none; }}`: {missing:?}"
+    );
+}

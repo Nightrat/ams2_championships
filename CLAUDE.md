@@ -55,6 +55,8 @@ All JS files are concatenated into a single `<script>` block each — no bundler
 11. `driver_performance.js` — Driver Performance tab (per-driver skills)
 12. `main.js` — tab switching, sub-tab init, `showTab(name)`
 
+**An author-level `display` cancels the `hidden` attribute.** `[hidden] { display: none }` lives in the UA stylesheet, so any rule of ours that gives the same element a `display` outranks it and the element is never hidden — it just renders empty, which for a bordered box is a stray strip and for a badge is an alarm that will not go out. A class hidden by attribute therefore needs `.<class>[hidden] { display: none; }` spelled out. This has bitten three times: the collapsed `<details>` on the lap charts, `.live-grid-warning`, and `.tab-warn`. `test_nothing_hidden_by_attribute_is_kept_visible_by_its_own_display_rule` now scans the served page for elements carrying `hidden`, checks each of their classes for a `display` rule, and fails naming any that has no opt-out — so it catches the next one rather than these. It is deliberately blind to the `…-hidden` *class* mechanism (`.tab-panel-hidden` and friends), which has no conflict to resolve.
+
 ### include_str! caching gotcha
 
 `cargo` does **not** always detect changes to `include_str!` files when only the asset file changes. If CSS/JS edits aren't appearing, touch `championship_html.rs` or run `cargo build` with `--` to force a rebuild.

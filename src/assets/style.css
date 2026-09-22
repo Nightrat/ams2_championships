@@ -1136,6 +1136,10 @@ body.hide-phantom-entries .driverperf-phantom-count::after { content: ' (hidden)
   font-size: 0.72rem; font-weight: 700; line-height: 1.05em; text-align: center;
   color: #1a1a24; background: #e0b050; border-radius: 50%;
 }
+/* An author-level `display` outranks the UA stylesheet's `[hidden] { display: none }`, so the
+   badge has to opt back out by hand or it is never hidden at all. Same trap as the collapsed
+   `<details>` rule further up. */
+.tab-warn[hidden] { display: none; }
 .config-check-group { display: flex; gap: 1.2rem; flex-wrap: wrap; }
 /* Class season years: one narrow box per class, wrapping into columns. */
 .config-class-years {
@@ -1343,6 +1347,10 @@ header h1 { flex: 1 1 100%; }
   background: #2a2010; border: 1px solid #7a5c18; border-left-width: 3px;
   border-radius: 4px; color: #f0c674; font-size: 0.85rem; line-height: 1.4;
 }
+/* `display: flex` above outranks the UA stylesheet's `[hidden] { display: none }`, and
+   `renderGridStatus` hides this box with the attribute — without this it stays as an empty
+   bordered strip whenever there is nothing to say. */
+.live-grid-warning[hidden] { display: none; }
 .live-grid-warning-icon { flex: none; font-size: 1rem; line-height: 1.2; }
 .live-grid-warning-text { flex: 1; }
 
