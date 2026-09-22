@@ -49,6 +49,19 @@ function collectClassYears() {
   return out;
 }
 
+// An empty Custom AI Drivers folder means this install has no rosters at all, and everything
+// singleplayer is downstream of one: no rating, no team requirement, no offer, no money, and the
+// live grid falls back to AMS2's car models. So it is flagged twice — beside the box that fixes
+// it, and as a "!" on the Config tab itself, since someone who has never opened the tab is
+// exactly the person who has not set it.
+function flagMissingAiDir(dir) {
+  var missing = !(dir && String(dir).trim());
+  var notice = document.getElementById('cfg-custom-ai-dir-missing');
+  var badge = document.getElementById('tab-config-warn');
+  if (notice) notice.hidden = !missing;
+  if (badge) badge.hidden = !missing;
+}
+
 function loadConfig() {
   fetch('/api/config').then(function (r) { return r.json(); })
     .then(function (cfg) {
@@ -57,6 +70,7 @@ function loadConfig() {
       document.getElementById('cfg-host').value       = cfg.host;
       document.getElementById('cfg-saves-dir').value = cfg.saves_dir || '';
       document.getElementById('cfg-custom-ai-dir').value = cfg.custom_ai_dir || '';
+      flagMissingAiDir(cfg.custom_ai_dir);
       document.getElementById('cfg-poll-ms').value    = cfg.poll_ms;
       document.getElementById('cfg-record-practice').checked = cfg.record_practice;
       document.getElementById('cfg-record-qualify').checked  = cfg.record_qualify;
@@ -141,6 +155,7 @@ function saveConfig(newCfg) {
       var res = r.body;
       _loadedConfig = res.config;
       applyTrackMapConfig(res.config);
+      flagMissingAiDir(res.config.custom_ai_dir);
       // Redrawn from the response, not left as typed: the server drops an override that only
       // repeats the built-in year, and changing the Custom AI folder changes which classes there
       // are to answer for at all.
@@ -204,3 +219,7 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
     if (btn.dataset.tab === 'config') loadConfig();
   });
 });
+
+// Read once at startup, only so the "!" on the Config tab is there for someone who has never
+// opened it. Clicking the tab reloads anyway, so this costs one request and nothing else.
+loadConfig();

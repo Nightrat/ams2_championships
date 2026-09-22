@@ -1119,10 +1119,22 @@ body.hide-phantom-entries .driverperf-phantom-count::after { content: ' (hidden)
   background: #2a1a1a; color: #e74c3c; border: 1px solid #8b1a1a;
   border-radius: 3px; padding: 0 4px; letter-spacing: 0.03em;
 }
-.config-diverged {
+/* Amber notice inside a config group. `.config-diverged` says the career is not running on
+   these settings; `.config-warn` says one of them has not been filled in. Same treatment,
+   different claim, so they share the rule rather than repeating it. */
+.config-diverged,
+.config-warn {
   font-size: 0.8rem; color: #e0b050;
   background: #2a2410; border: 1px solid #6b5518;
   border-radius: 3px; padding: 0.4rem 0.6rem; margin-bottom: 0.5rem;
+}
+.config-warn code { color: #f0d090; background: #3a3018; padding: 0 3px; border-radius: 2px; }
+/* The "!" on a tab button: a setting the user has to go into that tab and fill in. Sits on the
+   button so it is seen without opening the tab, which is the whole point of it. */
+.tab-warn {
+  display: inline-block; margin-left: 0.4rem; min-width: 1.05em;
+  font-size: 0.72rem; font-weight: 700; line-height: 1.05em; text-align: center;
+  color: #1a1a24; background: #e0b050; border-radius: 50%;
 }
 .config-check-group { display: flex; gap: 1.2rem; flex-wrap: wrap; }
 /* Class season years: one narrow box per class, wrapping into columns. */

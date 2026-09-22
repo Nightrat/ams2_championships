@@ -16,7 +16,7 @@ fn test_load_or_create_missing_file_writes_defaults_and_creates_file() {
     let cfg = load_or_create(&path);
     assert_eq!(cfg.port, 8080);
     assert_eq!(cfg.host, "127.0.0.1");
-    assert_eq!(cfg.poll_ms, 200);
+    assert_eq!(cfg.poll_ms, 500);
     assert!(cfg.record_practice);
     assert!(cfg.record_qualify);
     assert!(cfg.record_race);
@@ -97,7 +97,7 @@ fn test_config_default_values() {
     let cfg = Config::default();
     assert_eq!(cfg.port, 8080);
     assert_eq!(cfg.host, "127.0.0.1");
-    assert_eq!(cfg.poll_ms, 200);
+    assert_eq!(cfg.poll_ms, 500);
     assert!(cfg.record_practice);
     assert!(cfg.record_qualify);
     assert!(cfg.record_race);
@@ -445,15 +445,30 @@ fn test_normalize_economy_pulls_nonsense_into_range() {
 #[test]
 fn test_a_career_starts_with_enough_to_choose_a_way_in() {
     // What the figure is *for* lives in `contracts`, where it can be measured against the real
-    // rosters: see `test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid`. All this
-    // asserts is the shape — a career starts with real money, on the order of a season's pay
-    // rather than a rounding error.
-    let path = tmp_path();
-    fs::write(&path, "{}").unwrap();
-    let cfg = load_or_create(&path);
-    assert!(cfg.starting_balance > cfg.offer_params().floor_salary);
-    assert!(cfg.starting_balance >= cfg.offer_params().buy_in_per_point);
-    let _ = fs::remove_file(&path);
+    // rosters: see `test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most`.
+    // All this asserts is the shape — a career starts with real money, on the order of a season's
+    // pay rather than a rounding error.
+    //
+    // Asserted against `Config::default` and not against a `{}` file, because a balance only
+    // means anything next to the economy it is spent in and those two no longer match: the
+    // shipped default is 100,000 against a 50,000 floor salary and 3,000 a rating point, while
+    // the serde fallbacks a field-less config gets still price a seat at 150,000 a point. A
+    // career founded on one of those old configs can therefore afford nothing outright and gets
+    // in only through `contracts::open_a_way_in`'s discount — which still works, but is a claim
+    // about the last resort rather than about the shape of the balance.
+    let cfg = Config::default();
+    assert!(
+        cfg.starting_balance > cfg.offer_params().floor_salary,
+        "balance {} is less than one season at the back of the grid ({})",
+        cfg.starting_balance,
+        cfg.offer_params().floor_salary
+    );
+    assert!(
+        cfg.starting_balance >= cfg.offer_params().buy_in_per_point,
+        "balance {} cannot cover even one rating point of sponsorship ({})",
+        cfg.starting_balance,
+        cfg.offer_params().buy_in_per_point
+    );
 }
 
 #[test]
@@ -515,11 +530,26 @@ fn test_normalize_class_years_stores_what_will_actually_be_used() {
 }
 
 #[test]
-fn test_a_config_without_class_years_has_none() {
-    // Every config written before this existed, and the shipped default.
+fn test_a_config_that_says_nothing_about_class_years_gains_none() {
+    // Every config written before this existed. A file that is silent about overrides has none —
+    // the shipped set belongs to a *new* config (`Config::default`), not to an old one being
+    // re-read, or upgrading would quietly re-add an override the user had cleared.
     let path = tmp_path();
     fs::write(&path, "{}").unwrap();
     assert!(load_or_create(&path).class_years.is_empty());
-    assert!(Config::default().class_years.is_empty());
     let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_new_config_only_ships_years_the_table_cannot_answer() {
+    // An override that merely repeats the built-in year is dropped by `class_years()`, so any
+    // that survives round-tripping is one `SEASON_YEARS` genuinely has no answer for — `FE-G1`,
+    // a fictional car whose season is whichever livery mod is installed.
+    let cfg = Config::default();
+    assert_eq!(cfg.class_years.get("FE-G1"), Some(&1995));
+    assert_eq!(
+        cfg.class_years,
+        cfg.class_years(),
+        "a shipped override that the table already agrees with would be dropped on first save"
+    );
 }

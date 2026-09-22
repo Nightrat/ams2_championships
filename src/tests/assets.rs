@@ -168,3 +168,28 @@ fn test_every_embedded_script_is_lexically_intact() {
         }
     }
 }
+
+/// The two ids that carry the "no Custom AI folder" warning have to exist in the markup, because
+/// both places that set them are `if (el)`-guarded — a renamed id would not throw, it would just
+/// stop warning, and the whole point of the flag is that it appears for someone who has not gone
+/// looking for it.
+#[test]
+fn test_the_missing_roster_folder_warning_is_wired_to_real_elements() {
+    let html = build_base_html();
+    for id in ["cfg-custom-ai-dir-missing", "tab-config-warn"] {
+        assert!(
+            html.contains(&format!("id=\"{id}\"")),
+            "{id} is set by config.js but is not in the page"
+        );
+        assert!(
+            JS_CONFIG.contains(&format!("getElementById('{id}')")),
+            "{id} is in the page but nothing ever unhides it"
+        );
+    }
+    // Hidden until the config says otherwise, so a set folder never flashes a warning on load.
+    assert!(html.contains(r#"id="cfg-custom-ai-dir-missing" class="config-warn" hidden"#));
+    assert!(html.contains(r#"id="tab-config-warn" class="tab-warn""#));
+    // And the CSS that makes the "!" read as one, rather than as stray punctuation.
+    assert!(CSS.contains(".tab-warn {"), "the badge has no styling");
+    assert!(CSS.contains(".config-warn {"), "the notice has no styling");
+}

@@ -56,25 +56,36 @@ fn default_champion_prize() -> i64 {
 fn default_floor_prize() -> i64 {
     PrizeParams::default().floor_prize
 }
-/// Enough that a brand-new career can buy into **at least two** of the seats that ask for
-/// sponsorship — a choice of way in, rather than one take-it-or-leave-it.
+/// Credits a career is founded with, for a config that does not say.
 ///
-/// Measured, not guessed. Across the eight rosters in `docs/custom_ai_files_with_perf_scalars`
-/// the second-cheapest pay-driver seat for a driver on the starting rating runs to 4,949,999 at
-/// worst (F-Retro_Gen3); this covers it with a little room.
-/// `test_a_new_career_can_buy_into_two_pay_seats_on_every_shipped_grid` re-measures it and fails
-/// if retuning the economy moves the costs out from under it.
+/// Kept level with [`Config::default`]'s own figure, so a new install and a config written before
+/// this field existed found a career on the same money. Worth knowing that they do **not** then
+/// spend it in the same economy: the serde fallbacks around it are still the old ones, where a
+/// seat cost 150,000 a rating point rather than 3,000, so a career founded on a field-less config
+/// can afford nothing outright and gets in through `contracts::open_a_way_in`'s discount instead.
+/// That works, but it is the last resort doing the work.
 ///
-/// It applies to **every** shipped class now. Two used to be exceptions — F-Vintage_Gen2 offered
-/// one pay seat and F-Classic_Gen3 none — because their back rows were reachable on merit and so
-/// were free rather than for sale. [`OfferParams::pay_driver_margin`] closed that: a team at the
-/// back sells to anyone it does not actively want.
-///
-/// Falling short of every seat is not a dead end — `contracts::offers_for_with` drops the
-/// cheapest to whatever the career holds. This figure is what stops that last resort being the
-/// *normal* way a career begins.
+/// The figure it replaced was 5,000,000, measured against that old economy: across the eight
+/// rosters in `docs/custom_ai_files_with_perf_scalars` the second-cheapest pay-driver seat for a
+/// driver on the starting rating reached 4,949,999, and it covered the dearest of those.
+/// `test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most` is what re-measures
+/// the promise now, against [`Config::default`]'s economy rather than this one.
 fn default_starting_balance() -> i64 {
-    5_000_000
+    100_000
+}
+
+/// Season-year overrides a new config is created with.
+///
+/// Only classes the shipped [`crate::season_years::SEASON_YEARS`] table cannot answer belong
+/// here — an entry that merely repeats the built-in year is dropped again by
+/// [`Config::class_years`]. `FE-G1` is the standing case: Formula Edge is a *fictional* car, so
+/// its season is whichever livery mod is installed rather than anything the table could ship.
+///
+/// Not a serde default: a config that already exists and says nothing about class years is
+/// saying it has no overrides, and re-adding one behind the user's back is exactly what
+/// `Config::class_years` drops agreeing entries to prevent.
+fn default_class_years() -> BTreeMap<String, u16> {
+    [("FE-G1".to_string(), 1995)].into_iter().collect()
 }
 
 /// Upper bound on every configurable money figure. Not a rule about what a career should be
@@ -317,6 +328,19 @@ impl Config {
     }
 }
 
+/// The settings a **brand-new** `config.json` is created with — the shipped starting point, and
+/// deliberately not the same thing as the per-field serde defaults above.
+///
+/// The two answer different questions and are allowed to differ. A `#[serde(default = "…")]`
+/// answers *"what did a config written before this field existed mean?"*, so it has to go on
+/// reproducing the behaviour of the build that wrote it — that is what
+/// `test_rating_tuning_defaults_for_existing_configs` pins. This answers *"what should someone
+/// who has never configured anything start on?"*, which is a tuning decision and free to move.
+///
+/// Machine-specific settings stay unset here on purpose: `saves_dir` (falls back to
+/// `championships` beside the executable), `active_career` (picked from the saves folder at
+/// startup), `custom_ai_dir`, and `spotter_voice` — unset means the system default voice,
+/// whereas naming one that is not installed silently mutes the spotter.
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -325,34 +349,40 @@ impl Default for Config {
             saves_dir: None,
             active_career: None,
             legacy_data_file: None,
-            poll_ms: default_poll_ms(),
-            record_practice: default_true(),
-            record_qualify: default_true(),
-            record_race: default_true(),
+            poll_ms: 500,
+            record_practice: true,
+            record_qualify: true,
+            record_race: true,
             show_track_map: default_show_track_map(),
             track_map_max_points: default_track_map_max_points(),
             spotter_enabled: false,
             spotter_voice: None,
             spotter_name: None,
             custom_ai_dir: None,
-            enforce_team_eligibility: default_true(),
+            enforce_team_eligibility: true,
             hide_locked_teams: false,
-            contract_top_salary: default_top_salary(),
-            contract_floor_salary: default_floor_salary(),
-            contract_buy_in_per_point: default_buy_in(),
+            // A far tighter economy than `OfferParams::default()`. Salaries and prizes are of a
+            // size a career actually spends, and the buy-in per point is low enough that the
+            // back of a grid is reachable from the founding balance rather than millions away
+            // from it — which is what keeps `starting_balance` worth only one floor salary.
+            contract_top_salary: 100_000,
+            contract_floor_salary: 50_000,
+            contract_buy_in_per_point: 3_000,
             contract_pay_driver_margin: default_pay_driver_margin(),
-            champion_prize: default_champion_prize(),
-            last_place_prize: default_floor_prize(),
-            starting_balance: default_starting_balance(),
+            champion_prize: 1_500_000,
+            last_place_prize: 50_000,
+            starting_balance: 100_000,
             starting_rating: default_starting_rating(),
-            rating_strictness: RatingParams::default().strictness,
+            // Every team asks five points more than its results alone would, and with no offer
+            // margin there is no middle tier: a bar missed is a seat refused outright.
+            rating_strictness: 5.0,
             eligibility_gates: Gates::default(),
             rating_half_life: default_rating_half_life(),
-            count_retirements: RatingParams::default().count_retirements,
+            count_retirements: true,
             retirement_min_laps_down: default_retirement_laps(),
-            retirement_distance_pct: default_retirement_distance_pct(),
-            offer_margin: default_offer_margin(),
-            class_years: BTreeMap::new(),
+            retirement_distance_pct: 80.0,
+            offer_margin: 0.0,
+            class_years: default_class_years(),
         }
     }
 }

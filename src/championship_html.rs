@@ -17,7 +17,7 @@ fn generate_html() -> String {
     <button class="tab-btn tab-active" data-tab="live">&#9679; Live Session</button>
     <button class="tab-btn" data-tab="career">&#127942; Career</button>
     <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
-    <button class="tab-btn" data-tab="config">&#9965; Config</button>
+    <button class="tab-btn" data-tab="config">&#9965; Config<span id="tab-config-warn" class="tab-warn" title="No Custom AI Drivers folder is set" hidden>!</span></button>
     <button class="tab-btn" data-tab="carperf">&#128202; Car Performance</button>
     <button class="tab-btn" data-tab="driverperf">&#128100; Driver Performance</button>
   </div>
@@ -208,6 +208,7 @@ fn generate_html() -> String {
         </div>
         <div class="config-group">
           <label class="config-label" for="cfg-custom-ai-dir">Custom AI Drivers folder</label>
+          <div id="cfg-custom-ai-dir-missing" class="config-warn" hidden><strong>!</strong> No folder is set, so this install has no rosters. Without one a singleplayer career cannot be rated, no team will make an offer, no money is earned, and the live grid shows AMS2 car models instead of team names. Point this at your AMS2 <code>UserData\CustomAIDrivers</code> folder and save.</div>
           <input class="config-input config-input-wide" id="cfg-custom-ai-dir" name="custom_ai_dir" type="text" placeholder="e.g. D:\SteamLibrary\steamapps\common\Automobilista 2\UserData\CustomAIDrivers" />
           <span class="config-hint">Folder with AMS2 Custom AI Driver XML files. Assign one to a championship (Manage tab) to show team/livery names instead of the AMS2 car class. A roster only works where the class&rsquo;s custom liveries are installed &mdash; AMS2 silently ignores an entry naming a livery it does not own. In a singleplayer career the rating, every team&rsquo;s requirement and every contract are derived from the season&rsquo;s roster, so a season raced on stock AI scores its points but cannot be judged. Race it at full grid size too: set as many opponents as the roster has cars, since your finish is judged against where your car ranks across the whole roster.</span>
         </div>
@@ -219,7 +220,7 @@ fn generate_html() -> String {
         <div class="config-group">
           <label class="config-label" for="cfg-poll-ms">Poll interval (ms)</label>
           <input class="config-input" id="cfg-poll-ms" name="poll_ms" type="number" min="50" max="5000" />
-          <span class="config-hint">Shared memory read interval for the live view (default 200 ms)</span>
+          <span class="config-hint">Shared memory read interval for the live view (default 500 ms)</span>
         </div>
         <div class="config-group">
           <label class="config-label">Auto-record <span class="config-restart-badge">restart</span></label>
@@ -267,7 +268,7 @@ fn generate_html() -> String {
         <div class="config-group">
           <label class="config-label" for="cfg-starting-balance">Starting balance</label>
           <input class="config-input" id="cfg-starting-balance" type="number" min="0" />
-          <span class="config-hint">Credits a <em>newly created</em> career begins with, before it has raced anything — by default enough to buy into at least two of the seats that ask for sponsorship, so there is a choice of way in rather than one take-it-or-leave-it. Lower it if money should not open a seat at all — or lower <em>Sponsorship required</em> instead, which is what makes a shortfall cost millions. Recorded on the save when the career is made, so changing this never moves the balance of a career that already exists.</span>
+          <span class="config-hint">Credits a <em>newly created</em> career begins with, before it has raced anything &mdash; by default enough to buy a seat on every shipped grid, and a choice of two on most of them, so there is a way in rather than one take-it-or-leave-it. Lower it if money should not open a seat at all. It only means anything alongside <em>Sponsorship required</em>, which sets what a rating shortfall costs, so the two have to be retuned together. Recorded on the save when the career is made, so changing this never moves the balance of a career that already exists.</span>
         </div>
         <div class="config-group">
           <label class="config-label" for="cfg-contract-buy-in">Sponsorship required</label>
@@ -287,12 +288,12 @@ fn generate_html() -> String {
           <div class="config-group">
             <label class="config-label" for="cfg-rating-strictness">Requirement offset</label>
             <input class="config-input" id="cfg-rating-strictness" name="rating_strictness" type="number" min="-50" max="50" step="1" />
-            <span class="config-hint">Rating points added to every team's requirement (default 0). Negative opens the whole grid up; positive makes every seat harder. Unlike the starting rating this never fades.</span>
+            <span class="config-hint">Rating points added to every team&rsquo;s requirement (default 5). Negative opens the whole grid up; positive makes every seat harder. Unlike the starting rating this never fades.</span>
           </div>
           <div class="config-group">
             <label class="config-label" for="cfg-offer-margin">Offer margin</label>
             <input class="config-input" id="cfg-offer-margin" name="offer_margin" type="number" min="0" max="100" step="1" />
-            <span class="config-hint">How far <em>below</em> a team's requirement you may sit and still be offered the seat on merit (default 10). A team asking 59 will take a 50 at its ordinary rate; drop more than this below and the seat locks, and only a back-of-the-grid team will then sell it for sponsorship. Set to 0 to make every bar one you must clear outright. This shifts how far short of a bar a team will look — the requirement offset above shifts the bars themselves.</span>
+            <span class="config-hint">How far <em>below</em> a team&rsquo;s requirement you may sit and still be offered the seat on merit. <strong>The default is 0</strong>, so every bar is one you must clear outright: fall short at all and the seat locks, and only a back-of-the-grid team will then sell it for sponsorship. Raise it to open a middle tier &mdash; at 10, a team asking 59 takes a 50 at its ordinary rate. This shifts how far short of a bar a team will look; the requirement offset above shifts the bars themselves.</span>
           </div>
           <div class="config-group">
             <label class="config-label" for="cfg-eligibility-gates">Requirement built from</label>
@@ -323,7 +324,7 @@ fn generate_html() -> String {
           <div class="config-group">
             <label class="config-label" for="cfg-retirement-distance-pct">Retirement threshold (% of distance)</label>
             <input class="config-input" id="cfg-retirement-distance-pct" name="retirement_distance_pct" type="number" min="0" max="100" step="1" />
-            <span class="config-hint">A car must finish short of this share of the leader's distance to count as retired (default 90%). Both thresholds have to agree, so loosening either one alone only makes retirements rarer. 100% calls anything off the lead lap a retirement; 0% means nothing ever is.</span>
+            <span class="config-hint">A car must finish short of this share of the leader&rsquo;s distance to count as retired (default 80%). Both thresholds have to agree, so loosening either one alone only makes retirements rarer. 100% calls anything off the lead lap a retirement; 0% means nothing ever is.</span>
           </div>
           <div class="config-group">
             <div id="cfg-rating-diverged" class="config-diverged" hidden>The career you are playing is not using the settings above &mdash; it is still on the ones it was created with.</div>
