@@ -8,7 +8,7 @@ use ams2_championship::data_store::{
     SavePath, SharedStore,
 };
 use ams2_championship::http::{
-    json_err, json_ok, read_full_request, send_response, track_slug, url_decode,
+    json_err, json_ok, read_full_request, send_response, send_with_cache, track_slug, url_decode,
 };
 use ams2_championship::spotter::Focus;
 use ams2_championship::websocket::handle_websocket;
@@ -101,6 +101,82 @@ fn cfg_custom_ai_dir(config_path: &std::path::Path) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+/// The Custom AI Drivers folder and the class season-year overrides, from **one** config read.
+///
+/// The two always travel together: every caller that lists classes also orders and labels them
+/// by season, and reading the file twice for the two halves of one answer is how they could
+/// disagree across a concurrent `PATCH /api/config`.
+fn cfg_custom_ai(
+    config_path: &std::path::Path,
+) -> Option<(PathBuf, std::collections::BTreeMap<String, u16>)> {
+    let cfg = ams2_championship::config::load_or_create(config_path);
+    let dir = cfg
+        .custom_ai_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+        .map(PathBuf::from)?;
+    Some((dir, cfg.class_years()))
+}
+
+/// One row of the Config tab's season-year list.
+#[derive(serde::Serialize)]
+struct ClassYearRow {
+    class: String,
+    /// The year in force: the override where there is one, else the shipped table's.
+    year: Option<u16>,
+    /// What the shipped table says on its own — what clearing the box falls back to, and `None`
+    /// for a class it has never heard of (every mod, and Formula Edge).
+    builtin: Option<u16>,
+    /// Whether `year` came from config rather than from the table.
+    overridden: bool,
+}
+
+/// Every class the Config tab offers a season year for: the rosters AMS2 would actually read,
+/// plus any class an override names.
+///
+/// The second half matters — an override whose roster has since been removed from the folder
+/// would otherwise be unreachable from the UI while still being stored, and the only way to
+/// clear it would be to edit `config.json` by hand.
+///
+/// Ordered the way the Car Performance tab orders classes (year, then name) so the list reads as
+/// the timeline it is, and so a corrected year visibly moves its class into place on save.
+fn class_year_rows(cfg: &ams2_championship::config::Config) -> Vec<ClassYearRow> {
+    use ams2_championship::{custom_ai, season_years};
+    let years = cfg.class_years();
+    let mut names: std::collections::BTreeSet<String> = years.keys().cloned().collect();
+    if let Some(dir) = cfg
+        .custom_ai_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+    {
+        for file in custom_ai::list_files_for_known_classes(std::path::Path::new(dir)) {
+            names.insert(custom_ai::class_of_file(&file).to_string());
+        }
+    }
+    let mut rows: Vec<ClassYearRow> = names
+        .into_iter()
+        .map(|class| {
+            let builtin = season_years::season_year(&class);
+            let overridden = years.contains_key(&class);
+            ClassYearRow {
+                year: years.get(&class).copied().or(builtin),
+                builtin,
+                overridden,
+                class,
+            }
+        })
+        .collect();
+    rows.sort_by(|a, b| {
+        a.year
+            .unwrap_or(u16::MAX)
+            .cmp(&b.year.unwrap_or(u16::MAX))
+            .then_with(|| a.class.cmp(&b.class))
+    });
+    rows
+}
+
 /// Everything needed to rate and rank one car class.
 struct ClassData {
     perf: ams2_championship::custom_ai::ClassPerformance,
@@ -109,6 +185,10 @@ struct ClassData {
     skills: std::collections::HashMap<String, f32>,
     /// Whether the class has a baseline recorded to reset back to.
     has_baseline: bool,
+    /// Each team's preview picture, as a path under the `Overrides` folder — see
+    /// [`ams2_championship::liveries::InstalledLiveries::previews_for`]. A team whose liveries
+    /// carry none is absent, which is the common case for a class with no livery mod.
+    previews: std::collections::HashMap<String, String>,
 }
 
 /// Loads every readable car class from the configured Custom AI Drivers folder.
@@ -119,12 +199,13 @@ struct ClassData {
 /// position down the order, making the whole field look easier to beat than it was.
 fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
     use ams2_championship::{custom_ai, driver_rating};
-    let Some(dir) = cfg_custom_ai_dir(config_path) else {
+    let Some((dir, years)) = cfg_custom_ai(config_path) else {
         return vec![];
     };
     // One scan for every class: the manifests are per car model, not per class.
-    let installed = ams2_championship::liveries::installed_livery_names(&dir);
-    custom_ai::class_performance(&dir)
+    let installed = ams2_championship::liveries::installed_liveries(&dir);
+    let names = installed.as_ref().map(|l| l.names());
+    custom_ai::class_performance_with(&dir, &years)
         .into_iter()
         .map(|perf| {
             let file = format!("{}.xml", perf.class);
@@ -136,15 +217,41 @@ fn load_classes(config_path: &std::path::Path) -> Vec<ClassData> {
                 .collect();
             let ctx = driver_rating::RatingContext::new(
                 &perf.class,
-                roster_seats_with(&dir, &file, installed.as_ref()),
+                roster_seats_with(&dir, &file, names.as_ref()),
                 &pace,
             );
             ClassData {
                 skills: custom_ai::parse_team_skills(&path),
                 has_baseline: custom_ai::has_baseline(&path),
+                previews: team_previews(installed.as_ref(), &path),
                 ctx,
                 perf,
             }
+        })
+        .collect()
+}
+
+/// The preview picture to show for each team in one class: the first of its liveries that has
+/// one.
+///
+/// The whole class is resolved in one call, because a livery name alone does not say which car
+/// model declared it — only the rest of the roster does. See
+/// [`ams2_championship::liveries::InstalledLiveries::previews_for`].
+fn team_previews(
+    installed: Option<&ams2_championship::liveries::InstalledLiveries>,
+    class_file: &std::path::Path,
+) -> std::collections::HashMap<String, String> {
+    let Some(installed) = installed else {
+        return Default::default();
+    };
+    let teams = ams2_championship::custom_ai::parse_team_liveries(class_file);
+    let roster: Vec<String> = teams.values().flatten().cloned().collect();
+    let previews = installed.previews_for(&roster);
+    teams
+        .into_iter()
+        .filter_map(|(team, liveries)| {
+            let found = liveries.iter().find_map(|l| previews.get(l))?;
+            Some((team, found.clone()))
         })
         .collect()
 }
@@ -167,6 +274,9 @@ fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> V
         required_rating: Option<f32>,
         /// True when every one of the team's entries names a livery AMS2 does not own.
         phantom: bool,
+        /// The car's picture, as a path for `/api/livery-preview/`. `None` when the livery mod
+        /// declares none, or when the class has no livery mod at all.
+        preview: Option<String>,
     }
     #[derive(serde::Serialize)]
     struct PlayerRow {
@@ -240,6 +350,7 @@ fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> V
                                 None
                             },
                             phantom: !real,
+                            preview: cd.previews.get(&c.team).cloned(),
                             car: c.clone(),
                         }
                     })
@@ -475,12 +586,12 @@ fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -
         classes: Vec<ClassRow>,
     }
 
-    let classes = match cfg_custom_ai_dir(config_path) {
-        Some(dir) => {
+    let classes = match cfg_custom_ai(config_path) {
+        Some((dir, years)) => {
             // Read once for the whole payload: the manifests cover every car model at once, and
             // a livery belongs to a model rather than to a class.
             let installed = ams2_championship::liveries::installed_livery_names(&dir);
-            custom_ai::class_performance(&dir)
+            custom_ai::class_performance_with(&dir, &years)
                 .into_iter()
                 .map(|c| {
                     let file = format!("{}.xml", c.class);
@@ -569,6 +680,26 @@ fn champ_class(champ: &Championship) -> String {
         .map(ams2_championship::custom_ai::class_of_file)
         .unwrap_or_default()
         .to_string()
+}
+
+/// Each team's picture in one championship's roster, keyed by team name — the same map
+/// `/api/car-performance` carries per class, for a client that has a list of teams and wants to
+/// show the cars.
+///
+/// Empty whenever anything is missing: no Custom AI folder, no roster on the championship, no
+/// livery mod. A missing picture is never worth a message of its own.
+fn champ_previews(
+    config_path: &std::path::Path,
+    champ: &Championship,
+) -> std::collections::HashMap<String, String> {
+    let Some(dir) = cfg_custom_ai_dir(config_path) else {
+        return Default::default();
+    };
+    let Some(file) = champ.custom_ai_file.as_deref() else {
+        return Default::default();
+    };
+    let installed = ams2_championship::liveries::installed_liveries(&dir);
+    team_previews(installed.as_ref(), &dir.join(file))
 }
 
 /// The career ledger and the negotiating position it leaves the driver in.
@@ -835,6 +966,44 @@ fn handle(
     if method == "GET" && path == "/api/car-performance" {
         json_ok(&mut stream, &car_performance_json(&config_path, &store));
         return;
+    }
+
+    // GET /api/livery-preview/<path under Overrides> — the livery mod's own picture of one car,
+    // decoded from its `.dds` into a PNG. The path is one `/api/car-performance` handed out, but
+    // it is re-checked here rather than trusted: see `liveries::preview_file`.
+    if method == "GET" {
+        if let Some(rest) = path.strip_prefix("/api/livery-preview/") {
+            let requested = url_decode(rest.split('?').next().unwrap_or(""));
+            let file = cfg_custom_ai_dir(&config_path)
+                .and_then(|dir| ams2_championship::liveries::overrides_dir(&dir))
+                .and_then(|overrides| {
+                    ams2_championship::liveries::preview_file(&overrides, &requested)
+                });
+            let Some(file) = file else {
+                json_err(&mut stream, "404 Not Found", "no such livery preview");
+                return;
+            };
+            let Ok(bytes) = std::fs::read(&file) else {
+                json_err(&mut stream, "404 Not Found", "no such livery preview");
+                return;
+            };
+            match ams2_championship::livery_image::dds_thumbnail_png(
+                &bytes,
+                ams2_championship::livery_image::THUMB_WIDTH,
+            ) {
+                // An hour: the file only changes when a livery mod is reinstalled, and until
+                // then every repaint of the table would otherwise decode the whole grid again.
+                Ok(png) => send_with_cache(
+                    &mut stream,
+                    "200 OK",
+                    "image/png",
+                    "public, max-age=3600",
+                    &png,
+                ),
+                Err(why) => json_err(&mut stream, "415 Unsupported Media Type", &why),
+            }
+            return;
+        }
     }
 
     // PATCH /api/car-performance — write one team's scalars back into its Custom AI XML file.
@@ -1321,6 +1490,11 @@ fn handle(
             standing: contracts::Standing,
             /// The deal already agreed for this season, if there is one.
             signed: Option<&'a contracts::Contract>,
+            /// Each team's picture, keyed by team name — see `champ_previews`. A map beside the
+            /// offers rather than a field on one, because `contracts::Offer` is the terms of a
+            /// deal and a picture is not one of them; the signed contract's row wants the same
+            /// picture, and it is not an offer at all.
+            previews: std::collections::HashMap<String, String>,
             offers: Vec<contracts::Offer>,
         }
         let id = segs[2];
@@ -1340,6 +1514,7 @@ fn handle(
 
         let (ledger, standing) = career_standing(&cfg, &data);
         let rated = champ_eligibility(&config_path, champ, &data);
+        let previews = champ_previews(&config_path, champ);
         let body = match &rated {
             Some((rep, eligibility)) => Body {
                 enabled: data.mode.uses_contracts(),
@@ -1360,6 +1535,7 @@ fn handle(
                 ),
                 standing,
                 signed,
+                previews,
             },
             None => Body {
                 enabled: data.mode.uses_contracts(),
@@ -1371,6 +1547,7 @@ fn handle(
                 teams: 0,
                 standing,
                 signed,
+                previews,
                 offers: vec![],
             },
         };
@@ -2481,11 +2658,23 @@ fn handle(
             career_rating_matches: bool,
             /// The tuning the career really runs on, so the notice can say what it would change.
             career_rating: Option<ams2_championship::driver_rating::RatingParams>,
+            /// Every class a season year can be set for, with the year in force and the one the
+            /// shipped table would give. `cfg.class_years` alone could not fill the form: it
+            /// holds only the classes somebody has answered for.
+            classes: Vec<ClassYearRow>,
+            /// The range a year is held to, so the boxes enforce what the server enforces rather
+            /// than keeping a second copy of the bounds that can drift — the same reason
+            /// `/api/car-performance` ships `scalar_min`/`scalar_max`.
+            year_min: u16,
+            year_max: u16,
         }
         let career_rating = store.read().unwrap().rating_params;
         let body = Body {
             career_rating_matches: career_rating.is_none_or(|p| p == cfg.rating_params()),
             career_rating,
+            classes: class_year_rows(&cfg),
+            year_min: ams2_championship::season_years::YEAR_MIN,
+            year_max: ams2_championship::season_years::YEAR_MAX,
             cfg,
         };
         let json = serde_json::to_vec(&body).unwrap_or_default();
@@ -2569,6 +2758,12 @@ fn handle(
             retirement_distance_pct: f32,
             #[serde(default = "default_margin")]
             offer_margin: f32,
+            /// Season year per class. Optional for the same reason the money is: a form that
+            /// predates the field, or one rendered before the Custom AI folder was set, must
+            /// carry the stored overrides through rather than wipe them. An empty map is a
+            /// deliberate "no overrides" and is honoured as one.
+            #[serde(default)]
+            class_years: Option<std::collections::BTreeMap<String, u16>>,
         }
         fn yes() -> bool {
             true
@@ -2690,11 +2885,16 @@ fn handle(
             retirement_min_laps_down: req_body.retirement_min_laps_down.min(50),
             retirement_distance_pct: req_body.retirement_distance_pct.clamp(0.0, 100.0),
             offer_margin: req_body.offer_margin.clamp(0.0, 100.0),
+            // Taken raw and cleaned by `normalize_class_years` below, the same way the economy
+            // is: the clamp and the "same as the built-in table" rule live on `Config`, so the
+            // route cannot state a second version of either.
+            class_years: req_body.class_years.unwrap_or(old_cfg.class_years),
         };
         // Store what the economy will actually run on, so the form cannot show one thing while
         // the grid uses another.
         let mut new_cfg = new_cfg;
         new_cfg.normalize_economy();
+        new_cfg.normalize_class_years();
 
         if let Err(e) = ams2_championship::config::save(config_path.as_ref(), &new_cfg) {
             json_err(&mut stream, "500 Internal Server Error", &e.replace('"', "'"));
@@ -2705,8 +2905,12 @@ fn handle(
         struct PatchResponse<'a> {
             config: &'a ams2_championship::config::Config,
             restart_required: Vec<&'static str>,
+            /// Rebuilt rather than echoed back: saving may have changed the Custom AI folder, and
+            /// with it which classes there are to answer for at all.
+            classes: Vec<ClassYearRow>,
         }
         let resp = PatchResponse {
+            classes: class_year_rows(&new_cfg),
             config: &new_cfg,
             restart_required,
         };

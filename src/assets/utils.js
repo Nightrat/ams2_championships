@@ -12,6 +12,20 @@ function sortChamps(champs) {
 var SESSION_TYPE_LABELS = { 1: 'P', 3: 'Q', 5: 'R' };
 var SESSION_TYPE_NAMES  = { 1: 'Practice', 3: 'Qualify', 5: 'Race' };
 
+// ── Livery pictures ───────────────────────────────────────────────────────────
+// The livery mod's own picture of a car, decoded from its .dds by /api/livery-preview. `path`
+// is whatever the server handed out for that team — `preview` on a Car Performance row, or the
+// `previews` map beside a season's offers. Nothing is drawn without one: a class with no livery
+// mod, and an entry declaring no PREVIEWIMAGE, are both ordinary rather than errors.
+//
+// `loading="lazy"` is load-bearing. A grid is two dozen pictures the server decodes on demand,
+// and the ones below the fold are usually never asked for at all.
+function liveryImg(path, cls) {
+  if (!path) return '';
+  return '<img class="' + cls + '" loading="lazy" decoding="async" alt=""' +
+    ' src="/api/livery-preview/' + encodeURIComponent(path) + '">';
+}
+
 // ── Shared utilities ──────────────────────────────────────────────────────────
 function esc(str) {
   return String(str)

@@ -118,11 +118,13 @@ function renderOffers(champId, data) {
     return;
   }
 
+  var previews = data.previews || {};
   var rows = (data.offers || []).map(function (o) {
     var afford = !o.buy_in || data.balance >= o.buy_in;
     var terms = fmtCredits(o.salary) + ' &middot; ' + fmtTarget(o.objective);
     return '<tr class="contract-row contract-row-' + esc(offerClass(o)) + '">' +
-      '<td class="contract-team">' + esc(o.team) + '</td>' +
+      '<td class="contract-team">' +
+        liveryImg(previews[o.team], 'contract-car') + esc(o.team) + '</td>' +
       '<td>' + (offerLabel(o)
         ? '<span class="contract-kind contract-kind-' + esc(offerClass(o)) + '">' +
           esc(offerLabel(o)) + '</span>'
@@ -181,6 +183,7 @@ function renderSignedDeal(champId, data) {
   var canRelease = data.open || !data.offers;
   panel.innerHTML = '<div class="contract-box contract-box-signed">' +
     '<div class="contract-header">' +
+      liveryImg((data.previews || {})[c.team], 'contract-car') +
       '<span class="contract-title">Signed &mdash; ' + esc(c.team) + '</span>' +
       '<span class="contract-note">' +
         fmtCredits(c.salary) + ' · ' + fmtTarget(c.objective) +

@@ -61,6 +61,25 @@ fn call_full(
     request_bytes: Vec<u8>,
     config: Option<std::path::PathBuf>,
 ) -> String {
+    String::from_utf8_lossy(&call_full_raw(
+        store,
+        data_path,
+        saves_dir,
+        request_bytes,
+        config,
+    ))
+    .into_owned()
+}
+
+/// [`call_full`] without the lossy conversion — for the one route that answers with an image,
+/// whose bytes would not survive being read as text.
+fn call_full_raw(
+    store: ams2_championship::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    saves_dir: std::path::PathBuf,
+    request_bytes: Vec<u8>,
+    config: Option<std::path::PathBuf>,
+) -> Vec<u8> {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let html = Arc::new(b"<html/>".to_vec());
@@ -96,7 +115,7 @@ fn call_full(
     client.write_all(&request_bytes).unwrap();
     let mut resp = Vec::new();
     client.read_to_end(&mut resp).unwrap();
-    String::from_utf8_lossy(&resp).into_owned()
+    resp
 }
 
 fn get(
@@ -4878,4 +4897,267 @@ fn test_removing_takes_the_same_one_time_backup_every_writer_does() {
     let backup = std::fs::read_to_string(dir.join("F-Test.xml.bak")).unwrap();
     assert!(backup.contains("Monza_1991"), "the baseline still has them");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_route_patch_config_round_trips_a_class_season_year() {
+    // The whole point of the setting: a class the shipped table cannot answer for gets an
+    // answer, and GET lists it back as an override rather than as the table's own.
+    let (store, path) = make_saves_dir("cfg_class_years");
+    let config = path.parent().unwrap().join("config.json");
+    let body = br#"{"port":8080,"host":"127.0.0.1","poll_ms":200,"record_practice":true,
+        "record_qualify":true,"record_race":true,"show_track_map":true,
+        "track_map_max_points":5000,"saves_dir":null,
+        "class_years":{"FE-G1":1995,"F-Retro_Gen1":1974}}"#;
+    let resp = patch_config_with(store.clone(), path.clone(), body, config.clone());
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    let v = body_json(&resp);
+    assert_eq!(v["config"]["class_years"]["FE-G1"], 1995);
+    assert!(
+        v["config"]["class_years"].get("F-Retro_Gen1").is_none(),
+        "a year that only repeats the built-in one is not an override: {resp}"
+    );
+
+    let resp = call_with_config(
+        store,
+        path.clone(),
+        b"GET /api/config HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config),
+    );
+    let v = body_json(&resp);
+    let row = v["classes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["class"] == "FE-G1")
+        .cloned()
+        .unwrap_or_else(|| panic!("FE-G1 not listed: {resp}"));
+    assert_eq!(row["year"], 1995);
+    assert_eq!(row["overridden"], true);
+    assert!(
+        row["builtin"].is_null(),
+        "the table has no year of its own for a fictional car: {resp}"
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn test_route_patch_config_omitting_class_years_leaves_them_alone() {
+    // `config_body` sends none at all, exactly like a form rendered before the field existed.
+    // An omitted map carries the stored overrides through; only an explicit empty one clears.
+    let (store, path) = make_saves_dir("cfg_class_years_absent");
+    let config = path.parent().unwrap().join("config.json");
+    std::fs::write(&config, r#"{"class_years":{"FE-G1":1995}}"#).unwrap();
+
+    let resp = patch_config_with(
+        store.clone(),
+        path.clone(),
+        &config_body("null"),
+        config.clone(),
+    );
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert_eq!(body_json(&resp)["config"]["class_years"]["FE-G1"], 1995);
+
+    let cleared = br#"{"port":8080,"host":"127.0.0.1","poll_ms":200,"record_practice":true,
+        "record_qualify":true,"record_race":true,"show_track_map":true,
+        "track_map_max_points":5000,"saves_dir":null,"class_years":{}}"#;
+    let resp = patch_config_with(store, path.clone(), cleared, config);
+    assert!(status_line(&resp).contains("200"), "got {resp}");
+    assert!(
+        body_json(&resp)["config"]["class_years"]
+            .as_object()
+            .unwrap()
+            .is_empty(),
+        "an empty map is a deliberate clear, not a stale form: {resp}"
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+// ── livery previews ───────────────────────────────────────────────────────────
+
+/// The smallest real DDS there is: one 4×4 DXT1 block of flat red.
+fn tiny_dds() -> Vec<u8> {
+    let mut dds = vec![0u8; 128];
+    dds[0..4].copy_from_slice(b"DDS ");
+    dds[4..8].copy_from_slice(&124u32.to_le_bytes());
+    dds[12..16].copy_from_slice(&4u32.to_le_bytes()); // height
+    dds[16..20].copy_from_slice(&4u32.to_le_bytes()); // width
+    dds[80..84].copy_from_slice(&0x4u32.to_le_bytes()); // DDPF_FOURCC
+    dds[84..88].copy_from_slice(b"DXT1");
+    let red = 0xF800u16; // 5:6:5 red, and the larger endpoint, so no punch-through
+    dds.extend_from_slice(&red.to_le_bytes());
+    dds.extend_from_slice(&0u16.to_le_bytes());
+    dds.extend_from_slice(&0u32.to_le_bytes()); // every pixel on endpoint 0
+    dds
+}
+
+/// [`make_perf_fixture`], plus a livery mod that declares a preview picture for the Williams and
+/// nothing for the AGS — and the Custom AI folder nested where the install root can be derived
+/// from it.
+fn make_preview_fixture() -> (std::path::PathBuf, std::path::PathBuf) {
+    let (dir, config) = make_perf_fixture();
+    let model = dir
+        .join("Vehicles")
+        .join("Textures")
+        .join("CustomLiveries")
+        .join("Overrides")
+        .join("williams_fw14");
+    std::fs::create_dir_all(model.join("Previews")).unwrap();
+    std::fs::write(
+        model.join("williams_fw14.xml"),
+        r#"<USER_OVERRIDES>
+        <LIVERY_OVERRIDE LIVERY="1" NAME="Williams #5 N. Mansell" BASELIVERY="Default">
+            <PREVIEWIMAGE PATH="Previews\five.dds" />
+            <TEXTURE NAME="BODY" PATH="Previews\body.dds" />
+        </LIVERY_OVERRIDE>
+        <LIVERY_OVERRIDE LIVERY="2" NAME="AGS #31 I. Capelli" BASELIVERY="Default" />
+        </USER_OVERRIDES>"#,
+    )
+    .unwrap();
+    std::fs::write(model.join("Previews").join("five.dds"), tiny_dds()).unwrap();
+    let ai = dir.join("UserData").join("CustomAIDrivers");
+    std::fs::create_dir_all(&ai).unwrap();
+    std::fs::copy(dir.join("F-Test.xml"), ai.join("F-Test.xml")).unwrap();
+    std::fs::write(
+        &config,
+        format!(
+            "{{\"custom_ai_dir\":{}}}",
+            serde_json::to_string(&ai.display().to_string()).unwrap()
+        ),
+    )
+    .unwrap();
+    (dir, config)
+}
+
+fn get_bytes_with_config(path: &str, config: &std::path::Path) -> Vec<u8> {
+    let (store, data_path) = make_test_store();
+    let saves_dir = data_path.parent().unwrap().to_path_buf();
+    call_full_raw(
+        store,
+        data_path,
+        saves_dir,
+        format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").into_bytes(),
+        Some(config.to_path_buf()),
+    )
+}
+
+#[test]
+fn test_route_car_performance_carries_the_preview_each_car_has_one_for() {
+    let (dir, config) = make_preview_fixture();
+    let cars = body_json(&get_with_config("/api/car-performance", &config))["classes"][0]["cars"]
+        .clone();
+    let by_team: std::collections::HashMap<String, serde_json::Value> = cars
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| (c["team"].as_str().unwrap().to_string(), c.clone()))
+        .collect();
+    assert_eq!(
+        by_team["Williams"]["preview"],
+        "williams_fw14/Previews/five.dds"
+    );
+    // The AGS entry declares no PREVIEWIMAGE, which is not an error — it simply has no picture.
+    assert!(by_team["AGS"]["preview"].is_null(), "{cars}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_livery_preview_answers_with_a_png() {
+    let (dir, config) = make_preview_fixture();
+    let resp = get_bytes_with_config(
+        "/api/livery-preview/williams_fw14%2FPreviews%2Ffive.dds",
+        &config,
+    );
+    let head = String::from_utf8_lossy(&resp[..resp.len().min(200)]).into_owned();
+    assert!(head.starts_with("HTTP/1.1 200"), "{head}");
+    assert!(head.contains("Content-Type: image/png"), "{head}");
+    // The one route that may be cached: the file it reads is part of the game's install.
+    assert!(head.contains("Cache-Control: public"), "{head}");
+    let body_at = resp.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+    assert_eq!(
+        &resp[body_at..body_at + 8],
+        &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A],
+        "the body is a PNG"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_livery_preview_refuses_to_read_outside_the_overrides_folder() {
+    let (dir, config) = make_preview_fixture();
+    // The config.json two levels up is a real file, and readable — the path check is the only
+    // thing standing between a typed URL and it.
+    let escape = "/api/livery-preview/..%2F..%2F..%2F..%2Fconfig.dds";
+    let resp = get_with_config(escape, &config);
+    assert!(status_line(&resp).contains("404"), "{resp}");
+
+    // A path inside the folder that is not a texture is refused on the same grounds.
+    let resp = get_with_config("/api/livery-preview/williams_fw14%2Fwilliams_fw14.xml", &config);
+    assert!(status_line(&resp).contains("404"), "{resp}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_route_livery_preview_is_a_plain_404_without_a_custom_ai_folder() {
+    let (store, data_path) = make_test_store();
+    let resp = get(store, data_path, "/api/livery-preview/anything%2Fat-all.dds");
+    assert!(status_line(&resp).contains("404"), "{resp}");
+}
+
+#[test]
+fn test_route_offers_carry_a_picture_of_each_car_on_offer() {
+    // Nested the way a real install is, so the Overrides folder can be derived by climbing two
+    // levels out of the Custom AI folder.
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ams2_offer_prev_{ns}"));
+    let ai_dir = root.join("UserData").join("CustomAIDrivers");
+    std::fs::create_dir_all(&ai_dir).unwrap();
+    std::fs::write(ai_dir.join("F-Classic_Gen1.xml"), OFFER_ROSTER).unwrap();
+    let model = root
+        .join("Vehicles")
+        .join("Textures")
+        .join("CustomLiveries")
+        .join("Overrides")
+        .join("williams_fw11");
+    std::fs::create_dir_all(model.join("Previews")).unwrap();
+    // Only the Williams has a picture; the Osella declares none, which is not an error.
+    std::fs::write(
+        model.join("williams_fw11.xml"),
+        r#"<USER_OVERRIDES>
+        <LIVERY_OVERRIDE LIVERY="1" NAME="1986 Williams #5 - N. Mansell" BASELIVERY="Default">
+            <PREVIEWIMAGE PATH="Previews\w5.dds" />
+        </LIVERY_OVERRIDE>
+        <LIVERY_OVERRIDE LIVERY="2" NAME="1986 Osella #21 - P. Ghinzani" BASELIVERY="Default" />
+        </USER_OVERRIDES>"#,
+    )
+    .unwrap();
+    let config = root.join("config.json");
+    std::fs::write(
+        &config,
+        format!(
+            "{{\"custom_ai_dir\":{}}}",
+            serde_json::to_string(&ai_dir.display().to_string()).unwrap()
+        ),
+    )
+    .unwrap();
+
+    let v = body_json(&offers_resp(rated_champ("c1"), &config));
+    assert_eq!(v["rated"], true, "{v}");
+    assert_eq!(v["previews"]["Williams"], "williams_fw11/Previews/w5.dds");
+    assert!(v["previews"]["Osella"].is_null(), "{}", v["previews"]);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_offers_carry_an_empty_picture_map_without_a_livery_mod() {
+    let (root, config) = make_offer_fixture(true);
+    let v = body_json(&offers_resp(rated_champ("c1"), &config));
+    // Nothing installed to look in: a map with no entries, not a missing field the client would
+    // have to guard against.
+    assert!(v["previews"].is_object(), "{v}");
+    assert_eq!(v["previews"].as_object().unwrap().len(), 0, "{v}");
+    std::fs::remove_dir_all(&root).ok();
 }

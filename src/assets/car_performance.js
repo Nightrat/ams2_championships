@@ -105,7 +105,7 @@ function renderCarPerformanceClass(cls, idx, best) {
       ? ' <span class="driverperf-phantom-tag" title="' + esc(CARPERF_NO_SEAT_TITLE) + '">no livery</span>'
       : '';
     return '<tr data-team="' + esc(c.team) + '"' + (c.phantom ? ' class="driverperf-phantom"' : '') + '>' +
-      '<td class="stat-name">' + esc(c.team) + mark + '</td>' +
+      '<td class="stat-name">' + liveryImg(c.preview, 'carperf-car') + esc(c.team) + mark + '</td>' +
       '<td class="stat-name carperf-drivers">' + esc((c.drivers || []).join(', ')) + '</td>' +
       carPerfScalarCell('power_scalar', c.power_scalar) +
       carPerfScalarCell('weight_scalar', c.weight_scalar) +

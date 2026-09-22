@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::contracts::{OfferParams, PrizeParams};
@@ -200,6 +201,16 @@ pub struct Config {
     /// How far below a team's requirement a driver may sit and still be offered the seat.
     #[serde(default = "default_offer_margin")]
     pub offer_margin: f32,
+
+    /// Season year per car class, overriding the table shipped in [`crate::season_years`].
+    ///
+    /// Keyed on the class name — the file stem AMS2 matches, the same key the built-in table
+    /// uses. Only classes somebody has actually answered for are stored: [`Config::class_years`]
+    /// drops anything that merely restates the built-in year, so the shipped table stays the
+    /// source of truth for every class nobody has had an opinion about and keeps applying if it
+    /// is ever corrected.
+    #[serde(default)]
+    pub class_years: BTreeMap<String, u16>,
 }
 
 impl Config {
@@ -256,6 +267,38 @@ impl Config {
         }
     }
 
+    /// The season-year overrides, cleaned: names trimmed, years held inside
+    /// [`crate::season_years::YEAR_MIN`]..=[`crate::season_years::YEAR_MAX`], and any entry that
+    /// merely repeats the built-in year dropped.
+    ///
+    /// Dropping the agreeing ones is what keeps the shipped table meaningful. Without it, saving
+    /// the Config tab once would freeze every class the folder happens to hold at whatever this
+    /// build thinks today — a later correction to `SEASON_YEARS` would then never reach anyone
+    /// who had pressed Save, and `config.json` would carry a line per class saying nothing.
+    pub fn class_years(&self) -> BTreeMap<String, u16> {
+        self.class_years
+            .iter()
+            .filter_map(|(class, year)| {
+                let class = class.trim();
+                if class.is_empty() {
+                    return None;
+                }
+                let year = (*year).clamp(crate::season_years::YEAR_MIN, crate::season_years::YEAR_MAX);
+                if crate::season_years::season_year(class) == Some(year) {
+                    return None;
+                }
+                Some((class.to_string(), year))
+            })
+            .collect()
+    }
+
+    /// Writes the cleaned overrides back over the raw field, for the same reason
+    /// [`Self::normalize_economy`] exists: what is stored has to be what is used, or the Config
+    /// tab shows one year while every table sorts by another.
+    pub fn normalize_class_years(&mut self) {
+        self.class_years = self.class_years();
+    }
+
     /// Writes the clamped economy back over the raw fields, so what is stored is what is used.
     ///
     /// Clamping only on the way out is not enough for a *pair*: `PATCH /api/config` would
@@ -309,6 +352,7 @@ impl Default for Config {
             retirement_min_laps_down: default_retirement_laps(),
             retirement_distance_pct: default_retirement_distance_pct(),
             offer_margin: default_offer_margin(),
+            class_years: BTreeMap::new(),
         }
     }
 }

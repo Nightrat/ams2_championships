@@ -16,7 +16,7 @@ Each row shows:
 
 | | |
 |---|---|
-| **Team** | Who is offering |
+| **Team** | Who is offering, with a picture of the car — the same preview image its livery mod gives the game's own car picker. Rows show no picture where the mod ships none, which is normal |
 | **Badge** | *Renewal* or *Pay driver*. Most rows are an ordinary paid deal and carry no badge |
 | **Terms** | Salary for the season, and the finishing position they expect |
 | **Price** | Sponsorship you must bring, for a seat you are buying into |

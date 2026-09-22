@@ -150,3 +150,114 @@ fn test_installed_livery_names_none_when_the_folder_is_missing() {
     let ai = std::env::temp_dir().join("ams2_no_such_install/UserData/CustomAIDrivers");
     assert_eq!(installed_livery_names(&ai), None);
 }
+
+#[test]
+fn test_parse_manifest_reads_the_preview_each_entry_declares() {
+    let entries = parse_manifest_entries(MANIFEST);
+    assert_eq!(
+        entries[0].preview.as_deref(),
+        Some(r"F1_1978_Season\preview16.dds")
+    );
+    // The second entry declares none, and must not inherit the first one's.
+    assert_eq!(entries[1].preview, None);
+}
+
+#[test]
+fn test_a_preview_belongs_to_the_entry_it_sits_inside() {
+    // A self-closing entry has no body at all, so the next entry's preview is not its own.
+    let xml = r#"<USER_OVERRIDES>
+        <LIVERY_OVERRIDE LIVERY="1" NAME="Empty Seat" BASELIVERY="Default" />
+        <LIVERY_OVERRIDE LIVERY="2" NAME="Real Car" BASELIVERY="Default">
+            <PREVIEWIMAGE PATH="skins\two.dds" />
+        </LIVERY_OVERRIDE>
+    </USER_OVERRIDES>"#;
+    let entries = parse_manifest_entries(xml);
+    assert_eq!(entries[0].preview, None);
+    assert_eq!(entries[1].preview.as_deref(), Some(r"skins\two.dds"));
+}
+
+/// A throwaway install holding the given `<model>/<model>.xml` manifests, returned as its
+/// `CustomAIDrivers` path and a guard to delete it by.
+fn install_with(manifests: &[(&str, &str)]) -> (PathBuf, PathBuf) {
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ams2_prev_{ns}"));
+    let ai_dir = root.join("UserData").join("CustomAIDrivers");
+    std::fs::create_dir_all(&ai_dir).unwrap();
+    for (model, xml) in manifests {
+        let dir = overrides_dir(&ai_dir).unwrap().join(model);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(format!("{model}.xml")), xml).unwrap();
+    }
+    (ai_dir, root)
+}
+
+fn manifest_of(entries: &[(&str, &str)]) -> String {
+    let body: String = entries
+        .iter()
+        .map(|(name, preview)| {
+            format!(
+                "<LIVERY_OVERRIDE LIVERY=\"1\" NAME=\"{name}\">\
+                 <PREVIEWIMAGE PATH=\"Previews\\{preview}\" /></LIVERY_OVERRIDE>"
+            )
+        })
+        .collect();
+    format!("<USER_OVERRIDES>{body}</USER_OVERRIDES>")
+}
+
+#[test]
+fn test_a_preview_path_is_rooted_at_the_overrides_folder() {
+    let (ai_dir, root) = install_with(&[("brabham_bt46", &manifest_of(&[("Lauda", "one.dds")]))]);
+    let previews = installed_liveries(&ai_dir)
+        .unwrap()
+        .previews_for(&["Lauda".to_string()]);
+    // Forward-slashed and prefixed by the model, so one path answers from the Overrides root
+    // rather than from whichever manifest happened to declare it.
+    assert_eq!(
+        previews.get("Lauda").map(String::as_str),
+        Some("brabham_bt46/Previews/one.dds")
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_a_name_two_models_share_goes_to_the_one_the_rest_of_the_roster_is_in() {
+    // "Senna" is declared by both McLarens, exactly as the real 1991 and 1992 manifests do.
+    // Only the rest of the roster can say which season is being raced.
+    let (ai_dir, root) = install_with(&[
+        (
+            "mclaren_mp46",
+            &manifest_of(&[("Senna", "91.dds"), ("Berger 91", "91b.dds")]),
+        ),
+        (
+            "mclaren_mp47",
+            &manifest_of(&[("Senna", "92.dds"), ("Berger 92", "92b.dds")]),
+        ),
+    ]);
+    let index = installed_liveries(&ai_dir).unwrap();
+
+    let ninety_two = index.previews_for(&["Senna".to_string(), "Berger 92".to_string()]);
+    assert_eq!(
+        ninety_two.get("Senna").map(String::as_str),
+        Some("mclaren_mp47/Previews/92.dds")
+    );
+    let ninety_one = index.previews_for(&["Senna".to_string(), "Berger 91".to_string()]);
+    assert_eq!(
+        ninety_one.get("Senna").map(String::as_str),
+        Some("mclaren_mp46/Previews/91.dds")
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_a_roster_name_nothing_declares_has_no_preview() {
+    let (ai_dir, root) = install_with(&[("brabham_bt46", &manifest_of(&[("Lauda", "one.dds")]))]);
+    let previews = installed_liveries(&ai_dir)
+        .unwrap()
+        .previews_for(&["Lauda".to_string(), "Nobody At All".to_string()]);
+    assert_eq!(previews.len(), 1);
+    assert!(!previews.contains_key("Nobody At All"));
+    std::fs::remove_dir_all(&root).ok();
+}

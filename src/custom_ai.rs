@@ -1063,7 +1063,22 @@ pub fn list_files_for_known_classes(dir: &Path) -> Vec<String> {
 /// can't be determined, every file is included rather than none. Classes are always returned in
 /// chronological order (by the real F1 season they model, via `season_years`); classes with no
 /// known season year sort last, alphabetically among themselves.
+///
+/// Equivalent to [`class_performance_with`] on no year overrides — the shipped table alone.
 pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
+    class_performance_with(dir, &BTreeMap::new())
+}
+
+/// [`class_performance`], judging each class's season by the user's answer where there is one
+/// (`config.class_years`, via [`crate::season_years::season_year_with`]).
+///
+/// The years are taken as a parameter rather than read here because this module knows nothing
+/// about config — and because a modded class's year is a fact about the install, which only the
+/// caller holding the config can supply.
+pub fn class_performance_with(
+    dir: &Path,
+    years: &BTreeMap<String, u16>,
+) -> Vec<ClassPerformance> {
     let known = known_class_names(dir);
     let mut classes: Vec<ClassPerformance> = list_files(dir)
         .into_iter()
@@ -1099,7 +1114,7 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
                     .partial_cmp(&b.pace_delta_pct)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
-            let year = crate::season_years::season_year(&class);
+            let year = crate::season_years::season_year_with(&class, years);
             ClassPerformance {
                 class,
                 year,
@@ -1144,6 +1159,33 @@ pub fn parse_team_skills_str(xml: &str) -> HashMap<String, f32> {
 pub fn parse_team_skills(path: &Path) -> HashMap<String, f32> {
     match fs::read_to_string(path) {
         Ok(content) => parse_team_skills_str(&content),
+        Err(_) => HashMap::new(),
+    }
+}
+
+/// Each team's `livery_name`s, in the order the file lists them.
+///
+/// **Regular drivers only**, and for the same reason [`parse_team_skills_str`] uses that list: a
+/// per-track stand-in is not one of the team's cars, and the caller for this is the Car
+/// Performance table, whose rows are the same regular entries. Order is the file's, so a caller
+/// wanting *the* car of a team — its preview picture, say — gets the same one every time rather
+/// than whichever the hash map happened to yield.
+pub fn parse_team_liveries_str(xml: &str) -> HashMap<String, Vec<String>> {
+    let mut out: HashMap<String, Vec<String>> = HashMap::new();
+    for (livery, _) in regular_driver_blocks(xml) {
+        let team = extract_team_name(&livery);
+        let entries = out.entry(team).or_default();
+        if !entries.contains(&livery) {
+            entries.push(livery);
+        }
+    }
+    out
+}
+
+/// File-reading wrapper around [`parse_team_liveries_str`]. Empty map if the file can't be read.
+pub fn parse_team_liveries(path: &Path) -> HashMap<String, Vec<String>> {
+    match fs::read_to_string(path) {
+        Ok(content) => parse_team_liveries_str(&content),
         Err(_) => HashMap::new(),
     }
 }

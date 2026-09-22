@@ -35,13 +35,30 @@ pub fn parse_request(buf: &[u8]) -> Request {
 }
 
 pub fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]) {
+    send_with_cache(stream, status, content_type, "no-store", body);
+}
+
+/// [`send_response`] with the caller's own caching rule.
+///
+/// Everything else this server answers is live state, which is why the default is `no-store`.
+/// A picture decoded out of a file in the game's install is the exception: nothing about it
+/// changes between requests, and re-fetching twenty of them every time a table repaints is work
+/// nobody asked for.
+pub fn send_with_cache(
+    stream: &mut TcpStream,
+    status: &str,
+    content_type: &str,
+    cache_control: &str,
+    body: &[u8],
+) {
     let header = format!(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\
-         Cache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\n\
+         Cache-Control: {}\r\nAccess-Control-Allow-Origin: *\r\n\
          Connection: close\r\n\r\n",
         status,
         content_type,
-        body.len()
+        body.len(),
+        cache_control
     );
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(body);

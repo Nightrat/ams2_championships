@@ -7,6 +7,7 @@ pub mod data_store;
 pub mod driver_rating;
 pub mod http;
 pub mod lap_charts;
+pub mod livery_image;
 pub mod liveries;
 pub mod saves;
 pub mod season_years;

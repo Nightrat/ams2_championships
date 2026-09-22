@@ -71,7 +71,7 @@ Test files live in `src/tests/` and are wired into their parent module with `#[p
 - `src/tests/driver_rating.rs` — ratings and team requirements, incl. `test_reference_career_rating_snapshot`
 - `src/tests/contracts.rs` — offers, renewals, pay-driver seats, salary instalments, sealing
 - `src/tests/custom_ai.rs` — roster parsing/writing, baselines
-- `src/tests/liveries.rs`, `src/tests/season_years.rs` — team-name resolution and season-year parsing
+- `src/tests/liveries.rs`, `src/tests/season_years.rs` — team-name resolution, and the season-year table plus the user's overrides of it
 - `src/tests/server.rs` — integration tests for HTTP routes via real TCP loopback (`TcpListener::bind("127.0.0.1:0")`)
 
 ### Data files (saves folder — `championships/` next to the exe by default)
@@ -196,6 +196,16 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - `Config::rating_params()` clamps on the way out and `PATCH /api/config` clamps on the way in — config.json is hand-edited often enough that neither side can be trusted alone. New rating fields need a non-zero serde default (`#[serde(default = "…")]`), or a form that omits them silently resets every driver.
 - A championship's Custom AI file and player team are both locked once it has its first assigned session. This is a championship integrity rule: `enforce_team_eligibility` does **not** disable it.
 
+### A class's season year can be answered by the user (`src/season_years.rs`)
+
+`SEASON_YEARS` is the shipped table and cannot be the whole answer: it covers Reiza's historic ladder, and for a **modded class there is no answer to ship** — the season is whichever livery mod is installed. `FE-G1` is the case that makes this unavoidable even for a stock class: Formula Edge is a *fictional* car, so one install's is a 1995 F1 grid and another's is not. (It was also the class the module doc called "no plausible match": the registry spells it `FE-G1`, not `F-Edge`.)
+
+- `config.class_years` is the override map, class name → year, and `season_year_with` is the only way to ask. `class_performance_with` takes it; `class_performance` is the same call on an empty map.
+- **The year is a label and a sort order.** Nothing derives from it — not the rating, not a requirement, not a contract. It appears in the Car Performance and Driver Performance headings and decides the order classes are listed in (year, then name; no year sorts last).
+- **An override that only repeats the built-in year is dropped**, in `Config::class_years` and written back by `normalize_class_years`. Otherwise saving the Config tab once would freeze every class in the folder at whatever the table says today, and a later correction to `SEASON_YEARS` would never reach anyone who had pressed Save.
+- `GET /api/config` carries `classes` (every class the folder holds **plus** every class an override names, so one left behind by a deleted roster can still be cleared) and the `year_min`/`year_max` the boxes enforce — the same reason `/api/car-performance` ships `scalar_min`/`scalar_max`. `PATCH` answers with the list rebuilt, since saving may have changed the Custom AI folder.
+- `PATCH /api/config`'s `class_years` is `Option`, like the money: omitted carries the stored map through, an explicit `{}` clears it. `config.js` omits it entirely until the form has been filled from the server, so a tab that never loaded cannot wipe overrides it never showed.
+
 ### A roster only exists if the liveries do (`src/liveries.rs`)
 
 **Everything singleplayer is downstream of the Custom AI file actually being the grid AMS2 ran.** The rating scores results against the roster's pace scalars, team requirements come from the same place, and contracts are priced off those requirements — so a season raced on stock AI produces no rating movement, no offers and no money, and the live grid falls back to car models. This is one dependency, not four, and the docs say so in those terms.
@@ -206,6 +216,22 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - **`roster_seats_with` is the one way to ask what seats a roster offers**, and it subtracts the phantoms. Both enforcement paths and every rating context go through it: a phantom seat can never be occupied by an AI, so leaving it in makes it look free in every session forever — which corrupts the elimination `infer_player_seat` depends on — and inflates the field size every expected finishing position is derived from. It takes the installed set rather than reading it, so a caller looping over classes scans the manifests once.
 - The Car and Driver Performance tabs surface it per row (`no livery`), and `mark_phantom_entries` carries the tri-state through: `true` ignored by AMS2, `false` fine, `null` not checkable — which the tabs must not report as a clean bill of health.
 - Separately, `infer_player_seat` gives up with `RosterNotDetected` when **fewer than half** the AI on a recorded grid are named in the file. That is the "this session did not use it" case, and it is a *skip*, never a failure: it means the session was run on stock AI, which is not something to accuse the user of.
+
+### Showing the car (`src/livery_image.rs`, `GET /api/livery-preview/`)
+
+The same manifest that says a livery exists usually also says what it looks like: `<PREVIEWIMAGE PATH="...">` inside a `<LIVERY_OVERRIDE>`, a wide render of the car on a transparent background that the game shows in its own car picker. The Car Performance tab puts it beside the team name, so a row is a car rather than three numbers.
+
+- **`.dds` is the whole difficulty.** It is a block-compressed texture (BC1/BC2/BC3 — `DXT1`/`DXT3`/`DXT5` — 2048×768 or 2048×640 across the shipped mods) and no browser reads one. Decoding is therefore hand-rolled, along with the PNG it comes back out as, because an image crate would pull in more dependencies than the rest of the program has together. BC7 and anything else is reported as unsupported and the row simply shows no picture.
+- **The thumbnail is produced in one pass, never as a full-size image**: each block's pixels go straight into the target's bins. A full decode would be 6 MB built only to be thrown away, since the output is a sixth the width.
+- **Colour is averaged weighted by alpha.** The background is fully transparent and its hidden RGB is arbitrary (usually black), so a plain average draws a dark halo round every edge of the car.
+- The PNG writer is a real deflate — fixed Huffman codes with greedy LZ77 — not stored blocks. A 320px preview is 32 KB compressed against roughly 200 KB uncompressed, and a class is two dozen of them. `src/tests/livery_image.rs` carries a matching **inflater** so every test goes the whole way round: an encoder checked only for a plausible header would pass just as happily on a stream no browser could read.
+- **A livery name does not identify a car model**, and this is the one place that matters. "McLaren-Honda #1 A. Senna" is declared by both the 1991 and the 1992 McLaren; a `CustomAIDrivers` file names no model, and the game resolves it per grid slot in a way nothing readable records. `InstalledLiveries::previews_for` therefore takes the **whole roster** and, for a shared name, picks the model that declares more of the rest of it — a 1991 grid matches the 1991 manifest almost entirely and the 1992 one barely at all. Ties fall to the first model alphabetically so the answer cannot depend on directory order. Eight of the 328 names in a full install need this.
+- `liveries::installed_liveries` is now the single scan of the `Overrides` folder and `installed_livery_names` is a wrapper on it, so the phantom check and the pictures do not read every manifest twice.
+- The route serves a *file path under `Overrides`*, handed out by the payload that lists the teams. It comes back through a URL anyone can type, so `liveries::preview_file` re-checks it: plain path components only, `.dds` only, and the resolved file must still be inside `Overrides`.
+- **Two payloads carry paths, in two shapes, and the difference is deliberate.** `/api/car-performance` puts `preview` on the row, because a row there *is* a car. `/api/championships/:id/offers` carries a `previews` map keyed by team name beside the offers, because `contracts::Offer` is the terms of a deal and a picture is not one of them — and because the signed contract's own row wants the same picture while not being an offer at all. `champ_previews` is `team_previews` for one championship's roster.
+- `liveryImg(path, class)` in `utils.js` is the only place the URL is built. Both surfaces call it, so the encoding, the lazy loading and the "no path, no image" rule cannot drift apart.
+- **It is the one route that may be cached** (`http::send_with_cache`, an hour). Everything else this server answers is live state; this is a file in the game's install, and re-decoding two dozen of them on every repaint is work nobody asked for.
+- Nothing here is required for anything: a class with no livery mod, an entry with no `PREVIEWIMAGE` and an unreadable file all end the same way, with no picture and no message. The tab already says elsewhere when a roster is the problem.
 
 ### A per-track override is not a driver (`custom_ai.rs`)
 

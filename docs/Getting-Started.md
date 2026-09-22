@@ -123,6 +123,7 @@ On first run `config.json` is created next to the executable with all default va
 | `show_track_map` | `false` | Show the track radar canvas in the live timing view |
 | `track_map_max_points` | `5000` | Maximum unique grid cells accumulated for the track radar |
 | `custom_ai_dir` | `null` | Your AMS2 `UserData\CustomAIDrivers` folder — the rosters seasons are raced on |
+| `class_years` | `{}` | Season year per class, overriding the built-in years — see [Season years](Rating-and-Performance.md#season-years). Only the classes you have answered for are stored |
 | `spotter_enabled` | `false` | Enable the server-side voice spotter |
 | `spotter_voice` | `null` | TTS voice name to use (`null` = system default) |
 | `spotter_name` | `null` | Driver name to track in multiplayer (`null` = viewed player) |

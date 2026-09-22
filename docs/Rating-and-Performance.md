@@ -69,6 +69,22 @@ The per-class performance scalars from your AMS2 Custom AI Drivers rosters, in a
 
 These scalars are what the rating measures your results against, and they are also what decides which teams are quick — so editing them moves both the pace order of the grid and the bars every team asks for.
 
+### The picture beside each team
+
+Each row shows the car, taken from the same livery mod the game itself takes it from: the preview image a mod installs alongside its skins, which is what AMS2 shows in its own car picker. Nothing to set up — if the mod ships previews, they appear. The seats on offer in the Manage tab show the same pictures.
+
+Some rows will have none, and that is normal rather than a fault. A class with no livery mod has no previews to show, and a mod is free to install a skin without one. Where a livery is shared by two cars a generation apart, the app works out which is yours from the rest of the grid.
+
+### Season years
+
+Each class is labelled with the real-world season it is modelled on, and the classes are listed in that order — 1967 first, 2025 last. The app ships the years for Reiza's own historic ladder (F-Vintage through F-Ultimate).
+
+It cannot ship them all. A **modded class** is whatever grid its liveries paint on it, and so is Formula Edge (`FE-G1`), which is a fictional car rather than a real season — a 1995 F1 livery mod makes it a 1995 season for you and something else for someone else. Those classes show no year and sort last until you give them one.
+
+**Config → Class season years** lists every class in your Custom AI Drivers folder with a box for the year. The built-in year sits greyed out in the box: type over it to correct one, clear the box to go back to it. Only the years you actually change are stored, so a class you leave alone keeps following the app.
+
+The year is a label and a sort order and nothing else — no rating, contract, requirement or result is derived from it.
+
 ### Entries marked “no livery”
 
 A Custom AI Drivers file cannot create a car. Each entry binds a name, skills and scalars to a livery the game **already owns**, matched on `livery_name` — and an entry naming a livery AMS2 does not have is **silently ignored**. No error, no warning: that driver simply never reaches a grid, and a roster can happily name more drivers than the class has cars.

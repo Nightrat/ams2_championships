@@ -467,3 +467,59 @@ fn test_a_hand_set_starting_balance_survives_and_is_clamped() {
     assert!(load_or_create(&path).starting_balance.max(0) == 0);
     let _ = fs::remove_file(&path);
 }
+
+#[test]
+fn test_class_years_keeps_only_what_the_shipped_table_does_not_already_say() {
+    // Dropping the agreeing entries is what keeps the table the source of truth: saving the
+    // Config tab once must not freeze every class in the folder at whatever this build thinks.
+    let path = tmp_path();
+    fs::write(
+        &path,
+        r#"{"class_years":{"FE-G1":1995,"F-Classic_Gen1":1986,"F-Classic_Gen2":1989}}"#,
+    )
+    .unwrap();
+    let cfg = load_or_create(&path);
+    let years = cfg.class_years();
+    assert_eq!(years.get("FE-G1"), Some(&1995), "a class the table cannot answer for");
+    assert_eq!(years.get("F-Classic_Gen2"), Some(&1989), "a correction to the table");
+    assert_eq!(
+        years.get("F-Classic_Gen1"),
+        None,
+        "an entry that only repeats the built-in year is not an override"
+    );
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_class_years_are_clamped_and_unnamed_entries_dropped() {
+    let path = tmp_path();
+    fs::write(&path, r#"{"class_years":{"FE-G1":90,"Mod_B":65535,"  ":1990}}"#).unwrap();
+    let years = load_or_create(&path).class_years();
+    assert_eq!(years.get("FE-G1"), Some(&crate::season_years::YEAR_MIN));
+    assert_eq!(years.get("Mod_B"), Some(&crate::season_years::YEAR_MAX));
+    assert!(!years.contains_key("  "), "a nameless class is not a class");
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_normalize_class_years_stores_what_will_actually_be_used() {
+    // Same rule as `normalize_economy`: the Config tab must not show one year while every table
+    // sorts by another.
+    let path = tmp_path();
+    fs::write(&path, r#"{"class_years":{"FE-G1":3000,"F-Retro_Gen1":1974}}"#).unwrap();
+    let mut cfg = load_or_create(&path);
+    cfg.normalize_class_years();
+    assert_eq!(cfg.class_years.get("FE-G1"), Some(&crate::season_years::YEAR_MAX));
+    assert!(!cfg.class_years.contains_key("F-Retro_Gen1"));
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_config_without_class_years_has_none() {
+    // Every config written before this existed, and the shipped default.
+    let path = tmp_path();
+    fs::write(&path, "{}").unwrap();
+    assert!(load_or_create(&path).class_years.is_empty());
+    assert!(Config::default().class_years.is_empty());
+    let _ = fs::remove_file(&path);
+}

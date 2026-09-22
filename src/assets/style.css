@@ -1013,6 +1013,16 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
 }
 .carperf-filter-check input[type="checkbox"] { accent-color: #e74c3c; cursor: pointer; }
 .carperf-drivers { color: #999; font-size: 0.92em; }
+/* The livery mod's own picture of the car, decoded from its .dds by /api/livery-preview. The
+   box is fixed and the picture is contained inside it: the previews come in more than one
+   aspect ratio, and a row that resizes as its image arrives would shuffle the whole table. */
+.carperf-car {
+  width: 132px;
+  height: 50px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 0.55rem;
+}
 /* ── Driver Performance tab ─────────────────────────────────────────────────── */
 #driverperf-container { padding: 1rem; }
 /* 15 attribute columns will not fit most windows — scroll the table, not the page. */
@@ -1096,6 +1106,13 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
   border-radius: 3px; padding: 0.4rem 0.6rem; margin-bottom: 0.5rem;
 }
 .config-check-group { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+/* Class season years: one narrow box per class, wrapping into columns. */
+.config-class-years {
+  display: flex; flex-wrap: wrap; gap: 0.35rem 1.2rem; margin-bottom: 0.35rem;
+}
+.config-year-row { display: flex; align-items: center; gap: 0.5rem; }
+.config-year-name { font-size: 0.82rem; color: #ccc; min-width: 9rem; }
+.config-input-year { width: 5.5rem; }
 .config-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; }
 .config-save-msg { font-size: 0.82rem; color: #aaa; }
 .config-save-msg-ok    { color: #7dcea0; }
@@ -1168,6 +1185,17 @@ header h1 { flex: 1 1 100%; }
 .contract-why-row td { border-top: none; padding-top: 0; padding-bottom: 0.45rem; }
 .contract-why { color: #7a7a8c; font-size: 0.74rem; line-height: 1.4; }
 .contract-team { font-weight: 600; }
+/* The car being offered, same source as the Car Performance tab's — see .carperf-car for why
+   the box is fixed. Smaller here: an offers list is a handful of rows read at a glance. */
+.contract-car {
+  width: 96px;
+  height: 36px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+/* The signed-deal header is already a flex row with its own gap, so the margin would double up. */
+.contract-header .contract-car { margin-right: 0; }
 .contract-terms, .contract-price { color: #aaa; font-size: 0.82rem; }
 .contract-price { text-align: right; white-space: nowrap; }
 .contract-unaffordable { color: #b04a4a; }

@@ -212,6 +212,11 @@ fn generate_html() -> String {
           <span class="config-hint">Folder with AMS2 Custom AI Driver XML files. Assign one to a championship (Manage tab) to show team/livery names instead of the AMS2 car class. A roster only works where the class&rsquo;s custom liveries are installed &mdash; AMS2 silently ignores an entry naming a livery it does not own. In a singleplayer career the rating, every team&rsquo;s requirement and every contract are derived from the season&rsquo;s roster, so a season raced on stock AI scores its points but cannot be judged. Race it at full grid size too: set as many opponents as the roster has cars, since your finish is judged against where your car ranks across the whole roster.</span>
         </div>
         <div class="config-group">
+          <label class="config-label">Class season years</label>
+          <div id="cfg-class-years" class="config-class-years"></div>
+          <span class="config-hint">The real-world season each class is raced in. It labels and orders the Car Performance and Driver Performance tables &mdash; nothing else reads it, so no rating, contract or result moves with it. Each box shows the built-in year greyed out; type over it to correct it, and clear it to go back. Classes AMS2 gives no year of its own &mdash; every mod, and Formula Edge (<code>FE-G1</code>), which is a fictional car and so is whatever season its liveries paint on it &mdash; are blank until you fill them in, and sort last until you do.</span>
+        </div>
+        <div class="config-group">
           <label class="config-label" for="cfg-poll-ms">Poll interval (ms)</label>
           <input class="config-input" id="cfg-poll-ms" name="poll_ms" type="number" min="50" max="5000" />
           <span class="config-hint">Shared memory read interval for the live view (default 200 ms)</span>

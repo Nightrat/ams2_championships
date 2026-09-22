@@ -8,6 +8,47 @@ function applyTrackMapConfig(cfg) {
   if (typeof TM_MAX !== 'undefined') TM_MAX = cfg.track_map_max_points;
 }
 
+// ── Class season years ────────────────────────────────────────────────────────
+// One box per class, each holding the *override* only: the built-in year sits in the
+// placeholder, so an empty box reads as "whatever the app says" and clearing one is how you
+// go back to it. The server decides what an override is worth keeping — a year equal to the
+// built-in one is dropped there, not here.
+
+var _classYearBounds = { min: 1900, max: 2100 };  // replaced by whatever /api/config reports
+
+function renderClassYears(classes, yearMin, yearMax) {
+  var host = document.getElementById('cfg-class-years');
+  if (!host) return;
+  if (typeof yearMin === 'number') _classYearBounds.min = yearMin;
+  if (typeof yearMax === 'number') _classYearBounds.max = yearMax;
+  if (!classes || !classes.length) {
+    host.innerHTML = '<span class="config-hint">Set the Custom AI Drivers folder above and save to list your classes here.</span>';
+    return;
+  }
+  host.innerHTML = classes.map(function (c, i) {
+    var id = 'cfg-class-year-' + i;
+    return '<div class="config-year-row">' +
+      '<label class="config-year-name" for="' + id + '">' + esc(c.class) + '</label>' +
+      '<input class="config-input config-input-year" type="number" step="1"' +
+      ' min="' + _classYearBounds.min + '" max="' + _classYearBounds.max + '"' +
+      ' id="' + id + '" data-class="' + esc(c.class) + '"' +
+      ' value="' + (c.overridden && c.year != null ? c.year : '') + '"' +
+      ' placeholder="' + (c.builtin != null ? c.builtin : '—') + '" />' +
+      '</div>';
+  }).join('');
+}
+
+// The overrides the boxes are currently showing. Blank boxes are simply absent, which is what
+// makes clearing one remove it.
+function collectClassYears() {
+  var out = {};
+  document.querySelectorAll('#cfg-class-years input[data-class]').forEach(function (el) {
+    var v = parseInt(el.value, 10);
+    if (!isNaN(v)) out[el.getAttribute('data-class')] = v;
+  });
+  return out;
+}
+
 function loadConfig() {
   fetch('/api/config').then(function (r) { return r.json(); })
     .then(function (cfg) {
@@ -39,6 +80,7 @@ function loadConfig() {
       document.getElementById('cfg-show-track-map').checked        = cfg.show_track_map;
       document.getElementById('cfg-track-map-max-points').value    = cfg.track_map_max_points;
       applyTrackMapConfig(cfg);
+      renderClassYears(cfg.classes, cfg.year_min, cfg.year_max);
       // The career runs on the tuning it was created with, so say so when the two have parted.
       var diverged = document.getElementById('cfg-rating-diverged');
       if (diverged) diverged.hidden = cfg.career_rating_matches !== false;
@@ -99,6 +141,10 @@ function saveConfig(newCfg) {
       var res = r.body;
       _loadedConfig = res.config;
       applyTrackMapConfig(res.config);
+      // Redrawn from the response, not left as typed: the server drops an override that only
+      // repeats the built-in year, and changing the Custom AI folder changes which classes there
+      // are to answer for at all.
+      renderClassYears(res.classes);
       var msgs = [];
       if (res.restart_required && res.restart_required.length) {
         msgs.push('Restart required for: ' + res.restart_required.join(', ') + '.');
@@ -144,6 +190,9 @@ document.getElementById('config-form').addEventListener('submit', function (e) {
     show_track_map:       document.getElementById('cfg-show-track-map').checked,
     track_map_max_points: parseInt(document.getElementById('cfg-track-map-max-points').value, 10),
   };
+  // Omitted entirely until the boxes have been filled from the server, so a form that has not
+  // loaded cannot send an empty map and wipe overrides the user never saw.
+  if (_loadedConfig) newCfg.class_years = collectClassYears();
   saveConfig(newCfg);
 });
 
