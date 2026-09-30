@@ -52,6 +52,10 @@ fn seal_career(
         return Ok(()); // No active career — nothing loaded, nothing to seal.
     }
     let cfg = ams2_championship::config::load_or_create(config_path);
+    let seated = seat_unseated(store, config_path);
+    if seated > 0 {
+        println!("Recorded the car driven in {seated} season(s) already under way.");
+    }
     let (stamped_rating, sealed, charts) = {
         // The guard is released before `persist` takes its own read lock: holding a write lock
         // across the write would deadlock on the same RwLock.
@@ -87,10 +91,38 @@ fn seal_career(
     if charts > 0 {
         println!("Moved {charts} lap chart(s) out of the career file into laps/.");
     }
-    if !stamped_rating && sealed == 0 && charts == 0 {
+    if !stamped_rating && sealed == 0 && charts == 0 && seated == 0 {
         return Ok(());
     }
     persist(store, path)
+}
+
+/// Stores the car on every season that has sessions and a declared team but no car yet — seasons
+/// raced before `player_seat` existed, or whose sessions have only now become conclusive. Returns
+/// how many it stored. A season whose sessions disagree is left alone: it is enforced on the team
+/// as before, rather than being locked to one of the two cars it was raced in.
+fn seat_unseated(store: &SharedStore, config_path: &std::path::Path) -> usize {
+    let Some(dir) = cfg_custom_ai_dir(config_path) else {
+        return 0;
+    };
+    let installed = ams2_championship::liveries::installed_livery_names(&dir);
+    let mut data = store.write().unwrap();
+    let d = &mut *data;
+    let mut seated = 0;
+    for champ in d.championships.iter_mut() {
+        if champ.player_seat.is_some() {
+            continue;
+        }
+        let Some(file) = champ.custom_ai_file.clone() else {
+            continue;
+        };
+        let seats = roster_seats_with(&dir, &file, installed.as_ref());
+        if let Some(lock) = ams2_championship::data_store::derive_seat_lock(champ, &d.sessions, &seats) {
+            champ.player_seat = Some(lock);
+            seated += 1;
+        }
+    }
+    seated
 }
 
 /// The configured Custom AI Drivers folder, if one is set and non-empty.
@@ -437,6 +469,105 @@ fn roster_seats(dir: &std::path::Path, file: &str) -> Vec<ams2_championship::cus
     roster_seats_with(dir, file, installed.as_ref())
 }
 
+/// [`roster_seats`] for a championship's own roster; empty without a folder or a file.
+fn champ_roster_seats(
+    config_path: &std::path::Path,
+    champ: &Championship,
+) -> Vec<ams2_championship::custom_ai::SeatEntry> {
+    cfg_custom_ai_dir(config_path)
+        .zip(champ.custom_ai_file.as_deref())
+        .map(|(dir, file)| roster_seats(&dir, file))
+        .unwrap_or_default()
+}
+
+/// Whether session `sid` may be added to `champ`, and the car to store on the season if adding
+/// it is what settles one.
+///
+/// Three rules, strictest first: a season with a stored car only takes sessions in that car; one
+/// without only takes sessions in its declared team; and a session that would leave no single
+/// car of the team consistent with the rest of the season is refused, because the season would
+/// then have been raced in two. Nothing is checked without a declared team and a roster — the
+/// same rule `check_player_team` has always had.
+fn check_session_seat(
+    champ: &Championship,
+    sessions: &[ams2_championship::data_store::RecordedSession],
+    seats: &[ams2_championship::custom_ai::SeatEntry],
+    sid: &str,
+) -> (Option<String>, Option<ams2_championship::data_store::SeatLock>) {
+    use ams2_championship::custom_ai::{self, SeatEvidence, TeamCheck};
+    use ams2_championship::data_store::{settle_player_seat, SeatLock};
+
+    let Some(team) = champ.player_team.as_deref().filter(|t| !t.trim().is_empty()) else {
+        return (None, None);
+    };
+    let Some(session) = sessions.iter().find(|s| s.id == sid) else {
+        return (None, None);
+    };
+    if seats.is_empty() {
+        return (None, None);
+    }
+    let grid = session.grid();
+    if let Some(lock) = &champ.player_seat {
+        return match custom_ai::check_locked_seat(seats, &grid, &lock.seat, &lock.replaces) {
+            TeamCheck::Failed(reason) => (Some(reason), None),
+            _ => (None, None),
+        };
+    }
+    if let TeamCheck::Failed(reason) = custom_ai::check_player_team(seats, &grid, team) {
+        return (Some(reason), None);
+    }
+    match settle_player_seat(champ, sessions, seats, Some(session)) {
+        SeatEvidence::Settled(s) => (
+            None,
+            Some(SeatLock {
+                replaces: custom_ai::replaced_driver(seats, &s.seat),
+                seat: s.seat,
+            }),
+        ),
+        // Refused only when this session is what breaks it. A season that already disagreed
+        // with itself before this existed is left to the team check rather than blocked.
+        SeatEvidence::Contradicted
+            if settle_player_seat(champ, sessions, seats, None) != SeatEvidence::Contradicted =>
+        {
+            (
+                Some(format!(
+                    "the other sessions of this season were driven in a different {team} car \
+                     than this one - a season is raced in one car"
+                )),
+                None,
+            )
+        }
+        _ => (None, None),
+    }
+}
+
+/// Re-derives a season's stored car after sessions have left it, so a car taken from a session
+/// assigned by mistake does not outlive that session.
+///
+/// A season with nothing assigned is back where it started and holds no car. Without a readable
+/// roster the car is kept rather than cleared: an unset folder is not evidence the car was wrong.
+/// A car chosen when **signing** is never touched — it was not derived from sessions, so losing
+/// them says nothing about it; tearing up the contract is what releases it.
+fn reseat(
+    champ: &mut Championship,
+    sessions: &[ams2_championship::data_store::RecordedSession],
+    contracts: &[ams2_championship::contracts::Contract],
+    config_path: &std::path::Path,
+) {
+    if ams2_championship::contracts::for_championship(contracts, &champ.id).is_some() {
+        return;
+    }
+    if champ.rounds.iter().all(|r| r.session_ids.is_empty()) {
+        champ.player_seat = None;
+        return;
+    }
+    let seats = champ_roster_seats(config_path, champ);
+    if !seats.is_empty() {
+        champ.player_seat =
+            ams2_championship::data_store::derive_seat_lock(champ, sessions, &seats);
+    }
+}
+
 /// The `/api/live-teams` payload.
 #[derive(serde::Serialize, Default, Debug)]
 struct LiveTeams {
@@ -459,6 +590,12 @@ struct LiveTeams {
     /// How the live grid measures up, when a roster could be found. Carried alongside the
     /// sentence so the tab can show the counts without re-deriving them.
     fit: Option<ams2_championship::custom_ai::GridFit>,
+    /// Whether the player is sitting in the season's car — its stored car once there is one,
+    /// otherwise any car of its team. A separate banner from `grid`, because the two are
+    /// independent problems and a wrong car is the one that gets the session refused: it is
+    /// said here, while the driver can still quit to the menu and pick the right livery, rather
+    /// than when the session is added and it is too late to re-run it.
+    seat: Option<GridStatus>,
 }
 
 /// A sentence about the live grid, and whether it is good news.
@@ -549,6 +686,59 @@ fn resolve_live_teams(
             None
         },
         fit,
+        seat: if sp && !grid.is_empty() {
+            live_seat_status(champ, &seats, grid)
+        } else {
+            None
+        },
+    }
+}
+
+/// The live seat banner — see [`LiveTeams::seat`]. The reason is the same sentence the
+/// assignment route refuses with, so what the banner warns about is exactly what will happen.
+fn live_seat_status(
+    champ: &Championship,
+    seats: &[ams2_championship::custom_ai::SeatEntry],
+    grid: &[ams2_championship::custom_ai::GridEntry],
+) -> Option<GridStatus> {
+    use ams2_championship::custom_ai::{self, TeamCheck};
+    let team = champ.player_team.as_deref().filter(|t| !t.trim().is_empty())?;
+    if seats.is_empty() {
+        return None;
+    }
+    let (check, want) = match &champ.player_seat {
+        Some(lock) => (
+            custom_ai::check_locked_seat(seats, grid, &lock.seat, &lock.replaces),
+            if lock.replaces.is_empty() {
+                lock.seat.clone()
+            } else {
+                format!("{} in place of {}", lock.seat, lock.replaces)
+            },
+        ),
+        None => (
+            custom_ai::check_player_team(seats, grid, team),
+            format!("a {team} car"),
+        ),
+    };
+    match check {
+        // Not this roster: the grid banner already says so, and nothing can be told about seats.
+        TeamCheck::Skipped(_) => None,
+        TeamCheck::Failed(reason) => GridStatus::warn(format!(
+            "WRONG CAR — {reason}. This session cannot be added to “{}”. Quit to the menu and \
+             pick {want}.",
+            champ.name
+        )),
+        TeamCheck::Passed(_) => Some(GridStatus {
+            ok: true,
+            text: match &champ.player_seat {
+                Some(_) => format!("Right car: {want}, the car “{}” is raced in.", champ.name),
+                None => format!(
+                    "Right team: {team}. Once an added session shows which {team} car you \
+                     drive, “{}” is locked to that car.",
+                    champ.name
+                ),
+            },
+        }),
     }
 }
 
@@ -1321,6 +1511,7 @@ fn handle(
             manufacturer_scoring: body.manufacturer_scoring,
             rounds: vec![],
             session_ids: vec![],
+            player_seat: None,
             custom_ai_file: roster,
             // The seat is taken by signing, never by creating — see POST .../sign.
             player_team: None,
@@ -1512,6 +1703,10 @@ fn handle(
             /// deal and a picture is not one of them; the signed contract's row wants the same
             /// picture, and it is not an offer at all.
             previews: std::collections::HashMap<String, String>,
+            /// The cars each offering team would put the player in, keyed by team name — see
+            /// `custom_ai::seat_choices`. Beside the offers for the same reason as `previews`:
+            /// which car is not part of the terms, it is what signing asks for alongside them.
+            seats: std::collections::HashMap<String, Vec<ams2_championship::custom_ai::SeatChoice>>,
             offers: Vec<contracts::Offer>,
         }
         let id = segs[2];
@@ -1533,15 +1728,8 @@ fn handle(
         let rated = champ_eligibility(&config_path, champ, &data);
         let previews = champ_previews(&config_path, champ);
         let body = match &rated {
-            Some((rep, eligibility)) => Body {
-                enabled: data.mode.uses_contracts(),
-                rated: true,
-                open,
-                reputation: rep.value,
-                balance: ledger.balance,
-                class: class.clone(),
-                teams: eligibility.len(),
-                offers: contracts::offers_for_with(
+            Some((rep, eligibility)) => {
+                let offers = contracts::offers_for_with(
                     id,
                     &class,
                     rep.value,
@@ -1549,11 +1737,31 @@ fn handle(
                     eligibility,
                     &standing,
                     &cfg.offer_params(),
-                ),
-                standing,
-                signed,
-                previews,
-            },
+                );
+                let roster = champ_roster_seats(&config_path, champ);
+                let seats = offers
+                    .iter()
+                    .map(|o| {
+                        let choices =
+                            ams2_championship::custom_ai::seat_choices(&roster, &o.team, rep.value);
+                        (o.team.clone(), choices)
+                    })
+                    .collect();
+                Body {
+                    enabled: data.mode.uses_contracts(),
+                    rated: true,
+                    open,
+                    reputation: rep.value,
+                    balance: ledger.balance,
+                    class: class.clone(),
+                    teams: eligibility.len(),
+                    offers,
+                    standing,
+                    signed,
+                    previews,
+                    seats,
+                }
+            }
             None => Body {
                 enabled: data.mode.uses_contracts(),
                 rated: false,
@@ -1565,6 +1773,7 @@ fn handle(
                 standing,
                 signed,
                 previews,
+                seats: Default::default(),
                 offers: vec![],
             },
         };
@@ -1592,6 +1801,11 @@ fn handle(
         #[derive(serde::Deserialize)]
         struct Body {
             team: String,
+            /// The car to drive, e.g. "Brabham #7" — one of the offers payload's `seats` for
+            /// this team. Optional so a caller that only names the team still signs: it then
+            /// gets the first car it may take.
+            #[serde(default)]
+            seat: Option<String>,
         }
         let Ok(body) = serde_json::from_slice::<Body>(&req.body) else {
             json_err(&mut stream, "400 Bad Request", "invalid body");
@@ -1696,11 +1910,47 @@ fn handle(
             return;
         }
 
+        // ── Which car ────────────────────────────────────────────────────────
+        // Chosen now and stored with the season, so every session is checked against one car
+        // from the first. Only a driver rated no higher than the player may be replaced — or,
+        // when that is nobody, the team's weakest. Re-derived here rather than trusted from the
+        // client, like the terms.
+        let choices = ams2_championship::custom_ai::seat_choices(
+            &champ_roster_seats(&config_path, &current),
+            &offer.team,
+            reputation.value,
+        );
+        let seat = match body.seat.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(wanted) => match choices.iter().find(|c| c.seat.eq_ignore_ascii_case(wanted)) {
+                Some(c) => Some(c.clone()),
+                None => {
+                    let open: Vec<String> = choices
+                        .iter()
+                        .map(|c| format!("{} (in place of {})", c.seat, c.replaces))
+                        .collect();
+                    let reason = format!(
+                        "You cannot take {wanted}: with a rating of {:.0} you may only replace a \
+                         {} driver rated no higher than you, or the weakest. Open: {}.",
+                        reputation.value,
+                        offer.team,
+                        if open.is_empty() { "none".into() } else { open.join(", ") }
+                    );
+                    json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));
+                    return;
+                }
+            },
+            None => choices.first().cloned(),
+        };
+
         let mut contract = contracts::Contract::from_offer(&id, offer, now_secs());
         contract.bought_for = offer.buy_in;
 
         if let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) {
             champ.player_team = Some(contract.team.clone());
+            champ.player_seat = seat.map(|c| ams2_championship::data_store::SeatLock {
+                seat: c.seat,
+                replaces: c.replaces,
+            });
         }
         data.contracts.push(contract.clone());
 
@@ -1764,6 +2014,7 @@ fn handle(
         // found it, so the offer list opens again.
         if let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) {
             champ.player_team = None;
+            champ.player_seat = None;
         }
         drop(data);
         if !persisted(&store, &cur(&data_path), &mut stream) {
@@ -1927,7 +2178,7 @@ fn handle(
             enforced: false,
             blocked: Default::default(),
         };
-        if let (Some(dir), Some(file), Some(team)) = (
+        if let (Some(dir), Some(file), Some(_)) = (
             cfg_custom_ai_dir(&config_path),
             champ.custom_ai_file.as_deref(),
             champ
@@ -1937,19 +2188,10 @@ fn handle(
         ) {
             let seats = roster_seats(&dir, file);
             out.enforced = true;
+            // The same verdict the assignment route gives, so the picker never offers a session
+            // that adding would refuse.
             for s in &data.sessions {
-                let grid: Vec<ams2_championship::custom_ai::GridEntry> = s
-                    .results
-                    .iter()
-                    .map(|r| ams2_championship::custom_ai::GridEntry {
-                        name: &r.name,
-                        car_name: &r.car_name,
-                        is_player: r.is_player,
-                    })
-                    .collect();
-                if let ams2_championship::custom_ai::TeamCheck::Failed(reason) =
-                    ams2_championship::custom_ai::check_player_team(&seats, &grid, team)
-                {
+                if let (Some(reason), _) = check_session_seat(champ, &data.sessions, &seats, &s.id) {
                     out.blocked.insert(s.id.clone(), reason);
                 }
             }
@@ -2005,6 +2247,8 @@ fn handle(
         // rather than read off `current` later, because the mutations below need `data` mutably
         // and would otherwise be held back by that borrow.
         let was_final = current.status == ChampionshipStatus::Final;
+        // Same reason: what the car stored on the season was chosen against.
+        let was_seated = (current.player_team.clone(), current.custom_ai_file.clone());
 
         // The championship as it would be after this request, used by both checks below so a
         // rejection leaves it untouched.
@@ -2184,6 +2428,11 @@ fn handle(
                 None
             };
         }
+        // A car belongs to a team on a roster; changing either leaves it meaningless. Both are
+        // locked once the season is raced, so this only ever clears a season with no sessions.
+        if (&champ.player_team, &champ.custom_ai_file) != (&was_seated.0, &was_seated.1) {
+            champ.player_seat = None;
+        }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
 
         // ── Closing a season settles what it paid ────────────────────────────
@@ -2270,7 +2519,8 @@ fn handle(
     {
         let (id, ridx) = (segs[2], segs[4].parse::<usize>().unwrap_or(usize::MAX));
         let mut data = store.write().unwrap();
-        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+        let d = &mut *data;
+        let Some(champ) = d.championships.iter_mut().find(|c| c.id == id) else {
             json_err(&mut stream, "404 Not Found", "not found");
             return;
         };
@@ -2279,6 +2529,7 @@ fn handle(
             return;
         }
         champ.rounds.remove(ridx);
+        reseat(champ, &d.sessions, &d.contracts, &config_path);
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         if !persisted(&store, &cur(&data_path), &mut stream) {
@@ -2315,29 +2566,12 @@ fn handle(
         // Applies only when the championship has a Custom AI file, which is also the only way
         // a player team can be set (see the PATCH route). Without that roster there is nothing
         // to infer the player's seat from, so the session is accepted unchecked.
-        let rejection: Option<String> = (|| {
-            let dir = cfg_custom_ai_dir(&config_path)?;
-            let file = champ.custom_ai_file.as_deref()?;
-            let team = champ
-                .player_team
-                .as_deref()
-                .filter(|t| !t.trim().is_empty())?;
-            let session = data.sessions.iter().find(|s| s.id == sid)?;
-            let seats = roster_seats(&dir, file);
-            let grid: Vec<ams2_championship::custom_ai::GridEntry> = session
-                .results
-                .iter()
-                .map(|r| ams2_championship::custom_ai::GridEntry {
-                    name: &r.name,
-                    car_name: &r.car_name,
-                    is_player: r.is_player,
-                })
-                .collect();
-            match ams2_championship::custom_ai::check_player_team(&seats, &grid, team) {
-                ams2_championship::custom_ai::TeamCheck::Failed(reason) => Some(reason),
-                _ => None,
-            }
-        })();
+        //
+        // Once the season's sessions have shown which of the team's cars the player drives, that
+        // car is stored on the season (`player_seat`) and every later session must be in it —
+        // the team name alone would accept the team-mate's car too.
+        let seats = champ_roster_seats(&config_path, champ);
+        let (rejection, lock) = check_session_seat(champ, &data.sessions, &seats, sid);
         if let Some(reason) = rejection {
             // json_err interpolates the message straight into JSON — keep quotes out of it.
             json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));
@@ -2351,6 +2585,9 @@ fn handle(
         let round = &mut champ.rounds[ridx];
         if !round.session_ids.contains(&sid.to_string()) {
             round.session_ids.push(sid.to_string());
+        }
+        if champ.player_seat.is_none() {
+            champ.player_seat = lock;
         }
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
@@ -2375,7 +2612,8 @@ fn handle(
             segs[6],
         );
         let mut data = store.write().unwrap();
-        let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
+        let d = &mut *data;
+        let Some(champ) = d.championships.iter_mut().find(|c| c.id == id) else {
             json_err(&mut stream, "404 Not Found", "not found");
             return;
         };
@@ -2384,6 +2622,7 @@ fn handle(
             return;
         }
         champ.rounds[ridx].session_ids.retain(|s| s != sid);
+        reseat(champ, &d.sessions, &d.contracts, &config_path);
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         if !persisted(&store, &cur(&data_path), &mut stream) {

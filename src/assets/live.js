@@ -81,8 +81,15 @@ function loadLiveTeams() {
     .then(function (t) {
       liveTeams = { teams: t.teams || {}, player_team: t.player_team };
       renderGridStatus(t.grid);
+      renderSeatStatus(t.seat);
     })
     .catch(function () {});
+}
+
+// The banner saying whether the player is in the season's car. Same shape as the grid one, but
+// a wrong car is red: the session will be refused, not merely judged on the wrong scale.
+function renderSeatStatus(status) {
+  renderStatusBox('live-seat-warning', status, 'live-seat-wrong');
 }
 
 // The banner above the timing table. The sentence is the server's — the same one the Manage and
@@ -92,11 +99,15 @@ function loadLiveTeams() {
 // the driver whether the grid was checked and passed or never checked at all, and this is the
 // one screen where knowing that still lets them do something about it.
 function renderGridStatus(status) {
-  var box = document.getElementById('live-grid-warning');
+  renderStatusBox('live-grid-warning', status, '');
+}
+
+function renderStatusBox(id, status, badClass) {
+  var box = document.getElementById(id);
   if (!box) return;
   if (!status || !status.text) { box.hidden = true; box.textContent = ''; return; }
   box.hidden = false;
-  box.className = status.ok ? 'live-grid-warning live-grid-ok' : 'live-grid-warning';
+  box.className = 'live-grid-warning ' + (status.ok ? 'live-grid-ok' : badClass);
   box.innerHTML = '<span class="live-grid-warning-icon">' +
       (status.ok ? '&#10003;' : '&#9888;') +
     '</span>' +
@@ -120,6 +131,7 @@ function processLiveData(d) {
 
       if (!d.connected || d.game_state < 2) {
         renderGridStatus(null);
+        renderSeatStatus(null);
         liveGridSize = -1;
         statusEl.className = 'live-status live-disconnected';
         statusTxt.textContent = 'Not connected \u2014 start AMS2 to see live data';

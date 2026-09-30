@@ -279,6 +279,19 @@ The dependency above is invisible from inside the game, so the app says it out l
 - Nothing here blocks anything — unlike `check_player_team`, which hides contradicting sessions from the picker. A grid warning is about what a result can *mean*, not about whether it may be recorded, assigned or scored.
 - `resolve_live_teams` takes `&[GridEntry]` rather than the shared-memory rows, so the resolver has no use for the other forty fields and a test can hand it a grid without fabricating sentinel values for them.
 
+### A season is raced in one car, not one team (`Championship.player_seat`)
+
+`check_player_team` accepts **either** car of the declared team, so a season could be raced in Williams #5 one weekend and #6 the next. `player_seat` (`SeatLock { seat, replaces }`) closes that.
+
+- **In singleplayer it is picked when signing.** `custom_ai::seat_choices` lists the team's cars whose regular driver's `race_skill × 100` (the same scale the team bar is built from) is **no higher than the player's rating**; when that is none, only the team's weakest car (all of them, if tied). A driver with no declared skill cannot be judged and is not held against the player; a per-track stand-in is never offered. The offers payload carries the list as `seats` (keyed by team, beside `previews`), `POST .../sign` takes `{team, seat}`, re-derives the list and refuses (409) a car not on it, and stores the lock at once. A `sign` without `seat` takes the first open car, so an older caller still signs.
+- A signed car is **never re-derived from sessions**: `reseat` skips a season with a contract, and only tearing up the contract (`DELETE .../sign`) releases it.
+- **Otherwise it is stored from the sessions** (an unset career, whose team comes from the picker, or a season signed before this existed). `custom_ai::settle_seat` intersects the team's free cars across every assigned session plus the one being added; the moment one car is left it is stored, with `replaced_driver` naming the regular holder (never a per-track stand-in — `SeatEntry.stand_in`). An ambiguous session (short grid, both cars empty) stores nothing and a later one settles it.
+- `check_session_seat` in the server is the one verdict, used by both the assignment route and `session-eligibility`, so the picker never offers a session adding would refuse. Stored car → `check_locked_seat`; none yet → the team check, plus a refusal when *this* session would leave no single car consistent. A season that already disagreed with itself before this existed is not blocked — it stays on the team check.
+- **Cleared only when the season has no sessions**, the same condition that unlocks the team; removing some re-derives it (`reseat`), so a car taken from a session assigned by mistake does not outlive it. With no readable roster it is kept, not cleared.
+- `seal_career` → `seat_unseated` stores it for seasons already under way on load.
+- The live tab gets `LiveTeams.seat`, a **separate red banner** (`#live-seat-warning`) from the grid one: a wrong car gets the session refused, and the menu is the only place to fix it. The reason text is the same sentence the route refuses with.
+- Singleplayer / unset only: multiplayer has no roster, so nothing here applies.
+
 ### Roster baselines (`custom_ai.rs`)
 
 A class's **baseline** is the roster as it was before the app first wrote to it — `<class>.xml.bak`, beside the file it describes. It is the reset source, and it is what any derived "how far has this been developed" figure is measured against.

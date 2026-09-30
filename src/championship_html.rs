@@ -62,6 +62,9 @@ fn generate_html() -> String {
            still be fixed — quit to the menu, set the opponent count, start again — so it sits
            above the timing table rather than in a tab the user would have to go looking in. -->
       <div id="live-grid-warning" class="live-grid-warning" hidden></div>
+      <!-- Whether the player is in the season's car. Separate from the grid banner: a wrong car
+           gets the session refused, and it can only be fixed from the menu. -->
+      <div id="live-seat-warning" class="live-grid-warning" hidden></div>
       <div id="live-info" class="live-info">
         <span id="live-session-type"></span>
         <span id="live-race-state"></span>

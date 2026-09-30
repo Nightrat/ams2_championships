@@ -320,6 +320,152 @@ fn test_check_player_team_skips_when_unverifiable() {
     ));
 }
 
+// ── The season's car: one seat of the team, not either ───────────────────────
+
+/// FULL_GRID with Patrese back and Warwick out: the *other* Brabham is the free one.
+fn brabham_8_grid() -> Vec<(&'static str, &'static str, bool)> {
+    FULL_GRID
+        .iter()
+        .map(|&(n, c, p)| if n == "Derek Warwick" { ("Riccardo Patrese", c, p) } else { (n, c, p) })
+        .collect()
+}
+
+#[test]
+fn test_the_team_check_accepts_either_car_which_is_why_a_seat_is_locked() {
+    let seats = parse_seats_str(ROSTER);
+    // The weakness this closes: both Brabhams pass the team check, one weekend each.
+    let eight = brabham_8_grid();
+    assert!(matches!(check_player_team(&seats, &grid(FULL_GRID), "Brabham"), TeamCheck::Passed(_)));
+    assert!(matches!(check_player_team(&seats, &grid(&eight), "Brabham"), TeamCheck::Passed(_)));
+    // Locked to #7, the team-mate's car is refused and the reason names both cars.
+    assert!(matches!(
+        check_locked_seat(&seats, &grid(FULL_GRID), "Brabham #7", "Riccardo Patrese"),
+        TeamCheck::Passed(_)
+    ));
+    match check_locked_seat(&seats, &grid(&eight), "Brabham #7", "Riccardo Patrese") {
+        TeamCheck::Failed(reason) => {
+            assert!(reason.contains("Brabham #7 (in place of Riccardo Patrese)"), "got {reason}");
+            assert!(reason.contains("Brabham #8"), "got {reason}");
+        }
+        other => panic!("expected Failed, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_a_locked_seat_still_accepts_a_grid_that_cannot_tell_the_two_apart() {
+    let seats = parse_seats_str(ROSTER);
+    // No Warwick: both Brabhams are free, so #7 is still possible — only evidence rejects.
+    let rows: Vec<(&str, &str, bool)> =
+        FULL_GRID.iter().copied().filter(|&(n, _, _)| n != "Derek Warwick").collect();
+    assert!(matches!(
+        check_locked_seat(&seats, &grid(&rows), "Brabham #7", ""),
+        TeamCheck::Passed(_)
+    ));
+    let stock: &[(&str, &str, bool)] = &[("Nightrat", M1, true), ("Aires Silva  (AI)", M1, false)];
+    assert!(matches!(
+        check_locked_seat(&seats, &grid(stock), "Brabham #7", ""),
+        TeamCheck::Skipped(_)
+    ));
+}
+
+#[test]
+fn test_settle_seat_narrows_across_sessions() {
+    let seats = parse_seats_str(ROSTER);
+    let both: Vec<(&str, &str, bool)> =
+        FULL_GRID.iter().copied().filter(|&(n, _, _)| n != "Derek Warwick").collect();
+    let (both, full) = (grid(&both), grid(FULL_GRID));
+    // One ambiguous session settles nothing; a second that fields #8 settles #7.
+    assert_eq!(settle_seat(&seats, [both.as_slice()], "Brabham"), SeatEvidence::Unknown);
+    match settle_seat(&seats, [both.as_slice(), full.as_slice()], "brabham") {
+        SeatEvidence::Settled(s) => assert_eq!(s.seat, "Brabham #7"),
+        other => panic!("expected Settled, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_settle_seat_sees_a_season_raced_in_two_cars() {
+    let seats = parse_seats_str(ROSTER);
+    let eight = brabham_8_grid();
+    let (seven, eight) = (grid(FULL_GRID), grid(&eight));
+    assert_eq!(
+        settle_seat(&seats, [seven.as_slice(), eight.as_slice()], "Brabham"),
+        SeatEvidence::Contradicted
+    );
+    // Stock-AI sessions say nothing, and no team means nothing to narrow.
+    let stock_rows: &[(&str, &str, bool)] = &[("Nightrat", M1, true), ("Aires Silva  (AI)", M1, false)];
+    let stock = grid(stock_rows);
+    assert_eq!(settle_seat(&seats, [stock.as_slice()], "Brabham"), SeatEvidence::Unknown);
+    assert_eq!(settle_seat(&seats, [seven.as_slice()], " "), SeatEvidence::Unknown);
+}
+
+#[test]
+fn test_replaced_driver_is_the_regular_holder_never_a_stand_in() {
+    let seats = parse_seats_str(ROSTER);
+    assert_eq!(replaced_driver(&seats, "Brabham #7"), "Riccardo Patrese");
+    // Alternating drivers: AMS2 fields one of them, so both are named.
+    assert_eq!(replaced_driver(&seats, "Brabham #8"), "Derek Warwick / Elio De Angelis");
+
+    let with_stand_in = parse_seats_str(
+        r#"<custom_ai_drivers>
+        <driver livery_name="1971 Ferrari #4 - C. Amon" tracks="Monza"><name>Tino Brambilla</name></driver>
+        <driver livery_name="1971 Ferrari #4 - C. Amon"><name>Chris Amon</name></driver>
+    </custom_ai_drivers>"#,
+    );
+    assert!(with_stand_in[0].stand_in && !with_stand_in[1].stand_in);
+    assert_eq!(replaced_driver(&with_stand_in, "Ferrari #4"), "Chris Amon");
+}
+
+// ── Choosing the car when signing ────────────────────────────────────────────
+
+const CHOICE_ROSTER: &str = r#"<custom_ai_drivers>
+    <driver livery_name="1986 Brabham #7 - R. Patrese"><name>Riccardo Patrese</name><race_skill>0.72</race_skill></driver>
+    <driver livery_name="1986 Brabham #8 - D. Warwick"><name>Derek Warwick</name><race_skill>0.60</race_skill></driver>
+    <driver livery_name="1986 Brabham #8 - E. De Angelis"><name>Elio De Angelis</name><race_skill>0.66</race_skill></driver>
+    <driver livery_name="1986 Brabham #7 - R. Patrese" tracks="Monza"><name>Stand In</name><race_skill>0.10</race_skill></driver>
+    <driver livery_name="1986 Coloni #31 - N. Larini"><name>Nicola Larini</name><race_skill>0.75</race_skill></driver>
+    <driver livery_name="1986 Coloni #32 - G. Tarquini"><name>Gabriele Tarquini</name><race_skill>0.75</race_skill></driver>
+    <driver livery_name="1986 AGS #14 - I. Capelli"><name>Ivan Capelli</name></driver>
+    <driver livery_name="1986 AGS #15 - P. Streiff"><name>Philippe Streiff</name><race_skill>0.90</race_skill></driver>
+</custom_ai_drivers>"#;
+
+fn choice_seats(team: &str, rating: f32) -> Vec<String> {
+    seat_choices(&parse_seats_str(CHOICE_ROSTER), team, rating)
+        .into_iter()
+        .map(|c| c.seat)
+        .collect()
+}
+
+#[test]
+fn test_seat_choices_offers_only_drivers_rated_no_higher_than_the_player() {
+    // #8's weaker alternate is 60, #7 is 72: a 65 may only take #8.
+    assert_eq!(choice_seats("Brabham", 65.0), vec!["Brabham #8"]);
+    assert_eq!(choice_seats("brabham", 80.0), vec!["Brabham #7", "Brabham #8"]);
+    // Exactly equal counts: you may replace someone as good as you.
+    assert_eq!(choice_seats("Brabham", 72.0), vec!["Brabham #7", "Brabham #8"]);
+}
+
+#[test]
+fn test_seat_choices_falls_back_to_the_weakest_car_only() {
+    // Nobody at or below 50: only the weakest car, never the stronger one.
+    let c = seat_choices(&parse_seats_str(CHOICE_ROSTER), "Brabham", 50.0);
+    assert_eq!(c.len(), 1);
+    assert_eq!(c[0].seat, "Brabham #8");
+    assert_eq!(c[0].replaces, "Derek Warwick / Elio De Angelis");
+    assert!((c[0].rating.unwrap() - 60.0).abs() < 1e-3);
+    // Tied for weakest: both are the weakest.
+    assert_eq!(choice_seats("Coloni", 50.0), vec!["Coloni #31", "Coloni #32"]);
+}
+
+#[test]
+fn test_seat_choices_never_offers_a_stand_in_and_does_not_block_on_a_missing_skill() {
+    // The Monza stand-in is rated 10 but is nobody's car to take: #7 stays Patrese's 72.
+    let c = seat_choices(&parse_seats_str(CHOICE_ROSTER), "Brabham", 80.0);
+    assert!(c.iter().all(|c| !c.replaces.contains("Stand In")), "{c:?}");
+    // Capelli declares no skill, so he cannot be judged and is not held against the player.
+    assert_eq!(choice_seats("AGS", 50.0), vec!["AGS #14"]);
+    assert!(choice_seats("Nobody", 50.0).is_empty());
+}
+
 #[test]
 fn test_list_files_filters_xml_and_sorts() {
     let ns = std::time::SystemTime::now()

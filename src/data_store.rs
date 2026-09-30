@@ -113,6 +113,17 @@ pub struct Championship {
     /// `custom_ai_file` does for AI drivers.
     #[serde(default)]
     pub player_team: Option<String>,
+    /// The one car of [`Self::player_team`] the player drives this season, and the roster driver
+    /// they replace in it.
+    ///
+    /// A team usually runs two cars, and the team name alone accepts either — so a season could
+    /// be raced in car #7 one weekend and #8 the next. In singleplayer it is chosen when signing
+    /// (`custom_ai::seat_choices`) and kept until the contract is torn up. A season without a
+    /// contract stores it the moment its assigned sessions show which car it is
+    /// (`custom_ai::settle_seat`), and loses it again only when every session is removed. Either
+    /// way, a session in any other car is refused.
+    #[serde(default)]
+    pub player_seat: Option<SeatLock>,
     /// How many races the season is meant to run, declared when it is created.
     ///
     /// The calendar is the one thing a career could never answer for itself: [`Self::rounds`]
@@ -125,6 +136,16 @@ pub struct Championship {
     /// does not use contracts. Those pay exactly as they did: the whole salary, at `Final`.
     #[serde(default)]
     pub planned_rounds: Option<u32>,
+}
+
+/// A season's car, fixed by its recorded sessions — see [`Championship::player_seat`].
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+pub struct SeatLock {
+    /// Team plus car number, e.g. "Brabham #7" — the unit seat inference works in.
+    pub seat: String,
+    /// The roster driver the player takes the place of, so the user can recognise the car by
+    /// who they chose to replace in AMS2's car picker.
+    pub replaces: String,
 }
 
 /// Which kind of career a save holds, and therefore which rules its seasons follow.
@@ -651,16 +672,62 @@ fn grid_note_for(s: &RecordedSession, seats: &[crate::custom_ai::SeatEntry]) -> 
     if seats.is_empty() || s.session_type == SESSION_PRACTICE {
         return None;
     }
-    let grid: Vec<crate::custom_ai::GridEntry> = s
-        .results
+    crate::custom_ai::GridFit::measure(seats, &s.grid()).note()
+}
+
+impl RecordedSession {
+    /// The grid as seat inference reads it.
+    pub fn grid(&self) -> Vec<crate::custom_ai::GridEntry<'_>> {
+        self.results
+            .iter()
+            .map(|r| crate::custom_ai::GridEntry {
+                name: &r.name,
+                car_name: &r.car_name,
+                is_player: r.is_player,
+            })
+            .collect()
+    }
+}
+
+/// Which car of its declared team a season has been raced in, judged from every session assigned
+/// to it plus `adding`, the one about to be. See [`Championship::player_seat`].
+///
+/// `Unknown` for a season with no declared team or no roster — there is nothing to narrow.
+pub fn settle_player_seat(
+    champ: &Championship,
+    sessions: &[RecordedSession],
+    seats: &[crate::custom_ai::SeatEntry],
+    adding: Option<&RecordedSession>,
+) -> crate::custom_ai::SeatEvidence {
+    let Some(team) = champ.player_team.as_deref().filter(|t| !t.trim().is_empty()) else {
+        return crate::custom_ai::SeatEvidence::Unknown;
+    };
+    let assigned: Vec<&RecordedSession> = champ
+        .rounds
         .iter()
-        .map(|r| crate::custom_ai::GridEntry {
-            name: &r.name,
-            car_name: &r.car_name,
-            is_player: r.is_player,
-        })
+        .flat_map(|r| r.session_ids.iter())
+        .filter_map(|id| sessions.iter().find(|s| &s.id == id))
+        .chain(adding)
         .collect();
-    crate::custom_ai::GridFit::measure(seats, &grid).note()
+    let grids: Vec<Vec<crate::custom_ai::GridEntry>> = assigned.iter().map(|s| s.grid()).collect();
+    crate::custom_ai::settle_seat(seats, grids.iter().map(|g| g.as_slice()), team)
+}
+
+/// The lock a season should carry, re-derived from its assigned sessions: `None` until they
+/// agree on one car. Also what removing a session falls back to, so a lock taken from a session
+/// assigned by mistake does not outlive it.
+pub fn derive_seat_lock(
+    champ: &Championship,
+    sessions: &[RecordedSession],
+    seats: &[crate::custom_ai::SeatEntry],
+) -> Option<SeatLock> {
+    match settle_player_seat(champ, sessions, seats, None) {
+        crate::custom_ai::SeatEvidence::Settled(s) => Some(SeatLock {
+            replaces: crate::custom_ai::replaced_driver(seats, &s.seat),
+            seat: s.seat,
+        }),
+        _ => None,
+    }
 }
 
 fn resolve_team_map(

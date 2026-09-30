@@ -753,6 +753,7 @@ fn season(id: &str, status: ChampionshipStatus, session_ids: &[&str]) -> Champio
         session_ids: vec![],
         custom_ai_file: Some("F-Classic_Gen1.xml".into()),
         player_team: Some("Osella".into()),
+        player_seat: None,
         planned_rounds: None,
     }
 }

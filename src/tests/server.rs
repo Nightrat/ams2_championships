@@ -205,6 +205,7 @@ fn make_champ(id: &str) -> Championship {
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
+        player_seat: None,
         planned_rounds: None,
     }
 }
@@ -2469,6 +2470,7 @@ fn test_route_offers_stay_open_for_a_team_picked_without_a_contract() {
     let (root, config) = make_offer_fixture(true);
     let champ = Championship {
         player_team: Some("Osella".into()),
+        player_seat: None,
         planned_rounds: None,
         ..rated_champ("c1")
     };
@@ -2697,6 +2699,101 @@ fn test_route_sign_records_the_deal_and_takes_the_seat() {
     assert_eq!(
         data.championships[0].player_team.as_deref(),
         Some(OPEN_SEAT)
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+// Osella on OFFER_ROSTER: #21 Ghinzani is 55, #22 Berg is 54. A starting rating of 50 clears
+// neither, so only the weaker car — Berg's — may be taken.
+
+#[test]
+fn test_route_offers_list_the_cars_each_team_would_give() {
+    let (root, config) = offer_fixture(true, r#","starting_rating":50"#);
+    let v = body_json(&offers_resp(rated_champ("c1"), &config));
+    let osella = v["seats"][OPEN_SEAT].as_array().expect("seats for the offering team");
+    assert_eq!(osella.len(), 1, "{v}");
+    assert_eq!(osella[0]["seat"], "Osella #22");
+    assert_eq!(osella[0]["replaces"], "Allan Berg");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_stores_the_chosen_car_with_the_season() {
+    let (root, config) = offer_fixture(true, r#","starting_rating":60"#);
+    // At 60 both Osellas are open, so the choice is the player's.
+    let (resp, store) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        r#"{"team":"Osella","seat":"Osella #21"}"#,
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_seat,
+        Some(ams2_championship::data_store::SeatLock {
+            seat: "Osella #21".into(),
+            replaces: "Piercarlo Ghinzani".into(),
+        })
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_refuses_a_car_whose_driver_outrates_the_player() {
+    let (root, config) = offer_fixture(true, r#","starting_rating":50"#);
+    let (resp, store) = sign_call(
+        rated_champ("c1"),
+        &config,
+        "POST",
+        r#"{"team":"Osella","seat":"Osella #21"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("Osella #22 (in place of Allan Berg)"), "it names what is open: {resp}");
+    // Nothing signed on a refusal.
+    assert!(store.read().unwrap().contracts.is_empty());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_sign_without_a_car_takes_the_first_one_open() {
+    let (root, config) = offer_fixture(true, r#","starting_rating":50"#);
+    let (resp, store) = sign_call(rated_champ("c1"), &config, "POST", r#"{"team":"Osella"}"#);
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_seat.as_ref().map(|s| s.seat.as_str()),
+        Some("Osella #22")
+    );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_a_signed_car_survives_its_sessions_being_removed() {
+    let (root, config) = offer_fixture(true, r#","starting_rating":50"#);
+    let (store, data_path) = make_sp_store();
+    let mut champ = rated_champ("c1");
+    champ.rounds = vec![Round::default()];
+    {
+        let mut d = store.write().unwrap();
+        d.championships.push(champ);
+        // Berg absent, the rest present: Osella #22 is the player's.
+        d.sessions = vec![grid_session("s1", &["Nigel Mansell", "Nelson Piquet", "Piercarlo Ghinzani"])];
+    }
+    let req = br#"{"team":"Osella","seat":"Osella #22"}"#;
+    let mut raw = format!(
+        "POST /api/championships/c1/sign HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        req.len()
+    )
+    .into_bytes();
+    raw.extend_from_slice(req);
+    let resp = call_with_config(store.clone(), data_path.clone(), raw, Some(config.clone()));
+    assert!(status_line(&resp).contains("200"), "{resp}");
+
+    seat_call(&store, &data_path, &config, "POST", "/api/championships/c1/rounds/0/sessions/s1");
+    seat_call(&store, &data_path, &config, "DELETE", "/api/championships/c1/rounds/0/sessions/s1");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_seat.as_ref().map(|s| s.seat.as_str()),
+        Some("Osella #22"),
+        "only tearing up the contract releases a signed car"
     );
     std::fs::remove_dir_all(&root).ok();
 }
@@ -2955,6 +3052,7 @@ fn test_route_sign_replaces_a_team_picked_directly() {
     let (root, config) = make_offer_fixture(true);
     let champ = Championship {
         player_team: Some("Williams".into()),
+        player_seat: None,
         planned_rounds: None,
         ..rated_champ("c1")
     };
@@ -3038,6 +3136,7 @@ fn test_route_release_refused_once_the_season_has_started() {
                 session_ids: vec!["s1".into()],
             }],
             player_team: Some(OPEN_SEAT.into()),
+            player_seat: None,
             planned_rounds: None,
             ..rated_champ("c1")
         };
@@ -4763,6 +4862,163 @@ fn test_live_says_so_when_the_grid_is_the_roster() {
     assert!(status.text.contains("Full grid"), "{status:?}");
     assert!(status.text.contains('3'), "it names the size: {status:?}");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+// ── The season's car: stored by the first conclusive session, enforced after ─
+//
+// [`OFFER_ROSTER`] runs two Williams. A team name accepts either of them, so a season could be
+// raced in #5 one weekend and #6 the next; the stored car is what stops that.
+
+/// Each AI name leaves its own car occupied: without Mansell, Williams #5 is the free one.
+fn williams_5_session(id: &str) -> RecordedSession {
+    grid_session(id, &["Nelson Piquet", "Piercarlo Ghinzani", "Allan Berg"])
+}
+fn williams_6_session(id: &str) -> RecordedSession {
+    grid_session(id, &["Nigel Mansell", "Piercarlo Ghinzani", "Allan Berg"])
+}
+
+/// An SP store holding a Williams season with two empty rounds, and `sessions` recorded.
+fn seat_store(
+    sessions: Vec<RecordedSession>,
+) -> (ams2_championship::data_store::SharedStore, std::path::PathBuf) {
+    let (store, data_path) = make_sp_store();
+    let mut champ = rated_champ("c1");
+    champ.player_team = Some("Williams".into());
+    champ.rounds = vec![Round::default(), Round::default()];
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(champ);
+        data.sessions = sessions;
+    }
+    (store, data_path)
+}
+
+fn seat_call(
+    store: &ams2_championship::data_store::SharedStore,
+    data_path: &std::path::Path,
+    config: &std::path::Path,
+    method: &str,
+    path: &str,
+) -> String {
+    call_with_config(
+        store.clone(),
+        data_path.to_path_buf(),
+        format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n").into_bytes(),
+        Some(config.to_path_buf()),
+    )
+}
+
+#[test]
+fn test_route_the_first_session_stores_the_car_and_refuses_the_team_mates() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = seat_store(vec![williams_5_session("s1"), williams_6_session("s2")]);
+
+    let resp = seat_call(&store, &data_path, &config, "POST", "/api/championships/c1/rounds/0/sessions/s1");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_seat,
+        Some(ams2_championship::data_store::SeatLock {
+            seat: "Williams #5".into(),
+            replaces: "Nigel Mansell".into(),
+        })
+    );
+
+    // Same team, other car: the team check alone would have let this in.
+    let resp = seat_call(&store, &data_path, &config, "POST", "/api/championships/c1/rounds/1/sessions/s2");
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("Williams #5 (in place of Nigel Mansell)"), "{resp}");
+    assert!(store.read().unwrap().championships[0].rounds[1].session_ids.is_empty());
+
+    // The picker is told the same thing, so it does not offer what adding would refuse.
+    let resp = seat_call(&store, &data_path, &config, "GET", "/api/championships/c1/session-eligibility");
+    let v = body_json(&resp);
+    assert!(v["blocked"]["s2"].is_string(), "{v}");
+    assert!(v["blocked"]["s1"].is_null(), "{v}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_route_removing_every_session_frees_the_car() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = seat_store(vec![williams_5_session("s1"), williams_6_session("s2")]);
+    seat_call(&store, &data_path, &config, "POST", "/api/championships/c1/rounds/0/sessions/s1");
+    assert!(store.read().unwrap().championships[0].player_seat.is_some());
+
+    let resp = seat_call(&store, &data_path, &config, "DELETE", "/api/championships/c1/rounds/0/sessions/s1");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(store.read().unwrap().championships[0].player_seat.is_none());
+
+    // Back to where the season started: the other car is now as good as the first was.
+    let resp = seat_call(&store, &data_path, &config, "POST", "/api/championships/c1/rounds/0/sessions/s2");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_seat.as_ref().map(|s| s.seat.as_str()),
+        Some("Williams #6")
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_route_an_ambiguous_session_stores_nothing_until_a_later_one_settles_it() {
+    let (root, config) = make_offer_fixture(true);
+    // Both Williams absent: either could be the player's, so nothing is stored yet.
+    let both = grid_session("s1", &["Piercarlo Ghinzani", "Allan Berg"]);
+    let (store, data_path) = seat_store(vec![both, williams_6_session("s2")]);
+
+    seat_call(&store, &data_path, &config, "POST", "/api/championships/c1/rounds/0/sessions/s1");
+    assert!(store.read().unwrap().championships[0].player_seat.is_none());
+
+    seat_call(&store, &data_path, &config, "POST", "/api/championships/c1/rounds/1/sessions/s2");
+    assert_eq!(
+        store.read().unwrap().championships[0].player_seat.as_ref().map(|s| s.seat.as_str()),
+        Some("Williams #6")
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_live_says_wrong_car_when_the_player_is_in_the_team_mates() {
+    let dir = make_live_teams_dir();
+    let mut champs = two_seasons();
+    champs[0].player_team = Some("Lotus".into());
+    champs[0].player_seat = Some(ams2_championship::data_store::SeatLock {
+        seat: "Lotus #1".into(),
+        replaces: "Alan Alpha".into(),
+    });
+
+    // Alpha is on track, Bravo is not: the player is in Lotus #2.
+    let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
+    let seat = resolve_live_teams(&dir, &champs, &grid, true).seat.expect("a wrong car is said");
+    assert!(!seat.ok, "{seat:?}");
+    assert!(seat.text.contains("WRONG CAR"), "{seat:?}");
+    assert!(seat.text.contains("Lotus #2 (in place of Ben Bravo)"), "{seat:?}");
+    assert!(seat.text.contains("Lotus #1 in place of Alan Alpha"), "it says what to pick: {seat:?}");
+
+    let grid = live_grid(&[("Ben Bravo", false), ("Carl Charlie", false), ("Me", true)]);
+    let seat = resolve_live_teams(&dir, &champs, &grid, true).seat.expect("the right car is said too");
+    assert!(seat.ok, "{seat:?}");
+
+    // Multiplayer has no seat to be in.
+    assert!(resolve_live_teams(&dir, &champs, &grid, false).seat.is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_live_says_wrong_team_before_any_car_is_stored() {
+    let dir = make_live_teams_dir();
+    // two_seasons declares Brabham; with Charlie on track the only free car is a Lotus.
+    let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
+    let seat = resolve_live_teams(&dir, &two_seasons(), &grid, true).seat.expect("said");
+    assert!(!seat.ok, "{seat:?}");
+    assert!(seat.text.contains("a Brabham car"), "{seat:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_the_page_carries_the_seat_banner() {
+    let html = ams2_championship::championship_html::build_base_html();
+    assert!(html.contains("live-seat-warning"));
+    assert!(html.contains("renderSeatStatus"));
 }
 
 // ── Removing per-track entries through the tab ───────────────────────────────

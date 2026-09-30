@@ -1389,6 +1389,13 @@ header h1 { flex: 1 1 100%; }
   background: #14231a; border-color: #2f5d3a; color: #8fc79a;
 }
 .live-grid-ok .live-grid-warning-icon { color: #6a9955; }
+.champ-player-seat { color: #ccc; font-size: 0.85rem; }
+/* Sitting in the wrong car gets the session refused outright, so it is red and bold rather than
+   the grid banner's amber — this one is not advice. */
+.live-grid-warning.live-seat-wrong {
+  background: #2e1212; border-color: #a33; color: #ff9b9b; font-weight: 600; font-size: 0.95rem;
+}
+.live-seat-wrong .live-grid-warning-icon { color: #e74c3c; font-size: 1.2rem; }
 
 /* Dropping a per-track entry. The row button is a quiet × inside the Tracks cell — the entry it
    removes is named right beside it, so the button needs no label of its own. */

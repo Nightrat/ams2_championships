@@ -134,12 +134,13 @@ function renderOffers(champId, data) {
         (o.buy_in ? (afford ? '' : '<span class="contract-unaffordable">') +
                     fmtCredits(o.buy_in) + ' in sponsorship' + (afford ? '' : '</span>') : '') +
       '</td>' +
+      '<td>' + seatPicker((data.seats || {})[o.team]) + '</td>' +
       '<td><button class="manage-btn manage-btn-primary contract-sign-btn"' +
         ' data-team="' + esc(o.team) + '"' + (afford ? '' : ' disabled') + '>Sign</button></td>' +
       '</tr>' +
       // A second row rather than more columns: the explanation is a sentence, and a sentence in
       // a column makes every other column narrow.
-      '<tr class="contract-why-row"><td colspan="5" class="contract-why">' +
+      '<tr class="contract-why-row"><td colspan="6" class="contract-why">' +
         offerWhy(o, data) +
         (afford ? '' : ' &middot; <b>more than the career is worth</b>') +
       '</td></tr>';
@@ -156,8 +157,26 @@ function renderOffers(champId, data) {
     '</div>';
 
   panel.querySelectorAll('.contract-sign-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () { signSeat(champId, btn.dataset.team); });
+    btn.addEventListener('click', function () {
+      var pick = btn.closest('tr').querySelector('.contract-seat-select');
+      signSeat(champId, btn.dataset.team, pick ? pick.value : null);
+    });
   });
+}
+
+// The cars a team would put the player in. The server has already cut the list down to drivers
+// rated no higher than the player (or the team's weakest, when that is nobody), so this only
+// lists them; the choice is checked again on signing.
+function seatPicker(choices) {
+  if (!choices || !choices.length) return '';
+  return '<select class="manage-select contract-seat-select" title="The driver you replace. ' +
+      'You may only take the car of a driver rated no higher than you — or, if there is none, ' +
+      'the team’s weakest. It is fixed for the season once signed.">' +
+    choices.map(function (c) {
+      return '<option value="' + esc(c.seat) + '">' + esc(c.seat) + ' — replace ' +
+        esc(c.replaces) + (c.rating == null ? '' : ' (' + Math.round(c.rating) + ')') + '</option>';
+    }).join('') +
+    '</select>';
 }
 
 function contractSummary(data) {
@@ -197,11 +216,11 @@ function renderSignedDeal(champId, data) {
   if (btn) btn.addEventListener('click', function () { releaseSeat(champId, c.team); });
 }
 
-function signSeat(champId, team) {
+function signSeat(champId, team, seat) {
   fetch('/api/championships/' + champId + '/sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ team: team }),
+    body: JSON.stringify({ team: team, seat: seat }),
   }).then(function (r) {
     return r.json().then(function (body) { return { ok: r.ok, body: body }; });
   }).then(function (r) {

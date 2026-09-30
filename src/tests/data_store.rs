@@ -23,6 +23,7 @@ fn sample_championship() -> Championship {
         session_ids: vec!["100".into()],
         custom_ai_file: None,
         player_team: None,
+        player_seat: None,
         planned_rounds: None,
     }
 }
@@ -236,6 +237,7 @@ fn make_champ(pts: Vec<i32>, sessions: &[&str]) -> Championship {
         session_ids: vec![],
         custom_ai_file: None,
         player_team: None,
+        player_seat: None,
         planned_rounds: None,
     }
 }
@@ -1267,6 +1269,7 @@ fn champ_with(id: &str, status: ChampionshipStatus, file: Option<&str>) -> Champ
         session_ids: vec![],
         custom_ai_file: file.map(str::to_string),
         player_team: None,
+        player_seat: None,
         planned_rounds: None,
     }
 }

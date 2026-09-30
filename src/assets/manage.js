@@ -247,6 +247,15 @@ function renderChampDetail(id) {
         '</select>' +
       '</label>' +
       '<span class="config-hint" id="player-team-rating"></span>') +
+      // The one car of the team this season is raced in: chosen when signing, or — for a
+      // season with no contract — stored once the assigned sessions show it. Every session
+      // must be in this car.
+      (champ.player_seat
+        ? '<span class="champ-player-seat" title="Chosen when you signed (or shown by the first sessions). A session driven in any other car is refused.">' +
+            'My Car&nbsp;<strong>' + esc(champ.player_seat.seat) + '</strong>' +
+            (champ.player_seat.replaces ? ' in place of ' + esc(champ.player_seat.replaces) : '') +
+            ' &#128274;</span>'
+        : '') +
     '</div>' +
     // Filled by loadOffers when contracts are switched on; empty otherwise, so the team picker
     // above stays the whole story for anyone not using them.

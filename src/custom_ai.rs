@@ -1209,6 +1209,12 @@ pub struct SeatEntry {
     pub driver: String,
     /// The raw `livery_name`, so [`without_phantom_seats`] can tell whether AMS2 owns this car.
     pub livery: String,
+    /// A per-track substitute rather than the driver who holds the seat. Kept in the list for
+    /// matching names (see [`parse_seats_str`]), but never the driver a player replaces.
+    pub stand_in: bool,
+    /// The entry's `race_skill`, when the file declares one — on the 0–1 scale the team bar is
+    /// built from. See [`seat_choices`].
+    pub skill: Option<f32>,
 }
 
 /// A team plus car number, without the driver — the unit the player declares.
@@ -1275,9 +1281,10 @@ pub fn name_key(name: &str) -> String {
 /// like an AI the roster does not know. Entries therefore repeat per seat — count cars with
 /// [`car_count`], never with `len()`.
 pub fn parse_seats_str(xml: &str) -> Vec<SeatEntry> {
-    named_driver_blocks(xml)
+    // The same blocks `named_driver_blocks` yields, walked directly so `tracks` survives.
+    all_driver_blocks(xml)
         .into_iter()
-        .filter_map(|(livery, block)| {
+        .filter_map(|DriverBlock { livery, block, tracks }| {
             let driver = element_text(&block, "name")?.to_string();
             let team = extract_team_name(&livery);
             let seat = match extract_car_number(&livery) {
@@ -1289,6 +1296,8 @@ pub fn parse_seats_str(xml: &str) -> Vec<SeatEntry> {
                 team,
                 driver,
                 livery,
+                stand_in: tracks.is_some(),
+                skill: element_text(&block, "race_skill").and_then(|s| s.trim().parse().ok()),
             })
         })
         .collect()
@@ -1635,6 +1644,190 @@ pub fn check_player_team(entries: &[SeatEntry], grid: &[GridEntry], declared: &s
             } else {
                 TeamCheck::Failed(format!(
                     "you declared {declared} but the car you drove and the drivers on the grid leave only: {}",
+                    seat_list(&seats)
+                ))
+            }
+        }
+    }
+}
+
+/// The roster driver a player in `seat` takes the place of — the regular holder, never a
+/// per-track stand-in. A seat with alternating drivers (Brabham #8 is De Angelis *and* Warwick
+/// in 1986) names both, since AMS2 would have spawned one of them.
+pub fn replaced_driver(entries: &[SeatEntry], seat: &str) -> String {
+    let mut seen = HashSet::new();
+    let regulars: Vec<&str> = entries
+        .iter()
+        .filter(|e| e.seat == seat && !e.stand_in)
+        .map(|e| e.driver.as_str())
+        .filter(|d| seen.insert(*d))
+        .collect();
+    if !regulars.is_empty() {
+        return regulars.join(" / ");
+    }
+    // Only stand-ins name this seat: say who is in it rather than nothing.
+    entries
+        .iter()
+        .find(|e| e.seat == seat)
+        .map(|e| e.driver.clone())
+        .unwrap_or_default()
+}
+
+/// One car of a team the player may sign to drive, with the driver they would replace in it.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct SeatChoice {
+    /// Team plus car number, e.g. "Brabham #7".
+    pub seat: String,
+    /// The regular driver(s) of that car — see [`replaced_driver`].
+    pub replaces: String,
+    /// That driver's `race_skill` on the player's 0–100 rating scale; the weaker one for a car
+    /// with alternating drivers. `None` when the file declares no skill for them.
+    pub rating: Option<f32>,
+}
+
+/// The cars of `team` a driver rated `player_rating` may take: those whose driver is rated no
+/// higher than the player — you replace someone you are at least as good as.
+///
+/// When that leaves none, the team's **weakest** car is offered instead (every car tied for
+/// weakest, if several are): a team that signed the player has a seat for them, and it is the
+/// one its worst driver was sitting in. A driver the file gives no skill cannot be judged, and is
+/// not held against the player — the same rule [`crate::driver_rating::is_allowed`] follows.
+///
+/// Per-track stand-ins are never offered: nobody is signed to replace a one-weekend substitute.
+/// Cars come back in file order.
+pub fn seat_choices(entries: &[SeatEntry], team: &str, player_rating: f32) -> Vec<SeatChoice> {
+    let team = team.trim();
+    let mut cars: Vec<SeatChoice> = Vec::new();
+    for e in entries.iter().filter(|e| !e.stand_in && e.team.eq_ignore_ascii_case(team)) {
+        let rating = e.skill.map(|s| s * 100.0);
+        match cars.iter_mut().find(|c| c.seat == e.seat) {
+            Some(c) => {
+                c.rating = match (c.rating, rating) {
+                    (Some(a), Some(b)) => Some(a.min(b)),
+                    (a, b) => a.or(b),
+                }
+            }
+            None => cars.push(SeatChoice {
+                seat: e.seat.clone(),
+                replaces: replaced_driver(entries, &e.seat),
+                rating,
+            }),
+        }
+    }
+    // A hair of slack: 0.55 × 100 is not exactly 55 in f32, and a rating of 55 must clear it.
+    let fits = |c: &SeatChoice| c.rating.is_none_or(|r| r <= player_rating + 1e-3);
+    if cars.iter().any(fits) {
+        return cars.into_iter().filter(fits).collect();
+    }
+    let weakest = cars
+        .iter()
+        .filter_map(|c| c.rating)
+        .fold(f32::INFINITY, f32::min);
+    cars.into_iter()
+        .filter(|c| c.rating.is_some_and(|r| r <= weakest + 1e-3))
+        .collect()
+}
+
+/// What a season's recorded sessions say about which car of its declared team the player drove.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SeatEvidence {
+    /// No session can tell — none identified its roster, or each left more than one of the
+    /// team's cars free. Enforcement stays on the team alone.
+    Unknown,
+    /// Every session that could tell agrees on this one car.
+    Settled(Seat),
+    /// No single car of the team was free in all of them: the season has been raced in two
+    /// different cars.
+    Contradicted,
+}
+
+/// Narrows a season to one car of `team` by intersecting what each recorded grid leaves free.
+///
+/// A single session often cannot say which of a team's two cars the player took — a short grid
+/// leaves both empty — but a later one that fields the other car settles it. Sessions that did
+/// not use the roster say nothing and are skipped, the same way [`check_player_team`] accepts
+/// them unchecked.
+pub fn settle_seat<'a, I>(entries: &[SeatEntry], grids: I, team: &str) -> SeatEvidence
+where
+    I: IntoIterator<Item = &'a [GridEntry<'a>]>,
+{
+    let team = team.trim();
+    if team.is_empty() || entries.is_empty() {
+        return SeatEvidence::Unknown;
+    }
+    let mut left: Option<Vec<Seat>> = None;
+    for grid in grids {
+        let free = match infer_player_seat(entries, grid) {
+            PlayerSeat::RosterNotDetected { .. } => continue,
+            PlayerSeat::NoEmptySeat => vec![],
+            PlayerSeat::Derived(s) => vec![s],
+            PlayerSeat::Candidates(v) => v,
+        };
+        let of_team = free.into_iter().filter(|s| s.team.eq_ignore_ascii_case(team));
+        left = Some(match left {
+            None => of_team.collect(),
+            Some(prev) => {
+                let now: Vec<Seat> = of_team.collect();
+                prev.into_iter().filter(|p| now.contains(p)).collect()
+            }
+        });
+    }
+    match left {
+        None => SeatEvidence::Unknown,
+        Some(v) if v.is_empty() => SeatEvidence::Contradicted,
+        Some(v) if v.len() == 1 => SeatEvidence::Settled(v.into_iter().next().unwrap()),
+        Some(_) => SeatEvidence::Unknown,
+    }
+}
+
+/// Checks a grid against the one car a season has been locked to — `seat` ("Brabham #7"),
+/// taken in place of `replaces`.
+///
+/// Stricter than [`check_player_team`], which accepts either car of a two-car team: once the
+/// season has shown which one the player drives, a session in the team-mate's car contradicts
+/// it. Same rule on uncertainty: only positive evidence rejects, and a seat that remains one
+/// of several candidates is accepted.
+///
+/// The reasons are phrased for both a recorded session and the live grid, since the Manage
+/// picker and the live banner print the same sentence.
+pub fn check_locked_seat(
+    entries: &[SeatEntry],
+    grid: &[GridEntry],
+    seat: &str,
+    replaces: &str,
+) -> TeamCheck {
+    let want = if replaces.is_empty() {
+        seat.to_string()
+    } else {
+        format!("{seat} (in place of {replaces})")
+    };
+    if entries.is_empty() {
+        return TeamCheck::Skipped("the Custom AI file lists no drivers".into());
+    }
+    match infer_player_seat(entries, grid) {
+        PlayerSeat::RosterNotDetected { matched, grid } => TeamCheck::Skipped(format!(
+            "only {matched} of {grid} drivers are in the Custom AI file - this session did not use it"
+        )),
+        PlayerSeat::NoEmptySeat => TeamCheck::Failed(format!(
+            "this season is driven in {want}, but every car in the roster is taken by an AI"
+        )),
+        PlayerSeat::Derived(s) => {
+            if s.seat.eq_ignore_ascii_case(seat) {
+                TeamCheck::Passed(format!("only {} was free - that is your seat", s.seat))
+            } else {
+                TeamCheck::Failed(format!(
+                    "this season is driven in {want}, but you are in {} (in place of {})",
+                    s.seat,
+                    replaced_driver(entries, &s.seat)
+                ))
+            }
+        }
+        PlayerSeat::Candidates(seats) => {
+            if seats.iter().any(|s| s.seat.eq_ignore_ascii_case(seat)) {
+                TeamCheck::Passed(format!("consistent with the free seats: {}", seat_list(&seats)))
+            } else {
+                TeamCheck::Failed(format!(
+                    "this season is driven in {want}, but the car you drove and the drivers on the grid leave only: {}",
                     seat_list(&seats)
                 ))
             }
