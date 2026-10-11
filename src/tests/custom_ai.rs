@@ -65,6 +65,38 @@ fn test_extract_team_name_driver_before_number_with_dash_separator() {
     );
 }
 
+/// The shapes a roster takes when it names AMS2's **stock** liveries rather than a livery mod's,
+/// taken from the shipped Formula Renault roster: the usual "Team #N Driver", a team and number
+/// with no driver, and a livery with no number at all. Seat accounting needs nothing more than
+/// these to split into team and car, which is what lets a stock-livery roster work without mods.
+#[test]
+fn test_stock_livery_names_split_into_team_and_car() {
+    let xml = r#"<custom_ai_drivers>
+        <driver livery_name="DAMS #1 C. Sainz Jr."><name>Carlos Sainz Jr.</name></driver>
+        <driver livery_name="DAMS #2 N. Nato"><name>Norman Nato</name></driver>
+        <driver livery_name="SMS Besmone Racing Team #30"><name>Richie Stanaway</name></driver>
+        <driver livery_name="SMS T-Rexergie Racing #31"><name>Oscar Tunjo</name></driver>
+        <driver livery_name="Custom Liv"><name>Alfonso Celis Jr.</name></driver>
+    </custom_ai_drivers>"#;
+    let seats: Vec<(String, String)> = parse_seats_str(xml)
+        .into_iter()
+        .map(|e| (e.team, e.seat))
+        .collect();
+    let pair = |t: &str, s: &str| (t.to_string(), s.to_string());
+    assert_eq!(
+        seats,
+        vec![
+            pair("DAMS", "DAMS #1"),
+            pair("DAMS", "DAMS #2"),
+            // Same "SMS" prefix, but three different teams — the number is what ends the name.
+            pair("SMS Besmone Racing Team", "SMS Besmone Racing Team #30"),
+            pair("SMS T-Rexergie Racing", "SMS T-Rexergie Racing #31"),
+            // No number: a one-car team named after the livery, still a seat of its own.
+            pair("Custom Liv", "Custom Liv"),
+        ]
+    );
+}
+
 #[test]
 fn test_parse_driver_teams_ignores_track_override_blocks() {
     let map = parse_driver_teams_str(SAMPLE);
@@ -339,10 +371,10 @@ fn test_the_team_check_accepts_either_car_which_is_why_a_seat_is_locked() {
     assert!(matches!(check_player_team(&seats, &grid(&eight), "Brabham"), TeamCheck::Passed(_)));
     // Locked to #7, the team-mate's car is refused and the reason names both cars.
     assert!(matches!(
-        check_locked_seat(&seats, &grid(FULL_GRID), "Brabham #7", "Riccardo Patrese"),
+        check_locked_seat(&seats, &grid(FULL_GRID), "Brabham #7", "Riccardo Patrese", SeatProof::Possible),
         TeamCheck::Passed(_)
     ));
-    match check_locked_seat(&seats, &grid(&eight), "Brabham #7", "Riccardo Patrese") {
+    match check_locked_seat(&seats, &grid(&eight), "Brabham #7", "Riccardo Patrese", SeatProof::Possible) {
         TeamCheck::Failed(reason) => {
             assert!(reason.contains("Brabham #7 (in place of Riccardo Patrese)"), "got {reason}");
             assert!(reason.contains("Brabham #8"), "got {reason}");
@@ -358,14 +390,150 @@ fn test_a_locked_seat_still_accepts_a_grid_that_cannot_tell_the_two_apart() {
     let rows: Vec<(&str, &str, bool)> =
         FULL_GRID.iter().copied().filter(|&(n, _, _)| n != "Derek Warwick").collect();
     assert!(matches!(
-        check_locked_seat(&seats, &grid(&rows), "Brabham #7", ""),
+        check_locked_seat(&seats, &grid(&rows), "Brabham #7", "", SeatProof::Possible),
         TeamCheck::Passed(_)
     ));
     let stock: &[(&str, &str, bool)] = &[("Nightrat", M1, true), ("Aires Silva  (AI)", M1, false)];
     assert!(matches!(
-        check_locked_seat(&seats, &grid(stock), "Brabham #7", ""),
+        check_locked_seat(&seats, &grid(stock), "Brabham #7", "", SeatProof::Possible),
         TeamCheck::Skipped(_)
     ));
+}
+
+/// The weakness `SeatProof::Exact` closes: without Warwick both Brabhams are empty, which is
+/// what the grid looks like whether the player drove #7 or drove #8 while AMS2 dropped Patrese.
+#[test]
+fn test_an_exact_seat_refuses_a_grid_that_cannot_tell_the_two_apart() {
+    let seats = parse_seats_str(ROSTER);
+    let rows: Vec<(&str, &str, bool)> =
+        FULL_GRID.iter().copied().filter(|&(n, _, _)| n != "Derek Warwick").collect();
+    match check_locked_seat(&seats, &grid(&rows), "Brabham #7", "", SeatProof::Exact) {
+        TeamCheck::Failed(reason) => {
+            assert!(reason.contains("Brabham #7, Brabham #8"), "names both: {reason}");
+            // Nine cars in the roster, so eight opponents.
+            assert!(reason.contains("Race with 8 opponents"), "says what to change: {reason}");
+        }
+        other => panic!("expected Failed, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_an_exact_seat_accepts_a_grid_that_leaves_only_that_car() {
+    let seats = parse_seats_str(ROSTER);
+    // Not every car is on track — Arrows #17 is empty too — but Boutsen shows Arrows runs Model2
+    // and the player drove a Model1, so it is ruled out and #7 is the one car left.
+    assert!(matches!(
+        check_locked_seat(&seats, &grid(FULL_GRID), "Brabham #7", "", SeatProof::Exact),
+        TeamCheck::Passed(_)
+    ));
+}
+
+#[test]
+fn test_an_exact_seat_still_refuses_the_wrong_car_and_skips_stock_ai() {
+    let seats = parse_seats_str(ROSTER);
+    assert!(matches!(
+        check_locked_seat(&seats, &grid(&brabham_8_grid()), "Brabham #7", "", SeatProof::Exact),
+        TeamCheck::Failed(_)
+    ));
+    let stock: &[(&str, &str, bool)] = &[("Nightrat", M1, true), ("Aires Silva  (AI)", M1, false)];
+    assert!(matches!(
+        check_locked_seat(&seats, &grid(stock), "Brabham #7", "", SeatProof::Exact),
+        TeamCheck::Skipped(_)
+    ));
+}
+
+// ── Roster entries that cannot spawn, read off the live grid ─────────────────
+//
+// Shaped on a real Formula Renault 3.5 session: six cars claimed, but one entry names a real car
+// wrongly (a stock driver drives it) and one names no car at all.
+
+const DEAD_ROSTER: &str = r#"<custom_ai_drivers>
+    <driver livery_name="Arden #1 A. Ann"><name>Amy Ann</name></driver>
+    <driver livery_name="Arden #2 B. Bob"><name>Ben Bob</name></driver>
+    <driver livery_name="Pons #3 C. Cid"><name>Carl Cid</name></driver>
+    <driver livery_name="Pons #4 D. Dan"><name>Dave Dan</name></driver>
+    <driver livery_name="SMS #5 E. Eve"><name>Eva Eve</name></driver>
+    <driver livery_name="Custom Liv"><name>Finn Fay</name></driver>
+</custom_ai_drivers>"#;
+const FR: &str = "Formula Renault 3.5";
+
+#[test]
+fn test_roster_fault_names_the_entries_a_full_grid_never_showed() {
+    let seats = parse_seats_str(DEAD_ROSTER);
+    // Five opponents for a six-car roster, player locked to SMS #5 — yet Pons #4 and Custom Liv
+    // never appear, Eve is on track in a reused livery, and a stock driver fills a car.
+    let rows: &[(&str, &str, bool)] = &[
+        ("Nightrat", FR, true),
+        ("Amy Ann", FR, false),
+        ("Ben Bob", FR, false),
+        ("Carl Cid", FR, false),
+        ("Eva Eve", FR, false),
+        ("Thiago Izequiel", FR, false),
+    ];
+    let text = roster_fault(&seats, &grid(rows), Some("SMS #5"), "Formula Renault.xml")
+        .expect("two cars missing from a grid with room for all");
+    assert!(text.contains("Dave Dan (Pons #4) and Finn Fay (Custom Liv) never appeared"), "{text}");
+    assert!(text.contains("unless you are driving one of them"), "{text}");
+    assert!(text.contains("(Thiago Izequiel)"), "{text}");
+    assert!(text.contains("1 of them names a real car wrongly"), "{text}");
+    assert!(text.contains("the other should be removed"), "{text}");
+    assert!(text.contains("Formula Renault.xml"), "{text}");
+    // Six claimed, two dead, one of those a real car under another name: five.
+    assert!(text.contains("fields 5 cars: race with 4 opponents"), "{text}");
+}
+
+#[test]
+fn test_roster_fault_with_the_locked_car_missing_blames_only_the_others() {
+    let seats = parse_seats_str(DEAD_ROSTER);
+    // Player in SMS #5 and Eve rightly absent; Custom Liv absent too, with no stock driver.
+    let rows: &[(&str, &str, bool)] = &[
+        ("Nightrat", FR, true),
+        ("Amy Ann", FR, false),
+        ("Ben Bob", FR, false),
+        ("Carl Cid", FR, false),
+        ("Dave Dan", FR, false),
+        ("Ben Bob", FR, false),
+    ];
+    let text = roster_fault(&seats, &grid(rows), Some("SMS #5"), "F.xml").expect("one dead entry");
+    assert!(text.starts_with("Ben Bob is on the grid twice"), "{text}");
+    assert!(text.contains("Finn Fay (Custom Liv) never appeared"), "{text}");
+    assert!(!text.contains("Eva Eve"), "the player's car is not a fault: {text}");
+    assert!(!text.contains("unless you are driving"), "{text}");
+    assert!(text.contains("Remove the entry from F.xml"), "{text}");
+    assert!(text.contains("fields 5 cars: race with 4 opponents"), "{text}");
+}
+
+#[test]
+fn test_roster_fault_says_nothing_it_cannot_prove() {
+    let seats = parse_seats_str(DEAD_ROSTER);
+    // Short grid, no repeats: a missing car may just have been left out.
+    let short: &[(&str, &str, bool)] = &[
+        ("Nightrat", FR, true),
+        ("Amy Ann", FR, false),
+        ("Ben Bob", FR, false),
+        ("Carl Cid", FR, false),
+    ];
+    assert_eq!(roster_fault(&seats, &grid(short), Some("SMS #5"), "F.xml"), None);
+    // Every car but the player's on track.
+    let full: &[(&str, &str, bool)] = &[
+        ("Nightrat", FR, true),
+        ("Amy Ann", FR, false),
+        ("Ben Bob", FR, false),
+        ("Carl Cid", FR, false),
+        ("Dave Dan", FR, false),
+        ("Finn Fay", FR, false),
+    ];
+    assert_eq!(roster_fault(&seats, &grid(full), Some("SMS #5"), "F.xml"), None);
+    // One car missing and it is not the locked one: that is the car the player is in.
+    let wrong_car: &[(&str, &str, bool)] = &[
+        ("Nightrat", FR, true),
+        ("Amy Ann", FR, false),
+        ("Ben Bob", FR, false),
+        ("Carl Cid", FR, false),
+        ("Eva Eve", FR, false),
+        ("Finn Fay", FR, false),
+    ];
+    assert_eq!(roster_fault(&seats, &grid(wrong_car), Some("SMS #5"), "F.xml"), None);
 }
 
 #[test]
@@ -677,6 +845,44 @@ fn test_known_class_names_parses_registered_names() {
     assert!(names.contains("F-Classic_Gen1"));
     assert!(names.contains("F-Classic_Gen1_LD"));
     assert!(!names.contains("F-Classic_Gen1_1986"));
+    std::fs::remove_dir_all(ai_dir.parent().unwrap().parent().unwrap()).ok();
+}
+
+/// A car mod's class is not in Reiza's registry — it is declared in the mod's own `.crd`, laid out
+/// as the Formula Renault 3.5 mod ships it. Its roster must be offered like any stock class's.
+#[test]
+fn test_known_class_names_includes_classes_declared_by_car_mods() {
+    let ai_dir = make_install_with_registry("modcar", &["F-Classic_Gen1"]);
+    let car = ai_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("Vehicles")
+        .join("formula_renault_35");
+    std::fs::create_dir_all(&car).unwrap();
+    std::fs::write(
+        car.join("formula_renault35.crd"),
+        "<class name=\"VehicleDetails\" base=\"BPersistent\">\n\
+         \t<prop name=\"Vehicle Class\" type=\"String\" />\n\
+         </class>\n\
+         <data class=\"VehicleDetails\" id=\"0xA441FE8\">\n\
+         \t<prop name=\"Vehicle Class\" data=\"Formula Renault\" />\n\
+         </data>\n",
+    )
+    .unwrap();
+    std::fs::write(ai_dir.join("Formula Renault.xml"), SAMPLE_WITH_SCALARS).unwrap();
+    std::fs::write(ai_dir.join("Formula Renault_old.xml"), SAMPLE_WITH_SCALARS).unwrap();
+
+    let names = known_class_names(&ai_dir).unwrap();
+    assert!(names.contains("F-Classic_Gen1"));
+    assert!(names.contains("Formula Renault"));
+    // The schema's own `type="String"` line declares no class.
+    assert!(!names.contains("String"));
+    assert_eq!(
+        list_files_for_known_classes(&ai_dir),
+        vec!["Formula Renault.xml".to_string()]
+    );
     std::fs::remove_dir_all(ai_dir.parent().unwrap().parent().unwrap()).ok();
 }
 

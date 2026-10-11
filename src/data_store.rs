@@ -184,6 +184,15 @@ impl CareerMode {
         self != CareerMode::Multiplayer
     }
 
+    /// Whether a session must *prove* it was driven in the season's car, rather than merely not
+    /// contradict it — see [`crate::custom_ai::SeatProof`].
+    ///
+    /// Singleplayer only: a contract was signed for that one car and is paid for it. An unset
+    /// career keeps the lenient check it always had, which never required a full grid.
+    pub fn requires_exact_car(self) -> bool {
+        self == CareerMode::Singleplayer
+    }
+
     /// Whether a new season may only be created once every existing one is finished.
     pub fn one_season_at_a_time(self) -> bool {
         self == CareerMode::Singleplayer

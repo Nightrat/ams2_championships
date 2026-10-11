@@ -38,7 +38,9 @@ A multiplayer career has no roster, no team and no contracts, so it is asked for
 
 A round can contain multiple sessions (e.g. a qualifying session and a race). Only race sessions contribute points to the standings — and only race sessions draw a salary instalment.
 
-In a singleplayer season that has both a roster and a team, sessions that could not have been yours are **left out of the picker**, with a line saying how many were hidden. The check reads the recorded grid against the roster: if every seat in the roster was filled by an AI, or the only free one was not your team's, you were not driving for that team in that session.
+In a singleplayer season that has both a roster and a team, sessions that could not have been yours are **left out of the picker**, with a line saying how many were hidden. The check reads the recorded grid against the roster: if every seat in the roster was filled by an AI, or the only free one was not your team's, you were not driving for that team in that session. Once the season has a car (the one you signed for, or the one its first sessions settled), a session driven in the team-mate's car is hidden too.
+
+In a singleplayer career a race or qualifying session must also **prove** it was your car. If its grid leaves your car empty alongside another car, the app cannot tell which one you drove, so the session cannot be added. The reason names the empty cars and the opponent count to race with next time. Practice is not checked.
 
 A session raced on a different roster entirely is *not* hidden — it cannot contradict a seat it never had. You can assign it; it simply will not tell the rating anything, and the season's grid check below will say so.
 
@@ -47,12 +49,12 @@ A session raced on a different roster entirely is *not* hidden — it cannot con
 Under the season's settings, a singleplayer season shows how its recorded sessions lined up with the roster it is judged against, and each session card carries its own note when something is off:
 
 - **Not raced on this roster** — barely any of that grid is in the Custom AI file, so the session cannot count towards your rating.
-- **Short grid** — fewer cars raced than the roster can field. Your finish is judged against where your car ranks in the *whole* roster, so a smaller field flatters it.
+- **Short grid** — fewer cars raced than the roster can field. Your finish is judged against where your car ranks in the *whole* roster, so a smaller field flatters it. In singleplayer, a short race or qualifying grid that leaves your car ambiguous cannot be added at all (see above).
 - **Cars not in the roster** — the opponent count was above what the roster can field, so AMS2 filled the rest with stock AI.
 
 A season raced properly says so in one line and nothing more. If there is nothing to check against — no Custom AI folder, or no roster on this season — it says that instead, rather than reporting all clear.
 
-The same warnings appear in two other places: live in the [Live Session](Live-Session.md#grid-warning) tab while you can still fix them, and on the affected sessions in the [Career](Career.md#round-results) tab afterwards.
+The same warnings appear in two other places: live in the [Live Session](Live-Session.md#grid-check) tab while you can still fix them, and on the affected sessions in the [Career](Career.md#round-results) tab afterwards.
 
 ## Editing a championship
 

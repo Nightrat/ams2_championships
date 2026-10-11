@@ -30,6 +30,7 @@ In a singleplayer career, a banner above the timing table says whether the grid 
 | ✓ *Full grid: all N cars of the roster are out* | Green. Every car the roster can field is on track, so the session will be judged on it. Nothing to do |
 | *Not raced on this roster* | Hardly any of the AI on track are in the season's Custom AI file, so nothing from this session can count towards your rating |
 | *Short grid* | Fewer cars are running than the roster can field — your finish will be judged against the full roster, which a smaller field flatters |
+| *… never appeared, although the grid had room for every car of the roster* | A roster entry names a livery AMS2 does not have, so its car never spawns, and every grid looks short. The banner names those entries, says whether to remove them or copy the exact livery name from the game's livery picker, and gives the opponent count the roster really supports. The game's own liveries and a car mod's cannot be checked from files, so a full grid is the only place this shows up |
 | *N cars not in the roster* | The opponent count is above what the roster can field, so AMS2 has filled the rest with its own AI |
 | *No championship is Active* | Nothing marks which season you are racing, so the session has no grid to be judged against |
 | *No Custom AI Drivers file / folder* | There is no roster to resolve team names from, or to rate against |
@@ -40,7 +41,13 @@ Those two tabs stay quiet on a session that was fine, rather than marking each o
 
 The banner is blank until a session loads, which is not the same as good news: there is simply no grid to check yet.
 
-Nothing is blocked by it — the session still records, still assigns and still scores championship points. A multiplayer career never shows it: it has no roster to race.
+The grid banner blocks nothing — the session still records, still assigns and still scores championship points. A multiplayer career never shows it: it has no roster to race.
+
+### Wrong car
+
+A second, red banner checks that you are in the season's car, or before the season has one, in a car of your team. **WRONG CAR** means the session will be **refused** when you add it to the season, so quit to the menu and fix it while you can.
+
+In a singleplayer career a race or qualifying session must also *show* that you drove your car. The app finds your car by elimination, so if the grid leaves your car empty alongside another one, it cannot tell which car you drove. The banner then gives the opponent count to set. Practice is not checked. If the same car is named as empty every time, its roster entry is the likely cause (see the grid banner above).
 
 ## Timing table
 

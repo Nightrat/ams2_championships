@@ -78,27 +78,29 @@ They differ for two reasons, and a season roster usually has both:
 - **A driver the game cannot field.** An entry whose livery AMS2 does not own is silently ignored and never reaches a grid; those rows are tagged **no livery**.
 - **More than one entry for the same car.** A roster names everyone who sat in that car across the season — a stand-in for one race, or a second livery — and they all share one seat on track. F-Vintage_Gen2 is 29 entries and 26 cars for exactly this reason: Tino Brambilla replaces Chris Amon in the Ferrari at Monza 1971, and two more entries only retune a driver at certain circuits.
 
-Getting it wrong breaks nothing, but it quietly costs you the things the roster was for:
+Getting it wrong costs you the things the roster was for — and in a singleplayer career, a grid that is too short is refused outright:
 
 | Grid size | What it does |
 |---|---|
-| **Fewer opponents than seats** | AMS2 fields only part of the roster. Your rating is then scored against what your car should do **across the whole grid** — a car that belongs around P18 of 22 — while you actually finished inside a field of, say, ten. Those are not the same scale, so the score flatters you and the rating drifts up on nothing. Most of the roster also looks unraced, which makes it harder for the app to work out which seat was yours |
+| **Fewer opponents than seats** | AMS2 fields only part of the roster, and the app can no longer tell which car you drove. It finds your car by elimination — every roster driver on track rules out their own car — so with several cars empty, "you drove the car you signed for" and "you drove another one while AMS2 left your car's driver out" look exactly the same. **A singleplayer race or qualifying session that leaves your car empty alongside another one cannot be added to the season**; the message names the empty cars and the opponent count to set. Practice is not checked. (Where it is accepted, the rating would also be scored against the whole grid while you finished inside a smaller field, which flatters it.) |
 | **More opponents than seats** | AMS2 makes up the difference with its own stock AI. Those cars are not in the roster, so they show as car models in the live grid — and if they outnumber the roster cars, the session counts as not having used the roster at all and is skipped by the rating |
 | **Exactly the roster** | Every team is on track, every expected finishing position means what it says, and your own seat is unambiguous |
 
 This is the same reason a season's roster locks once it has a recorded session: the grid is the yardstick everything is measured with, so it has to stay the same grid all season.
 
-**You will be told.** The app checks the grid against the roster and says so in three places: a banner in the Live Session tab while you are on track and can still fix it, a panel on the season in the Manage tab, and a flag on the affected races in the Career tab. Nothing is ever blocked — the session records, assigns and scores as normal; the message only says what it can and cannot be judged on.
+**You will be told.** The app checks the grid against the roster and says so in three places: a banner in the Live Session tab while you are on track and can still fix it, a panel on the season in the Manage tab, and a flag on the affected races in the Career tab. The grid warning itself blocks nothing — the session records, assigns and scores as normal; the message only says what it can and cannot be judged on. What *is* refused is a session that cannot show you were in your car: then the red **WRONG CAR** banner appears on the live tab while you can still quit and fix the opponent count.
+
+> **A car that never appears on any grid** will make every session look short. That is a roster entry whose `livery_name` matches no livery AMS2 has — for a livery mod the app marks it **no livery**, but for the game's own liveries it cannot check. If the same car is named in every refusal, fix or remove that entry.
 
 ### What happens when a piece is missing
 
 | Missing | What you get |
 |---|---|
-| The livery a roster entry names | AMS2 **silently ignores that entry** — no error, the driver never appears. The app marks such rows **no livery** in the Car and Driver Performance tabs. A roster can name more drivers than the class has cars |
+| The livery a roster entry names | AMS2 **silently ignores that entry** — no error, the driver never appears. The app marks such rows **no livery** in the Car and Driver Performance tabs, but only for a livery mod. The game's own liveries and a car mod's cannot be checked from files; there the Live Session tab names an entry that never appears on a full grid. A roster can name more drivers than the class has cars |
 | The whole livery pack for a class | Nothing in the roster spawns, so the race runs on stock AMS2 AI |
 | The Custom AI file (or the folder setting) | The live grid shows car models instead of team names, and the season has no grid to judge you against: no ratings, no team requirements and no offers |
 | A race actually run on stock AI | That session **does not count towards your rating** — the app can see that fewer than half the grid is in the roster and skips it rather than guessing. Nothing is broken and nothing is lost; the session is still recorded and still scores championship points |
-| A full grid (opponents set below the roster size) | Results are recorded and scored as normal, but the rating is measured against the wrong-sized field — see [Set the grid size to the roster](#set-the-grid-size-to-the-roster) |
+| A full grid (opponents set below the roster size) | Results are recorded and scored as normal, but the rating is measured against the wrong-sized field. In a singleplayer career, a race or qualifying session that leaves your car ambiguous is refused. See [Set the grid size to the roster](#set-the-grid-size-to-the-roster) |
 
 A career whose races never match its roster therefore sits on the starting rating for ever: it can still sign for whatever an unproven driver is offered, and still draws that salary, but it never improves its way up the grid. That is the system working as designed rather than a fault — but it is not much of a career, so it is worth getting the three pieces lined up before the first season.
 

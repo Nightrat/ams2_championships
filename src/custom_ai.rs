@@ -1005,6 +1005,10 @@ pub struct ClassPerformance {
 /// Reiza ships the authoritative list of registered class names as `Colour name="..."` entries
 /// in the game's own `GUI/HUD_1_6/HUD_ColoursDefs.xml`.
 ///
+/// That list is Reiza's own and knows nothing of **car mods**. A mod car declares its class in its
+/// own vehicle file instead — see [`mod_class_names`] — and those are added, or a mod's roster
+/// (`Formula Renault.xml`, for the Formula Renault 3.5 mod) would be hidden although AMS2 reads it.
+///
 /// `custom_ai_dir` is expected to be `<AMS2 install>/UserData/CustomAIDrivers`; the install root
 /// is derived by walking up two directory levels. Returns `None` if that derivation fails or the
 /// registry file can't be found/read — callers should treat `None` as "can't verify" (i.e. don't
@@ -1024,7 +1028,50 @@ pub fn known_class_names(custom_ai_dir: &Path) -> Option<HashSet<String>> {
         names.insert(rest[..end].to_string());
         rest = &rest[end..];
     }
+    names.extend(mod_class_names(install_root));
     Some(names)
+}
+
+/// The classes installed car mods declare: the `Vehicle Class` of every
+/// `<install>/Vehicles/<car>/*.crd`.
+///
+/// Reiza's own cars live sealed in the game's paks, so the only vehicle definitions lying in that
+/// folder as plain files are the ones a mod unpacked there. Unreadable folders and files are
+/// skipped — this only ever adds to the registry, so a miss hides a mod's roster as before.
+fn mod_class_names(install_root: &Path) -> HashSet<String> {
+    let mut names = HashSet::new();
+    let Ok(cars) = fs::read_dir(install_root.join("Vehicles")) else {
+        return names;
+    };
+    for car in cars.flatten() {
+        let Ok(files) = fs::read_dir(car.path()) else {
+            continue;
+        };
+        for file in files.flatten() {
+            let path = file.path();
+            let is_crd = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case("crd"));
+            if !is_crd {
+                continue;
+            }
+            let Ok(text) = fs::read_to_string(&path) else {
+                continue;
+            };
+            // The schema declares the property too (`type="String"`); only a `data` line has a value.
+            let class = text
+                .lines()
+                .filter(|l| l.contains("name=\"Vehicle Class\""))
+                .find_map(|l| attr_value(l, "data"))
+                .map(str::trim)
+                .filter(|c| !c.is_empty());
+            if let Some(class) = class {
+                names.insert(class.to_string());
+            }
+        }
+    }
+    names
 }
 
 /// The class name a `CustomAIDrivers` file claims by its filename — the stem AMS2 matches against
@@ -1041,7 +1088,7 @@ pub fn class_of_file(file: &str) -> &str {
 /// The game loads a `CustomAIDrivers` file only when its name minus `.xml` is a class in its own
 /// registry. Anything else is silently ignored — a per-track variant kept beside the real file
 /// (`F-Vintage_Gen2_03Nordschleiffe.xml`), or a class written the way the UI spells it rather than
-/// the way the registry does (`Formula Renault.xml`). Such a file cannot affect a session, so
+/// the way the registry does. Such a file cannot affect a session, so
 /// assigning a championship to it would promise AI behaviour that never happens.
 ///
 /// An unreadable registry returns every file rather than none, the same can't-verify rule
@@ -1592,6 +1639,141 @@ impl GridFit {
     }
 }
 
+/// Roster cars that cannot spawn, read off a grid that had room for all of them — or `None` when
+/// the grid shows nothing wrong, or cannot tell.
+///
+/// AMS2 fields one car per livery and binds a roster entry to a livery by name, silently skipping
+/// an entry that names none. For a livery mod [`crate::liveries::phantom_liveries`] catches that
+/// from the manifests, but the game's own liveries — and a car mod's — are sealed in its paks, so
+/// there the grid is the only witness. Given opponents enough for every car of the roster, every
+/// car but the player's must be on track; any other that is missing never spawns.
+///
+/// The grid says more than which entries are dead. A stock-named driver means a livery exists that
+/// *no* entry names, so that many of the missing entries name a real car wrongly rather than a car
+/// that does not exist; and a driver on track twice means AMS2 ran out of liveries and reused one.
+/// Which of the missing entries is the misnamed one cannot be told — the shared memory carries no
+/// livery — so the sentence says how many of each, not which.
+///
+/// `locked` is the season's car. When it is among the missing it is the player's and not a fault;
+/// otherwise one of the missing may be the car the player is in, so two must be missing before
+/// any can be blamed. `file` is the roster's file name, for the instruction.
+pub fn roster_fault(
+    seats: &[SeatEntry],
+    grid: &[GridEntry],
+    locked: Option<&str>,
+    file: &str,
+) -> Option<String> {
+    let fit = GridFit::measure(seats, grid);
+    if fit.seats == 0 || fit.ai == 0 || fit.not_roster() {
+        return None;
+    }
+    let ai: Vec<String> = grid
+        .iter()
+        .filter(|g| !g.is_player)
+        .map(|g| name_key(g.name))
+        .collect();
+    let mut seen: HashMap<&str, usize> = HashMap::new();
+    for key in &ai {
+        *seen.entry(key.as_str()).or_default() += 1;
+    }
+    let roster_keys: HashSet<String> = seats.iter().map(|e| name_key(&e.driver)).collect();
+    let mut twice: Vec<&str> = Vec::new();
+    let mut strangers: Vec<&str> = Vec::new();
+    for g in grid.iter().filter(|g| !g.is_player) {
+        let key = name_key(g.name);
+        if !roster_keys.contains(&key) {
+            strangers.push(g.name);
+        } else if seen.get(key.as_str()).copied().unwrap_or(0) > 1 && !twice.contains(&g.name) {
+            twice.push(g.name);
+        }
+    }
+    // Without room for every car a missing one may simply have been left out.
+    if fit.ai + 1 < fit.seats && twice.is_empty() {
+        return None;
+    }
+
+    let mut order: Vec<&str> = Vec::new();
+    for e in seats {
+        if !order.contains(&e.seat.as_str()) {
+            order.push(&e.seat);
+        }
+    }
+    let mut missing: Vec<&str> = order
+        .into_iter()
+        .filter(|seat| {
+            !seats
+                .iter()
+                .any(|e| e.seat == *seat && seen.contains_key(name_key(&e.driver).as_str()))
+        })
+        .collect();
+    let yours_missing = locked.is_some_and(|l| missing.iter().any(|m| m.eq_ignore_ascii_case(l)));
+    if yours_missing {
+        missing.retain(|m| !locked.is_some_and(|l| m.eq_ignore_ascii_case(l)));
+    }
+    if missing.is_empty() || (!yours_missing && missing.len() < 2) {
+        return None;
+    }
+
+    let join = |items: Vec<String>| match items.as_slice() {
+        [] => String::new(),
+        [one] => one.clone(),
+        [init @ .., last] => format!("{} and {last}", init.join(", ")),
+    };
+    let dead = missing.len();
+    let names = join(
+        missing
+            .iter()
+            .map(|seat| format!("{} ({seat})", replaced_driver(seats, seat)))
+            .collect(),
+    );
+    let mut text = String::new();
+    if !twice.is_empty() {
+        text.push_str(&format!(
+            "{} {} on the grid twice: AMS2 has fewer cars than the opponents you set, so it \
+             reused a livery. ",
+            join(twice.iter().map(|s| s.to_string()).collect()),
+            if twice.len() == 1 { "is" } else { "are" }
+        ));
+    }
+    text.push_str(&format!(
+        "{names} never appeared, although the grid had room for every car of the roster"
+    ));
+    if !yours_missing {
+        text.push_str(" — unless you are driving one of them");
+    }
+    text.push_str(&format!(". {} no livery AMS2 has. ", if dead == 1 { "Its livery_name matches" } else { "Their livery_name matches" }));
+    let s = strangers.len().min(dead);
+    let stock = join(strangers.iter().map(|s| s.to_string()).collect());
+    let pick = "copy the exact livery name from the game's livery picker";
+    match (s, dead - s) {
+        (0, _) => text.push_str(&format!(
+            "Remove {} from {file}, or {pick}.",
+            if dead == 1 { "the entry" } else { "these entries" }
+        )),
+        (_, 0) => text.push_str(&format!(
+            "AMS2 put stock driver{} ({stock}) in {} no entry names, so {} a real car wrongly: \
+             {pick} into {file}.",
+            if strangers.len() == 1 { "" } else { "s" },
+            if s == 1 { "a car" } else { "cars" },
+            if dead == 1 { "it names" } else { "they name" }
+        )),
+        (s, rest) => text.push_str(&format!(
+            "AMS2 put stock driver{} ({stock}) in {} no entry names, so {s} of them {} a real car \
+             wrongly — {pick} into {file} — and the other{} should be removed.",
+            if strangers.len() == 1 { "" } else { "s" },
+            if s == 1 { "a car" } else { "cars" },
+            if s == 1 { "names" } else { "name" },
+            if rest == 1 { "" } else { "s" }
+        )),
+    }
+    let cars = fit.seats - dead + s;
+    text.push_str(&format!(
+        " The roster then fields {cars} cars: race with {} opponents.",
+        cars.saturating_sub(1)
+    ));
+    Some(text)
+}
+
 /// Cars a roster can put on the grid: distinct `seat` values, i.e. team plus car number.
 ///
 /// **This must agree with `driver_rating::expected_positions`**, which ranks the same distinct
@@ -1780,13 +1962,34 @@ where
     }
 }
 
+/// How much a grid has to show before [`check_locked_seat`] accepts it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeatProof {
+    /// Accept unless the grid contradicts the car: the season's car being one of several left
+    /// empty is enough.
+    Possible,
+    /// Accept only a grid that leaves the season's car as the **one** car empty.
+    ///
+    /// The car is found by elimination — every roster driver on track rules out their own car —
+    /// so a short grid cannot tell "drove the signed car" from "drove another, and AMS2 happened
+    /// to leave the signed car's driver out". Both leave the signed car empty; only a grid with
+    /// every other car on it separates them. The rule bites only when the shortfall actually
+    /// makes the car ambiguous: an empty car whose team is seen on track in a different model
+    /// from the player's is ruled out, so it does not count against the grid. A team with nobody
+    /// on track has no known model, and its empty car does count.
+    Exact,
+}
+
 /// Checks a grid against the one car a season has been locked to — `seat` ("Brabham #7"),
 /// taken in place of `replaces`.
 ///
 /// Stricter than [`check_player_team`], which accepts either car of a two-car team: once the
 /// season has shown which one the player drives, a session in the team-mate's car contradicts
-/// it. Same rule on uncertainty: only positive evidence rejects, and a seat that remains one
-/// of several candidates is accepted.
+/// it. With [`SeatProof::Possible`] the rule on uncertainty is the usual one — only positive
+/// evidence rejects; with [`SeatProof::Exact`] an ambiguous grid is refused too.
+///
+/// A session that did not use the roster is `Skipped` either way: nothing can be told about
+/// seats from it, and it is the rating's business to ignore it.
 ///
 /// The reasons are phrased for both a recorded session and the live grid, since the Manage
 /// picker and the live banner print the same sentence.
@@ -1795,6 +1998,7 @@ pub fn check_locked_seat(
     grid: &[GridEntry],
     seat: &str,
     replaces: &str,
+    proof: SeatProof,
 ) -> TeamCheck {
     let want = if replaces.is_empty() {
         seat.to_string()
@@ -1823,13 +2027,24 @@ pub fn check_locked_seat(
             }
         }
         PlayerSeat::Candidates(seats) => {
-            if seats.iter().any(|s| s.seat.eq_ignore_ascii_case(seat)) {
-                TeamCheck::Passed(format!("consistent with the free seats: {}", seat_list(&seats)))
-            } else {
+            if !seats.iter().any(|s| s.seat.eq_ignore_ascii_case(seat)) {
                 TeamCheck::Failed(format!(
                     "this season is driven in {want}, but the car you drove and the drivers on the grid leave only: {}",
                     seat_list(&seats)
                 ))
+            } else if proof == SeatProof::Exact {
+                // Says what to change, and the one roster fault that looks the same from here: a
+                // car whose livery AMS2 lacks is empty on every grid, however many opponents.
+                TeamCheck::Failed(format!(
+                    "the grid left {} cars empty ({}), so it cannot show you drove {want}. Race \
+                     with {} opponents so every other car of the roster is on track. If one of \
+                     those cars is empty on every grid, its livery_name matches no livery AMS2 has",
+                    seats.len(),
+                    seat_list(&seats),
+                    car_count(entries).saturating_sub(1)
+                ))
+            } else {
+                TeamCheck::Passed(format!("consistent with the free seats: {}", seat_list(&seats)))
             }
         }
     }

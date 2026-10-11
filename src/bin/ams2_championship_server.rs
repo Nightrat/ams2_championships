@@ -488,14 +488,19 @@ fn champ_roster_seats(
 /// car of the team consistent with the rest of the season is refused, because the season would
 /// then have been raced in two. Nothing is checked without a declared team and a roster — the
 /// same rule `check_player_team` has always had.
+///
+/// `exact_car` is the career's [`CareerMode::requires_exact_car`]: a stored car must then be the
+/// *only* car the grid leaves empty, not merely one of them. Practice is exempt — a short practice
+/// grid is a choice, and nothing is paid or rated on it.
 fn check_session_seat(
     champ: &Championship,
     sessions: &[ams2_championship::data_store::RecordedSession],
     seats: &[ams2_championship::custom_ai::SeatEntry],
     sid: &str,
+    exact_car: bool,
 ) -> (Option<String>, Option<ams2_championship::data_store::SeatLock>) {
-    use ams2_championship::custom_ai::{self, SeatEvidence, TeamCheck};
-    use ams2_championship::data_store::{settle_player_seat, SeatLock};
+    use ams2_championship::custom_ai::{self, SeatEvidence, SeatProof, TeamCheck};
+    use ams2_championship::data_store::{settle_player_seat, SeatLock, SESSION_PRACTICE};
 
     let Some(team) = champ.player_team.as_deref().filter(|t| !t.trim().is_empty()) else {
         return (None, None);
@@ -508,7 +513,12 @@ fn check_session_seat(
     }
     let grid = session.grid();
     if let Some(lock) = &champ.player_seat {
-        return match custom_ai::check_locked_seat(seats, &grid, &lock.seat, &lock.replaces) {
+        let proof = if exact_car && session.session_type != SESSION_PRACTICE {
+            SeatProof::Exact
+        } else {
+            SeatProof::Possible
+        };
+        return match custom_ai::check_locked_seat(seats, &grid, &lock.seat, &lock.replaces, proof) {
             TeamCheck::Failed(reason) => (Some(reason), None),
             _ => (None, None),
         };
@@ -635,6 +645,7 @@ fn resolve_live_teams(
     champs: &[Championship],
     grid: &[ams2_championship::custom_ai::GridEntry],
     sp: bool,
+    proof: ams2_championship::custom_ai::SeatProof,
 ) -> LiveTeams {
     let Some(champ) = champs
         .iter()
@@ -672,25 +683,49 @@ fn resolve_live_teams(
     // An empty grid is the menu, not a problem with the grid.
     let fit = (!grid.is_empty() && !seats.is_empty())
         .then(|| ams2_championship::custom_ai::GridFit::measure(&seats, grid));
+    // A roster entry that cannot spawn is said ahead of the plain grid note: it is the cause the
+    // note would otherwise misreport — "above the 27 it can field" when the roster fields 26.
+    let fault = (sp && fit.is_some())
+        .then(|| {
+            ams2_championship::custom_ai::roster_fault(
+                &seats,
+                grid,
+                champ.player_seat.as_ref().map(|l| l.seat.as_str()),
+                file,
+            )
+        })
+        .flatten();
+    let mut seat = if sp && !grid.is_empty() {
+        live_seat_status(champ, &seats, grid, proof)
+    } else {
+        None
+    };
+    // A dead entry leaves its car empty on every grid, so the car check sees one empty car too
+    // many and may blame the driver for the roster's fault.
+    if let (Some(s), true) = (seat.as_mut(), fault.is_some()) {
+        if !s.ok {
+            s.text.push_str(
+                " If you did pick that car, the roster is the cause — see the grid banner.",
+            );
+        }
+    }
     LiveTeams {
         teams: ams2_championship::custom_ai::parse_driver_teams(&dir.join(file)),
         player_team: champ.player_team.clone().filter(|t| !t.trim().is_empty()),
         // A multiplayer career is judged on no roster, so it is told nothing either way.
         grid: if sp {
-            fit.and_then(|f| {
-                f.note()
-                    .map(|text| GridStatus { ok: false, text })
-                    .or_else(|| f.confirmation().map(|text| GridStatus { ok: true, text }))
+            fault.map(|text| GridStatus { ok: false, text }).or_else(|| {
+                fit.and_then(|f| {
+                    f.note()
+                        .map(|text| GridStatus { ok: false, text })
+                        .or_else(|| f.confirmation().map(|text| GridStatus { ok: true, text }))
+                })
             })
         } else {
             None
         },
         fit,
-        seat: if sp && !grid.is_empty() {
-            live_seat_status(champ, &seats, grid)
-        } else {
-            None
-        },
+        seat,
     }
 }
 
@@ -700,6 +735,7 @@ fn live_seat_status(
     champ: &Championship,
     seats: &[ams2_championship::custom_ai::SeatEntry],
     grid: &[ams2_championship::custom_ai::GridEntry],
+    proof: ams2_championship::custom_ai::SeatProof,
 ) -> Option<GridStatus> {
     use ams2_championship::custom_ai::{self, TeamCheck};
     let team = champ.player_team.as_deref().filter(|t| !t.trim().is_empty())?;
@@ -708,7 +744,7 @@ fn live_seat_status(
     }
     let (check, want) = match &champ.player_seat {
         Some(lock) => (
-            custom_ai::check_locked_seat(seats, grid, &lock.seat, &lock.replaces),
+            custom_ai::check_locked_seat(seats, grid, &lock.seat, &lock.replaces, proof),
             if lock.replaces.is_empty() {
                 lock.seat.clone()
             } else {
@@ -1033,7 +1069,16 @@ fn handle(
                         is_player: p.is_player,
                     })
                     .collect();
-                resolve_live_teams(&dir, &data.championships, &grid, sp)
+                // The proof the session will be held to when it is added, so the banner warns
+                // about exactly what the route will refuse. Practice is held to none.
+                let proof = if data.mode.requires_exact_car()
+                    && live.session_state != ams2_championship::data_store::SESSION_PRACTICE
+                {
+                    ams2_championship::custom_ai::SeatProof::Exact
+                } else {
+                    ams2_championship::custom_ai::SeatProof::Possible
+                };
+                resolve_live_teams(&dir, &data.championships, &grid, sp, proof)
             }
             // Nothing can be resolved without the folder, and in a singleplayer career that is
             // the first thing to fix rather than something to discover from an empty column.
@@ -2191,7 +2236,13 @@ fn handle(
             // The same verdict the assignment route gives, so the picker never offers a session
             // that adding would refuse.
             for s in &data.sessions {
-                if let (Some(reason), _) = check_session_seat(champ, &data.sessions, &seats, &s.id) {
+                if let (Some(reason), _) = check_session_seat(
+                    champ,
+                    &data.sessions,
+                    &seats,
+                    &s.id,
+                    data.mode.requires_exact_car(),
+                ) {
                     out.blocked.insert(s.id.clone(), reason);
                 }
             }
@@ -2571,7 +2622,7 @@ fn handle(
         // car is stored on the season (`player_seat`) and every later session must be in it —
         // the team name alone would accept the team-mate's car too.
         let seats = champ_roster_seats(&config_path, champ);
-        let (rejection, lock) = check_session_seat(champ, &data.sessions, &seats, sid);
+        let (rejection, lock) = check_session_seat(champ, &data.sessions, &seats, sid, data.mode.requires_exact_car());
         if let Some(reason) = rejection {
             // json_err interpolates the message straight into JSON — keep quotes out of it.
             json_err(&mut stream, "409 Conflict", &reason.replace('"', "'"));

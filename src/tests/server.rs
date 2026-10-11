@@ -2180,7 +2180,7 @@ fn two_seasons() -> Vec<Championship> {
 #[test]
 fn test_live_teams_come_from_the_active_championship() {
     let dir = make_live_teams_dir();
-    let out = resolve_live_teams(&dir, &two_seasons(), &[], false);
+    let out = resolve_live_teams(&dir, &two_seasons(), &[], false, ams2_championship::custom_ai::SeatProof::Possible);
 
     assert_eq!(out.player_team.as_deref(), Some("Brabham"));
     assert_eq!(
@@ -2206,7 +2206,7 @@ fn test_live_teams_follow_the_active_flag_when_it_moves() {
     champs[1].status = ChampionshipStatus::Active;
     champs[1].player_team = Some("March".into());
 
-    let out = resolve_live_teams(&dir, &champs, &[], false);
+    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert_eq!(out.player_team.as_deref(), Some("March"));
     assert_eq!(
         out.teams.get("Dan Delta").map(String::as_str),
@@ -2224,7 +2224,7 @@ fn test_live_teams_empty_when_no_championship_is_active() {
     let mut champs = two_seasons();
     champs[0].status = ChampionshipStatus::Progress;
 
-    let out = resolve_live_teams(&dir, &champs, &[], false);
+    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert!(out.teams.is_empty());
     assert_eq!(out.player_team, None);
 
@@ -2237,7 +2237,7 @@ fn test_live_teams_empty_when_the_active_championship_has_no_roster() {
     let mut champs = two_seasons();
     champs[0].custom_ai_file = None;
 
-    let out = resolve_live_teams(&dir, &champs, &[], false);
+    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert!(out.teams.is_empty());
     assert_eq!(
         out.player_team, None,
@@ -2253,7 +2253,7 @@ fn test_live_teams_treats_a_blank_player_team_as_unset() {
     let mut champs = two_seasons();
     champs[0].player_team = Some("   ".into());
 
-    let out = resolve_live_teams(&dir, &champs, &[], false);
+    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert!(!out.teams.is_empty(), "the roster still resolves");
     assert_eq!(out.player_team, None);
 
@@ -4782,7 +4782,7 @@ fn live_grid<'a>(names: &'a [(&'a str, bool)]) -> Vec<ams2_championship::custom_
 fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
     let dir = make_live_teams_dir();
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true);
+    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
 
     let grid = out.grid.expect("a short grid is worth interrupting for");
     assert!(!grid.ok, "{grid:?}");
@@ -4795,7 +4795,7 @@ fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
 fn test_live_warning_is_silent_for_a_career_with_no_roster() {
     let dir = make_live_teams_dir();
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &two_seasons(), &grid, false);
+    let out = resolve_live_teams(&dir, &two_seasons(), &grid, false, ams2_championship::custom_ai::SeatProof::Possible);
 
     assert!(out.grid.is_none());
     // The team names still resolve — nothing about the warning switches those off.
@@ -4811,7 +4811,7 @@ fn test_live_warning_when_no_championship_is_active() {
         c.status = ChampionshipStatus::Progress;
     }
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &champs, &grid, true);
+    let out = resolve_live_teams(&dir, &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
 
     let grid = out.grid.expect("no Active season is worth saying");
     assert!(!grid.ok, "{grid:?}");
@@ -4824,7 +4824,7 @@ fn test_live_warning_when_no_championship_is_active() {
 #[test]
 fn test_live_warning_says_nothing_before_a_session_loads() {
     let dir = make_live_teams_dir();
-    let out = resolve_live_teams(&dir, &two_seasons(), &[], true);
+    let out = resolve_live_teams(&dir, &two_seasons(), &[], true, ams2_championship::custom_ai::SeatProof::Possible);
 
     // Not `ok: false` and not `ok: true` — there is nothing to report on yet, and saying
     // either would be a claim about a grid that has not loaded.
@@ -4855,7 +4855,7 @@ fn test_live_says_so_when_the_grid_is_the_roster() {
     let dir = make_live_teams_dir();
     // CORE_XML fields three cars; the player takes one of them.
     let grid = live_grid(&[("Alan Alpha", false), ("Ben Bravo", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true);
+    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
 
     let status = out.grid.expect("a full grid is worth confirming");
     assert!(status.ok, "{status:?}");
@@ -4906,6 +4906,46 @@ fn seat_call(
         format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n").into_bytes(),
         Some(config.to_path_buf()),
     )
+}
+
+/// A singleplayer season must be able to *show* its car: with both Williams empty the grid looks
+/// the same whether the player drove #5 or drove #6 with Mansell left out, so a race is refused.
+/// Practice is exempt, and an unset career keeps the lenient check it always had.
+#[test]
+fn test_route_singleplayer_refuses_a_race_whose_grid_cannot_show_the_car() {
+    let (root, config) = make_offer_fixture(true);
+    let short = || grid_session("s1", &["Piercarlo Ghinzani", "Allan Berg"]);
+    let locked = |store: &ams2_championship::data_store::SharedStore| {
+        store.write().unwrap().championships[0].player_seat =
+            Some(ams2_championship::data_store::SeatLock {
+                seat: "Williams #5".into(),
+                replaces: "Nigel Mansell".into(),
+            });
+    };
+    let add = "/api/championships/c1/rounds/0/sessions/s1";
+
+    let (store, data_path) = seat_store(vec![short()]);
+    locked(&store);
+    let resp = seat_call(&store, &data_path, &config, "POST", add);
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("Race with 3 opponents"), "says what to change: {resp}");
+    // The Manage tab's picker gives the same verdict, so it never offers what adding refuses.
+    let resp = seat_call(&store, &data_path, &config, "GET", "/api/championships/c1/session-eligibility");
+    assert!(resp.contains("\"s1\""), "listed as blocked: {resp}");
+
+    let mut practice = short();
+    practice.session_type = ams2_championship::data_store::SESSION_PRACTICE;
+    let (store, data_path) = seat_store(vec![practice]);
+    locked(&store);
+    let resp = seat_call(&store, &data_path, &config, "POST", add);
+    assert!(status_line(&resp).contains("200"), "practice is exempt: {resp}");
+
+    let (store, data_path) = seat_store(vec![short()]);
+    locked(&store);
+    store.write().unwrap().mode = ams2_championship::data_store::CareerMode::Unset;
+    let resp = seat_call(&store, &data_path, &config, "POST", add);
+    assert!(status_line(&resp).contains("200"), "an unset career is not held to it: {resp}");
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]
@@ -4988,18 +5028,18 @@ fn test_live_says_wrong_car_when_the_player_is_in_the_team_mates() {
 
     // Alpha is on track, Bravo is not: the player is in Lotus #2.
     let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, &champs, &grid, true).seat.expect("a wrong car is said");
+    let seat = resolve_live_teams(&dir, &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("a wrong car is said");
     assert!(!seat.ok, "{seat:?}");
     assert!(seat.text.contains("WRONG CAR"), "{seat:?}");
     assert!(seat.text.contains("Lotus #2 (in place of Ben Bravo)"), "{seat:?}");
     assert!(seat.text.contains("Lotus #1 in place of Alan Alpha"), "it says what to pick: {seat:?}");
 
     let grid = live_grid(&[("Ben Bravo", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, &champs, &grid, true).seat.expect("the right car is said too");
+    let seat = resolve_live_teams(&dir, &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("the right car is said too");
     assert!(seat.ok, "{seat:?}");
 
     // Multiplayer has no seat to be in.
-    assert!(resolve_live_teams(&dir, &champs, &grid, false).seat.is_none());
+    assert!(resolve_live_teams(&dir, &champs, &grid, false, ams2_championship::custom_ai::SeatProof::Possible).seat.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -5008,7 +5048,7 @@ fn test_live_says_wrong_team_before_any_car_is_stored() {
     let dir = make_live_teams_dir();
     // two_seasons declares Brabham; with Charlie on track the only free car is a Lotus.
     let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, &two_seasons(), &grid, true).seat.expect("said");
+    let seat = resolve_live_teams(&dir, &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("said");
     assert!(!seat.ok, "{seat:?}");
     assert!(seat.text.contains("a Brabham car"), "{seat:?}");
     let _ = std::fs::remove_dir_all(&dir);
