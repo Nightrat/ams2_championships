@@ -2180,7 +2180,7 @@ fn two_seasons() -> Vec<Championship> {
 #[test]
 fn test_live_teams_come_from_the_active_championship() {
     let dir = make_live_teams_dir();
-    let out = resolve_live_teams(&dir, &two_seasons(), &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &[], false, ams2_championship::custom_ai::SeatProof::Possible);
 
     assert_eq!(out.player_team.as_deref(), Some("Brabham"));
     assert_eq!(
@@ -2206,7 +2206,7 @@ fn test_live_teams_follow_the_active_flag_when_it_moves() {
     champs[1].status = ChampionshipStatus::Active;
     champs[1].player_team = Some("March".into());
 
-    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert_eq!(out.player_team.as_deref(), Some("March"));
     assert_eq!(
         out.teams.get("Dan Delta").map(String::as_str),
@@ -2224,7 +2224,7 @@ fn test_live_teams_empty_when_no_championship_is_active() {
     let mut champs = two_seasons();
     champs[0].status = ChampionshipStatus::Progress;
 
-    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert!(out.teams.is_empty());
     assert_eq!(out.player_team, None);
 
@@ -2237,7 +2237,7 @@ fn test_live_teams_empty_when_the_active_championship_has_no_roster() {
     let mut champs = two_seasons();
     champs[0].custom_ai_file = None;
 
-    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert!(out.teams.is_empty());
     assert_eq!(
         out.player_team, None,
@@ -2253,7 +2253,7 @@ fn test_live_teams_treats_a_blank_player_team_as_unset() {
     let mut champs = two_seasons();
     champs[0].player_team = Some("   ".into());
 
-    let out = resolve_live_teams(&dir, &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
     assert!(!out.teams.is_empty(), "the roster still resolves");
     assert_eq!(out.player_team, None);
 
@@ -2951,6 +2951,169 @@ fn test_route_sign_refused_in_a_career_that_does_not_sign() {
         assert!(resp.contains("singleplayer career"), "{resp}");
         assert!(store.read().unwrap().contracts.is_empty());
     }
+    std::fs::remove_dir_all(&root).ok();
+}
+
+
+// ── A signed season keeps its own roster (`season_rosters`) ────────────────────
+
+/// A folder save inside the fixture, so there is somewhere to keep a season's roster — the
+/// shared test store is a flat file, which never gets one.
+fn folder_career(root: &std::path::Path) -> std::path::PathBuf {
+    let dir = root.join("saves").join("career");
+    std::fs::create_dir_all(&dir).unwrap();
+    dir.join("career.json")
+}
+
+fn routed(
+    store: &ams2_championship::data_store::SharedStore,
+    career: &std::path::Path,
+    config: &std::path::Path,
+    method: &str,
+    path: &str,
+    body: &str,
+) -> String {
+    let mut req = format!(
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    )
+    .into_bytes();
+    req.extend_from_slice(body.as_bytes());
+    call_with_config(store.clone(), career.to_path_buf(), req, Some(config.to_path_buf()))
+}
+
+/// Signs [`OPEN_SEAT`] for `c1` in a folder save. Hands back the store and the career path.
+fn signed_in_folder(
+    root: &std::path::Path,
+    config: &std::path::Path,
+) -> (ams2_championship::data_store::SharedStore, std::path::PathBuf) {
+    let (store, _) = make_sp_store();
+    store.write().unwrap().championships.push(rated_champ("c1"));
+    let career = folder_career(root);
+    let resp = routed(
+        &store,
+        &career,
+        config,
+        "POST",
+        "/api/championships/c1/sign",
+        &format!(r#"{{"team":"{OPEN_SEAT}"}}"#),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    (store, career)
+}
+
+/// The game's roster with Williams swapped for a team the season was never signed on.
+fn edited_roster() -> String {
+    OFFER_ROSTER.replace("Williams", "Minardi")
+}
+
+#[test]
+fn test_route_sign_keeps_a_copy_of_the_roster_with_the_season() {
+    let (root, config) = make_offer_fixture(true);
+    let (_, career) = signed_in_folder(&root, &config);
+    let copy = ams2_championship::season_rosters::stored(&career, "c1").expect("a stored roster");
+    assert_eq!(std::fs::read_to_string(copy).unwrap(), OFFER_ROSTER);
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_a_signed_season_reads_its_own_roster_not_the_games() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, career) = signed_in_folder(&root, &config);
+    let game = root.join("CustomAIDrivers").join("F-Classic_Gen1.xml");
+    std::fs::write(&game, edited_roster()).unwrap();
+
+    let v = body_json(&routed(&store, &career, &config, "GET", "/api/championships/c1/teams", ""));
+    let teams: Vec<&str> = v.as_array().unwrap().iter().filter_map(|t| t.as_str()).collect();
+    assert!(teams.iter().any(|t| t.contains("Williams")), "{teams:?}");
+    assert!(!teams.iter().any(|t| t.contains("Minardi")), "{teams:?}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_live_teams_flags_a_game_roster_that_is_not_the_seasons_and_restore_fixes_it() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, career) = signed_in_folder(&root, &config);
+
+    // Unchanged: nothing to say.
+    let v = body_json(&routed(&store, &career, &config, "GET", "/api/live-teams", ""));
+    assert!(v["roster"].is_null(), "{v}");
+
+    let game = root.join("CustomAIDrivers").join("F-Classic_Gen1.xml");
+    std::fs::write(&game, edited_roster()).unwrap();
+    let v = body_json(&routed(&store, &career, &config, "GET", "/api/live-teams", ""));
+    assert_eq!(v["roster"]["champ_id"], "c1", "{v}");
+    assert!(v["roster"]["text"].as_str().unwrap().contains("restart the session"), "{v}");
+
+    let resp = routed(&store, &career, &config, "POST", "/api/championships/c1/roster/restore", "");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(std::fs::read_to_string(&game).unwrap(), OFFER_ROSTER);
+    let v = body_json(&routed(&store, &career, &config, "GET", "/api/live-teams", ""));
+    assert!(v["roster"].is_null(), "{v}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_restore_refuses_a_season_with_no_roster_of_its_own() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, _) = make_sp_store();
+    store.write().unwrap().championships.push(rated_champ("c1"));
+    let career = folder_career(&root);
+    let resp = routed(&store, &career, &config, "POST", "/api/championships/c1/roster/restore", "");
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_tearing_up_a_contract_forgets_the_roster() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, career) = signed_in_folder(&root, &config);
+    let resp = routed(&store, &career, &config, "DELETE", "/api/championships/c1/sign", "");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(ams2_championship::season_rosters::stored(&career, "c1").is_none());
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_route_a_signed_seasons_roster_file_cannot_be_swapped() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, career) = signed_in_folder(&root, &config);
+    let resp = routed(
+        &store,
+        &career,
+        &config,
+        "PATCH",
+        "/api/championships/c1",
+        r#"{"custom_ai_file":"F-Classic_Gen2.xml"}"#,
+    );
+    assert!(status_line(&resp).contains("409"), "{resp}");
+    assert!(resp.contains("contract is signed"), "{resp}");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_seal_career_keeps_the_roster_of_a_season_signed_before_rosters_were_fixed() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, _) = make_sp_store();
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(rated_champ("c1"));
+        data.championships.push(rated_champ("c2"));
+        data.contracts.push(ams2_championship::contracts::Contract {
+            champ_id: "c1".into(),
+            team: OPEN_SEAT.into(),
+            signed_at: 1,
+            salary: 1,
+            objective: None,
+            bought_for: 0,
+            settled: None,
+        });
+    }
+    let career = folder_career(&root);
+    seal_career(&store, &career, &config).unwrap();
+    assert!(ams2_championship::season_rosters::stored(&career, "c1").is_some());
+    // Unsigned: it reads the game's file, as before.
+    assert!(ams2_championship::season_rosters::stored(&career, "c2").is_none());
     std::fs::remove_dir_all(&root).ok();
 }
 
@@ -4782,7 +4945,7 @@ fn live_grid<'a>(names: &'a [(&'a str, bool)]) -> Vec<ams2_championship::custom_
 fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
     let dir = make_live_teams_dir();
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
 
     let grid = out.grid.expect("a short grid is worth interrupting for");
     assert!(!grid.ok, "{grid:?}");
@@ -4795,7 +4958,7 @@ fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
 fn test_live_warning_is_silent_for_a_career_with_no_roster() {
     let dir = make_live_teams_dir();
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &two_seasons(), &grid, false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, false, ams2_championship::custom_ai::SeatProof::Possible);
 
     assert!(out.grid.is_none());
     // The team names still resolve — nothing about the warning switches those off.
@@ -4811,7 +4974,7 @@ fn test_live_warning_when_no_championship_is_active() {
         c.status = ChampionshipStatus::Progress;
     }
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
 
     let grid = out.grid.expect("no Active season is worth saying");
     assert!(!grid.ok, "{grid:?}");
@@ -4824,7 +4987,7 @@ fn test_live_warning_when_no_championship_is_active() {
 #[test]
 fn test_live_warning_says_nothing_before_a_session_loads() {
     let dir = make_live_teams_dir();
-    let out = resolve_live_teams(&dir, &two_seasons(), &[], true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &[], true, ams2_championship::custom_ai::SeatProof::Possible);
 
     // Not `ok: false` and not `ok: true` — there is nothing to report on yet, and saying
     // either would be a claim about a grid that has not loaded.
@@ -4855,7 +5018,7 @@ fn test_live_says_so_when_the_grid_is_the_roster() {
     let dir = make_live_teams_dir();
     // CORE_XML fields three cars; the player takes one of them.
     let grid = live_grid(&[("Alan Alpha", false), ("Ben Bravo", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
 
     let status = out.grid.expect("a full grid is worth confirming");
     assert!(status.ok, "{status:?}");
@@ -5028,18 +5191,18 @@ fn test_live_says_wrong_car_when_the_player_is_in_the_team_mates() {
 
     // Alpha is on track, Bravo is not: the player is in Lotus #2.
     let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("a wrong car is said");
+    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("a wrong car is said");
     assert!(!seat.ok, "{seat:?}");
     assert!(seat.text.contains("WRONG CAR"), "{seat:?}");
     assert!(seat.text.contains("Lotus #2 (in place of Ben Bravo)"), "{seat:?}");
     assert!(seat.text.contains("Lotus #1 in place of Alan Alpha"), "it says what to pick: {seat:?}");
 
     let grid = live_grid(&[("Ben Bravo", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("the right car is said too");
+    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("the right car is said too");
     assert!(seat.ok, "{seat:?}");
 
     // Multiplayer has no seat to be in.
-    assert!(resolve_live_teams(&dir, &champs, &grid, false, ams2_championship::custom_ai::SeatProof::Possible).seat.is_none());
+    assert!(resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, false, ams2_championship::custom_ai::SeatProof::Possible).seat.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -5048,7 +5211,7 @@ fn test_live_says_wrong_team_before_any_car_is_stored() {
     let dir = make_live_teams_dir();
     // two_seasons declares Brabham; with Charlie on track the only free car is a Lotus.
     let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("said");
+    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("said");
     assert!(!seat.ok, "{seat:?}");
     assert!(seat.text.contains("a Brabham car"), "{seat:?}");
     let _ = std::fs::remove_dir_all(&dir);

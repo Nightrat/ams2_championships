@@ -82,9 +82,68 @@ function loadLiveTeams() {
       liveTeams = { teams: t.teams || {}, player_team: t.player_team };
       renderGridStatus(t.grid);
       renderSeatStatus(t.seat);
+      renderRosterStatus(t.roster);
     })
     .catch(function () {});
 }
+
+// Set once the season's roster has been copied back, until dismissed. The copy only reaches the
+// track when AMS2 loads a session, and nothing the server can see says when that has happened —
+// so the reminder stays up rather than vanishing the moment the files agree.
+var liveRosterRestored = false;
+
+// The banner saying the game will not load the roster the active season was signed on, with the
+// button that copies it back. The sentence is the server's.
+function renderRosterStatus(roster) {
+  var box = document.getElementById('live-roster-warning');
+  if (!box) return;
+  if (roster && roster.text) {
+    liveRosterRestored = false;
+    box.hidden = false;
+    box.className = 'live-grid-warning live-roster-warning';
+    box.innerHTML = '<span class="live-grid-warning-icon">&#9888;</span>' +
+      '<span class="live-grid-warning-text">' + esc(roster.text) + '</span>' +
+      '<button class="manage-btn live-roster-btn" data-champ="' + esc(roster.champ_id) + '">' +
+        'Copy season roster to AMS2</button>';
+    return;
+  }
+  if (liveRosterRestored) {
+    box.hidden = false;
+    box.className = 'live-grid-warning live-grid-ok live-roster-warning';
+    box.innerHTML = '<span class="live-grid-warning-icon">&#10003;</span>' +
+      '<span class="live-grid-warning-text">The season’s roster is now the file AMS2 loads. ' +
+        '<strong>Restart the session in AMS2</strong> — quit to the menu and start it again ' +
+        '— because the game only reads the roster when a session loads.</span>' +
+      '<button class="manage-btn live-roster-dismiss">OK</button>';
+    return;
+  }
+  box.hidden = true;
+  box.textContent = '';
+}
+
+// Delegated: the banner is rebuilt on every lookup.
+document.addEventListener('click', function (e) {
+  var copy = e.target.closest && e.target.closest('.live-roster-btn');
+  if (copy) {
+    copy.disabled = true;
+    fetch('/api/championships/' + encodeURIComponent(copy.dataset.champ) + '/roster/restore',
+          { method: 'POST' })
+      .then(function (r) {
+        return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+      })
+      .then(function (r) {
+        if (!r.ok) { alert(r.body.error || 'Could not copy the roster.'); copy.disabled = false; return; }
+        liveRosterRestored = true;
+        loadLiveTeams();
+      })
+      .catch(function () { alert('Could not copy the roster.'); copy.disabled = false; });
+    return;
+  }
+  if (e.target.closest && e.target.closest('.live-roster-dismiss')) {
+    liveRosterRestored = false;
+    renderRosterStatus(null);
+  }
+});
 
 // The banner saying whether the player is in the season's car. Same shape as the grid one, but
 // a wrong car is red: the session will be refused, not merely judged on the wrong scale.

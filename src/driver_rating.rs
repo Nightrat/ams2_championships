@@ -451,6 +451,9 @@ pub struct RatingContext {
     pub class: String,
     pub seats: Vec<SeatEntry>,
     pub expected: HashMap<String, f32>,
+    /// The sessions this roster is restricted to, for a season that keeps its own copy of the
+    /// roster (see [`crate::season_rosters`]). `None` covers every session in the class.
+    pub only: Option<HashSet<String>>,
 }
 
 impl RatingContext {
@@ -460,14 +463,34 @@ impl RatingContext {
             class: class.to_string(),
             seats,
             expected,
+            only: None,
+        }
+    }
+
+    /// A season's own roster: it scores that season's sessions and no others.
+    ///
+    /// Callers list these **ahead of** the class contexts — the first context covering a session
+    /// is the one it is scored against, so a signed season's races are judged on the roster it
+    /// was signed on while every other session in the class reads the game's file.
+    pub fn for_season(
+        class: &str,
+        seats: Vec<SeatEntry>,
+        pace: &HashMap<String, f32>,
+        sessions: HashSet<String>,
+    ) -> Self {
+        RatingContext {
+            only: Some(sessions),
+            ..RatingContext::new(class, seats, pace)
         }
     }
 
     /// True when a session was run in this class. AMS2 exposes aero variants as separate
-    /// classes (`…_HD`) that share one roster, so those count here too.
+    /// classes (`…_HD`) that share one roster, so those count here too. A season's context also
+    /// requires the session to be one of that season's.
     fn covers(&self, session: &RecordedSession) -> bool {
-        session.car_class == self.class
-            || session.car_class.starts_with(&format!("{}_", self.class))
+        (session.car_class == self.class
+            || session.car_class.starts_with(&format!("{}_", self.class)))
+            && self.only.as_ref().is_none_or(|ids| ids.contains(&session.id))
     }
 }
 
@@ -610,6 +633,7 @@ fn compute_reputation_inner(
         class: String::new(),
         seats: seats.to_vec(),
         expected,
+        only: None,
     };
     accumulate_covering_all(player_name, sessions, &ctx, declared_team, params)
 }

@@ -65,6 +65,10 @@ fn generate_html() -> String {
       <!-- Whether the player is in the season's car. Separate from the grid banner: a wrong car
            gets the session refused, and it can only be fixed from the menu. -->
       <div id="live-seat-warning" class="live-grid-warning" hidden></div>
+      <!-- The game is not loading the roster the active season was signed on. Carries the one
+           fix there is — copying the season's roster back — and, once that is done, the reminder
+           that AMS2 only reads it when a session loads. -->
+      <div id="live-roster-warning" class="live-grid-warning live-roster-warning" hidden></div>
       <div id="live-info" class="live-info">
         <span id="live-session-type"></span>
         <span id="live-race-state"></span>
@@ -203,6 +207,13 @@ fn generate_html() -> String {
           <label class="config-label" for="cfg-host">Host <span class="config-restart-badge">restart</span></label>
           <input class="config-input" id="cfg-host" name="host" type="text" />
           <span class="config-hint">Bind address. Use <code>0.0.0.0</code> to allow LAN access (default 127.0.0.1)</span>
+        </div>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
+            <input id="cfg-open-browser" name="open_browser" type="checkbox" />
+            Open in browser on start
+          </label>
+          <span class="config-hint">Opens this page in the default browser when the server starts</span>
         </div>
         <div class="config-group">
           <label class="config-label" for="cfg-saves-dir">Save files folder <span class="config-restart-badge">restart</span></label>

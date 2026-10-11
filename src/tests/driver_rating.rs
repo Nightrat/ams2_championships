@@ -389,6 +389,37 @@ fn test_recorded_players_global_excludes_every_roster_and_lobby_ai() {
     assert_eq!(players, vec!["Nightrat".to_string(), "Wiper".to_string()]);
 }
 
+#[test]
+fn test_a_season_context_scores_only_its_own_sessions_and_wins_over_the_class() {
+    let sessions: Vec<RecordedSession> = (0..6)
+        .map(|i| sp_session(&format!("s{i}"), 100 + i, 5, 1, 15))
+        .collect();
+    let seasons: HashSet<String> = ["s0", "s1", "s2"].iter().map(|s| s.to_string()).collect();
+    // The season was signed on a roster where the Brabham was the quickest car, so its wins
+    // were what the car should do; the game's file has since made the Brabham slower.
+    let signed_pace: HashMap<String, f32> = [("Brabham", 0.0f32), ("Williams", 0.85), ("Osella", 5.6)]
+        .into_iter()
+        .map(|(t, p)| (t.to_string(), p))
+        .collect();
+    let season =
+        || RatingContext::for_season("F-Classic_Gen1", parse_seats_str(ROSTER), &signed_pace, seasons.clone());
+    let live = || RatingContext::new("F-Classic_Gen1", parse_seats_str(ROSTER), &pace());
+
+    let alone = compute_reputation_global(Some("Nightrat"), &sessions, &[season()], None);
+    assert_eq!(alone.sp_races, 3, "a season's roster covers that season's sessions only");
+
+    let live_only = compute_reputation_global(Some("Nightrat"), &sessions, &[live()], None);
+    let fixed = compute_reputation_global(Some("Nightrat"), &sessions, &[season(), live()], None);
+    assert_eq!(fixed.sp_races, 6, "the rest of the class still reads the game's file");
+    assert!(
+        fixed.value < live_only.value,
+        "the signed season's wins are judged on its own, quicker car: {} vs {}",
+        fixed.value,
+        live_only.value
+    );
+}
+
+
 // ── Reference career ─────────────────────────────────────────────────────────
 //
 // `fixtures/career_reference.json` is a real recorded career (72 sessions, 5 championships)

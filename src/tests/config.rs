@@ -77,6 +77,7 @@ fn test_load_and_upgrade_rewrites_file_with_all_fields() {
     let v: serde_json::Value = serde_json::from_str(&written).unwrap();
     for key in &[
         "host",
+        "open_browser",
         "poll_ms",
         "record_practice",
         "record_qualify",
@@ -105,6 +106,7 @@ fn test_config_default_values() {
     assert_eq!(cfg.track_map_max_points, 5000);
     assert!(cfg.active_career.is_none());
     assert!(cfg.enforce_team_eligibility);
+    assert!(cfg.open_browser);
 }
 
 #[test]

@@ -100,6 +100,9 @@ pub struct Config {
     /// Bind address. Use "0.0.0.0" to allow LAN access.
     #[serde(default = "default_host")]
     pub host: String,
+    /// Open the app in the default browser once the server is listening.
+    #[serde(default = "default_true")]
+    pub open_browser: bool,
     /// Folder holding the career save files (`*.json`) and their track layouts.
     /// Defaults to `championships` next to the executable.
     #[serde(default)]
@@ -346,6 +349,7 @@ impl Default for Config {
         Config {
             port: default_port(),
             host: default_host(),
+            open_browser: true,
             saves_dir: None,
             active_career: None,
             legacy_data_file: None,

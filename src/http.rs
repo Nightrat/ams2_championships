@@ -68,8 +68,11 @@ pub fn json_ok(stream: &mut TcpStream, body: &[u8]) {
     send_response(stream, "200 OK", "application/json", body);
 }
 
+/// Answers `{"error": msg}`. The message is escaped as a JSON string, so a Windows path (all
+/// backslashes) or a quote in it cannot break the body — callers still strip quotes out of habit,
+/// which is now harmless.
 pub fn json_err(stream: &mut TcpStream, status: &str, msg: &str) {
-    let body = format!("{{\"error\":\"{msg}\"}}");
+    let body = serde_json::json!({ "error": msg }).to_string();
     send_response(stream, status, "application/json", body.as_bytes());
 }
 

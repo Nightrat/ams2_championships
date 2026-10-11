@@ -1708,7 +1708,7 @@ fn grid_note_champ(ids: &[&str]) -> Championship {
 fn test_career_view_flags_a_race_that_did_not_fill_the_roster() {
     let dir = grid_roster_dir();
     let short = grid_note_session("r1", SESSION_RACE, &[("Nigel Mansell", false), ("Me", true)]);
-    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[short], Some(&dir));
+    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[short], Some(&dir), Path::new(""));
 
     let note = view.championships[0].rounds[0].sessions[0]
         .grid_note
@@ -1731,7 +1731,7 @@ fn test_career_view_leaves_a_full_grid_unflagged() {
             ("Me", true),
         ],
     );
-    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[full], Some(&dir));
+    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[full], Some(&dir), Path::new(""));
 
     assert!(view.championships[0].rounds[0].sessions[0]
         .grid_note
@@ -1749,7 +1749,7 @@ fn test_career_view_does_not_flag_practice() {
         SESSION_PRACTICE,
         &[("Nigel Mansell", false), ("Me", true)],
     );
-    let view = compute_career_full(&[grid_note_champ(&["p1"])], &[practice], Some(&dir));
+    let view = compute_career_full(&[grid_note_champ(&["p1"])], &[practice], Some(&dir), Path::new(""));
 
     assert!(view.championships[0].rounds[0].sessions[0]
         .grid_note
@@ -1762,7 +1762,7 @@ fn test_career_view_does_not_flag_practice() {
 #[test]
 fn test_career_view_says_nothing_without_a_roster() {
     let short = grid_note_session("r1", SESSION_RACE, &[("Nigel Mansell", false), ("Me", true)]);
-    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[short], None);
+    let view = compute_career_full(&[grid_note_champ(&["r1"])], &[short], None, Path::new(""));
 
     assert!(view.championships[0].rounds[0].sessions[0]
         .grid_note

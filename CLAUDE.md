@@ -70,6 +70,7 @@ Test files live in `src/tests/` and are wired into their parent module with `#[p
 - `src/tests/config.rs` — config load/create/defaults, clamping, `normalize_economy`
 - `src/tests/saves.rs` — both save layouts, name gating, delete and the startup husk sweep
 - `src/tests/lap_charts.rs` — externalising a chart, reading it back, the legacy inline fallback
+- `src/tests/season_rosters.rs` — a signed season's roster copy: read instead of the game's file, mismatch, restore, flat saves
 - `src/tests/driver_rating.rs` — ratings and team requirements, incl. `test_reference_career_rating_snapshot`
 - `src/tests/contracts.rs` — offers, renewals, pay-driver seats, salary instalments, sealing
 - `src/tests/custom_ai.rs` — roster parsing/writing, baselines
@@ -82,6 +83,7 @@ Test files live in `src/tests/` and are wired into their parent module with `#[p
 |---|---|
 | `<name>/career.json` | One career save — sessions and championships. `ams2_career` is the default |
 | `*.json` | **Legacy** flat save, written before folders. Still read, never migrated |
+| `<name>/rosters/<champ id>.xml` | The Custom AI file a season was signed on — see `season_rosters` |
 | `track_layouts/` | Per-track radar point arrays (`{slug}.json`), shared by all saves |
 
 ### Career mode: singleplayer or multiplayer (`CareerMode` in `data_store.rs`)
@@ -153,6 +155,19 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - Session ids go through `saves::sanitize_name` before being joined onto a path. They are written as unix timestamps, but a hand-edited career can hold anything.
 - Charts are written once and never edited, so unlike `career.json` there is no overwrite guard here — but a leading BOM is still stripped on read, for the same reason it is everywhere else.
 - Purging unassigned sessions deletes their charts too; a chart nothing points at is a stray file, and these are the big ones.
+
+### A signed season keeps its own roster (`src/season_rosters.rs`)
+
+The Custom AI file lives in the game's install, where the Car and Driver Performance tabs edit it and the user may swap it outright — and the rating, every team bar, the seat checks, the live grid's team names and the standings' team names were all read from it on every request. So a season raced, paid and finished was re-judged every time the file changed.
+
+- **`POST .../sign` copies the roster into the career** as `rosters/<champ id>.xml`, before anything is recorded; a folder save that cannot take the copy is not signed (500). From then on that season reads its roster from the copy and nowhere else.
+- **`season_rosters::roster_file` is the one way to ask which file a season reads** — the copy if there is one, else `<custom_ai_dir>/<custom_ai_file>`. In the server it is `champ_roster_file` / `champ_roster_seats`; `compute_career_full` takes the career path for the same reason. The liveries a roster is checked against for phantoms are still the install's — they are what AMS2 can spawn, whichever file names them.
+- **The rating scores a signed season's sessions against its copy.** `RatingContext::for_season` restricts a context to one season's session ids; `season_contexts` builds one per signed season and `rating_contexts` puts them **ahead of** the class contexts, because a session is scored against the first context that covers it. Every other session in the class still reads the game's file. That season's own team bars come from the copy too (`champ_eligibility`).
+- The Car and Driver Performance tabs keep showing and editing the **game's** files. That is the point: a roster can still be developed for seasons to come without reaching back into signed ones.
+- **The live tab says when the game will load something else** (`LiveTeams.roster`, from `season_rosters::matches_game`, byte for byte) and offers `POST /api/championships/:id/roster/restore`, which copies the season's roster over the game's file — `ensure_baseline` first, like every other write to a roster. AMS2 reads a roster when a session loads, so the banner then tells the user to restart the session, and stays up until dismissed: nothing the server can see says when that has happened. `main.js` re-asks `/api/live-teams` whenever the Live tab is opened, since an edit made in another tab changes the answer without changing the grid.
+- A signed season's `custom_ai_file` is locked (409 on `PATCH`) — the copy would contradict any other file. `DELETE .../sign` and deleting the championship remove the copy.
+- `seal_career` → `keep_signed_rosters` gives every season signed before this existed a copy of the game's file as it is at load — what those seasons were being judged on until then, so nothing moves on the upgrade.
+- **Legacy flat saves get no copy** — nowhere to keep one, and never migrated — so they sign and read the game's file exactly as before.
 
 ### HTTP server notes
 

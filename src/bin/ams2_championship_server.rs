@@ -34,7 +34,8 @@ fn now_secs() -> u64 {
         .as_secs()
 }
 
-/// Brings a freshly loaded career up to date: stamps the rating tuning it runs on if it has
+/// Brings a freshly loaded career up to date: keeps a copy of the roster of any season signed
+/// before rosters were fixed, stamps the rating tuning it runs on if it has
 /// none, and stamps the payout onto any season finished before settlements existed. Writes the
 /// career back if either changed anything.
 ///
@@ -52,7 +53,11 @@ fn seal_career(
         return Ok(()); // No active career — nothing loaded, nothing to seal.
     }
     let cfg = ams2_championship::config::load_or_create(config_path);
-    let seated = seat_unseated(store, config_path);
+    let kept = keep_signed_rosters(store, config_path, path);
+    if kept > 0 {
+        println!("Kept the roster of {kept} season(s) signed before rosters were fixed.");
+    }
+    let seated = seat_unseated(store, config_path, path);
     if seated > 0 {
         println!("Recorded the car driven in {seated} season(s) already under way.");
     }
@@ -97,11 +102,52 @@ fn seal_career(
     persist(store, path)
 }
 
+/// Gives every signed season that has no roster of its own a copy of the game's file — seasons
+/// signed before rosters were fixed at signing. Returns how many it copied.
+///
+/// The one-time upgrade beside the others in [`seal_career`], and correct for the same reason:
+/// the game's file is what those seasons have been judged on until now, so copying it moves
+/// nothing, and from here on nothing moves them either. A season whose file is missing, or a
+/// flat save with nowhere to keep a copy, is left reading the game's file as before.
+fn keep_signed_rosters(
+    store: &SharedStore,
+    config_path: &std::path::Path,
+    career: &std::path::Path,
+) -> usize {
+    use ams2_championship::season_rosters;
+    let Some(dir) = cfg_custom_ai_dir(config_path) else {
+        return 0;
+    };
+    if season_rosters::rosters_dir(career).is_none() {
+        return 0;
+    }
+    let data = store.read().unwrap();
+    data.championships
+        .iter()
+        .filter(|c| ams2_championship::contracts::for_championship(&data.contracts, &c.id).is_some())
+        .filter(|c| season_rosters::stored(career, &c.id).is_none())
+        .filter_map(|c| {
+            let game = dir.join(c.custom_ai_file.as_deref()?);
+            match season_rosters::store(career, &c.id, &game) {
+                Ok(()) => Some(()),
+                Err(e) => {
+                    eprintln!("Could not keep the roster of “{}”: {e}", c.name);
+                    None
+                }
+            }
+        })
+        .count()
+}
+
 /// Stores the car on every season that has sessions and a declared team but no car yet — seasons
 /// raced before `player_seat` existed, or whose sessions have only now become conclusive. Returns
 /// how many it stored. A season whose sessions disagree is left alone: it is enforced on the team
 /// as before, rather than being locked to one of the two cars it was raced in.
-fn seat_unseated(store: &SharedStore, config_path: &std::path::Path) -> usize {
+fn seat_unseated(
+    store: &SharedStore,
+    config_path: &std::path::Path,
+    career: &std::path::Path,
+) -> usize {
     let Some(dir) = cfg_custom_ai_dir(config_path) else {
         return 0;
     };
@@ -113,10 +159,10 @@ fn seat_unseated(store: &SharedStore, config_path: &std::path::Path) -> usize {
         if champ.player_seat.is_some() {
             continue;
         }
-        let Some(file) = champ.custom_ai_file.clone() else {
+        let Some(file) = ams2_championship::season_rosters::roster_file(career, Some(&dir), champ) else {
             continue;
         };
-        let seats = roster_seats_with(&dir, &file, installed.as_ref());
+        let seats = seats_at(&file, installed.as_ref());
         if let Some(lock) = ams2_championship::data_store::derive_seat_lock(champ, &d.sessions, &seats) {
             champ.player_seat = Some(lock);
             seated += 1;
@@ -293,7 +339,11 @@ fn team_previews(
 ///
 /// Built fresh from the XML files on each call, so a scalar edit is reflected immediately —
 /// nothing about this table is cached.
-fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> Vec<u8> {
+fn car_performance_json(
+    config_path: &std::path::Path,
+    career: &std::path::Path,
+    store: &SharedStore,
+) -> Vec<u8> {
     use ams2_championship::{custom_ai, driver_rating};
 
     #[derive(serde::Serialize)]
@@ -344,12 +394,13 @@ fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> V
     let classes = load_classes(config_path);
     // Only sessions committed to a championship are rated, and they are rated on the career's
     // own tuning rather than whatever Config happens to say now.
-    let (params, sessions, active) = {
+    let (params, sessions, active, seasons) = {
         let data = store.read().unwrap();
         (
             career_rating_params(&data, config_path),
             driver_rating::assigned_sessions(&data.championships, &data.sessions),
             ams2_championship::data_store::active_classes(&data.championships),
+            season_contexts(config_path, career, &data),
         )
     };
 
@@ -391,7 +442,8 @@ fn car_performance_json(config_path: &std::path::Path, store: &SharedStore) -> V
         })
         .collect();
 
-    let contexts: Vec<driver_rating::RatingContext> = classes.into_iter().map(|c| c.ctx).collect();
+    // Signed seasons are rated on their own rosters, the table below on the game's files.
+    let contexts = rating_contexts(seasons, classes);
     let players: Vec<PlayerRow> = driver_rating::recorded_players_global(&sessions, &contexts)
         .into_iter()
         .map(|name| {
@@ -459,25 +511,101 @@ fn roster_seats_with(
     file: &str,
     installed: Option<&std::collections::HashSet<String>>,
 ) -> Vec<ams2_championship::custom_ai::SeatEntry> {
-    let seats = ams2_championship::custom_ai::parse_seats(&dir.join(file));
+    seats_at(&dir.join(file), installed)
+}
+
+/// [`roster_seats_with`] for a roster file named by its full path — the game's, or a season's own
+/// copy. The liveries are always the install's: they are what AMS2 can spawn, whichever file
+/// names them.
+fn seats_at(
+    file: &std::path::Path,
+    installed: Option<&std::collections::HashSet<String>>,
+) -> Vec<ams2_championship::custom_ai::SeatEntry> {
+    let seats = ams2_championship::custom_ai::parse_seats(file);
     ams2_championship::custom_ai::without_phantom_seats(seats, installed)
 }
 
-/// [`roster_seats_with`] for a one-off lookup, reading the manifests itself.
-fn roster_seats(dir: &std::path::Path, file: &str) -> Vec<ams2_championship::custom_ai::SeatEntry> {
-    let installed = ams2_championship::liveries::installed_livery_names(dir);
-    roster_seats_with(dir, file, installed.as_ref())
+/// The file a championship's roster is read from: the copy the season keeps once a contract is
+/// signed, otherwise the game's file. **Every** read of one season's roster goes through here —
+/// see [`ams2_championship::season_rosters`].
+fn champ_roster_file(
+    config_path: &std::path::Path,
+    career: &std::path::Path,
+    champ: &Championship,
+) -> Option<PathBuf> {
+    ams2_championship::season_rosters::roster_file(
+        career,
+        cfg_custom_ai_dir(config_path).as_deref(),
+        champ,
+    )
 }
 
-/// [`roster_seats`] for a championship's own roster; empty without a folder or a file.
+/// The seats a championship's own roster offers; empty without a roster to read.
 fn champ_roster_seats(
     config_path: &std::path::Path,
+    career: &std::path::Path,
     champ: &Championship,
 ) -> Vec<ams2_championship::custom_ai::SeatEntry> {
-    cfg_custom_ai_dir(config_path)
-        .zip(champ.custom_ai_file.as_deref())
-        .map(|(dir, file)| roster_seats(&dir, file))
-        .unwrap_or_default()
+    let Some(file) = champ_roster_file(config_path, career, champ) else {
+        return Vec::new();
+    };
+    let installed = cfg_custom_ai_dir(config_path)
+        .and_then(|d| ams2_championship::liveries::installed_livery_names(&d));
+    seats_at(&file, installed.as_ref())
+}
+
+/// Every signed season's own roster as a rating context, keyed by championship id.
+///
+/// Each covers only that season's sessions, and callers put them **ahead of** the class contexts
+/// from [`load_classes`]: a session is scored against the first context that covers it, so a
+/// signed season's races are judged on the roster it was signed on, whatever the game's file
+/// has become since, while every other session in the class reads the game's file.
+fn season_contexts(
+    config_path: &std::path::Path,
+    career: &std::path::Path,
+    data: &CareerData,
+) -> Vec<(String, ams2_championship::driver_rating::RatingContext)> {
+    use ams2_championship::{custom_ai, driver_rating, season_rosters};
+    let installed = cfg_custom_ai_dir(config_path)
+        .and_then(|d| ams2_championship::liveries::installed_livery_names(&d));
+    data.championships
+        .iter()
+        .filter_map(|champ| {
+            let copy = season_rosters::stored(career, &champ.id)?;
+            let class = champ_class(champ);
+            let perf = custom_ai::class_performance_of(&class, &copy, &Default::default());
+            let pace: std::collections::HashMap<String, f32> = perf
+                .cars
+                .iter()
+                .map(|c| (c.team.clone(), c.pace_delta_pct))
+                .collect();
+            let sessions = champ
+                .rounds
+                .iter()
+                .flat_map(|r| r.session_ids.iter().cloned())
+                .collect();
+            let ctx = driver_rating::RatingContext::for_season(
+                &class,
+                seats_at(&copy, installed.as_ref()),
+                &pace,
+                sessions,
+            );
+            Some((champ.id.clone(), ctx))
+        })
+        .collect()
+}
+
+/// The contexts a career-wide rating is computed over: every signed season's own roster first,
+/// then one per class from the game's files. See [`season_contexts`].
+fn rating_contexts(
+    seasons: Vec<(String, ams2_championship::driver_rating::RatingContext)>,
+    classes: Vec<ClassData>,
+) -> Vec<ams2_championship::driver_rating::RatingContext> {
+    seasons
+        .into_iter()
+        .map(|(_, ctx)| ctx)
+        .chain(classes.into_iter().map(|c| c.ctx))
+        .collect()
 }
 
 /// Whether session `sid` may be added to `champ`, and the car to store on the season if adding
@@ -563,6 +691,7 @@ fn reseat(
     sessions: &[ams2_championship::data_store::RecordedSession],
     contracts: &[ams2_championship::contracts::Contract],
     config_path: &std::path::Path,
+    career: &std::path::Path,
 ) {
     if ams2_championship::contracts::for_championship(contracts, &champ.id).is_some() {
         return;
@@ -571,7 +700,7 @@ fn reseat(
         champ.player_seat = None;
         return;
     }
-    let seats = champ_roster_seats(config_path, champ);
+    let seats = champ_roster_seats(config_path, career, champ);
     if !seats.is_empty() {
         champ.player_seat =
             ams2_championship::data_store::derive_seat_lock(champ, sessions, &seats);
@@ -606,6 +735,20 @@ struct LiveTeams {
     /// said here, while the driver can still quit to the menu and pick the right livery, rather
     /// than when the session is added and it is too late to re-run it.
     seat: Option<GridStatus>,
+    /// Set when the active season keeps its own roster (see
+    /// [`ams2_championship::season_rosters`]) and the file AMS2 will load is not that roster.
+    /// Everything about the season is judged on its copy, so a session raced on anything else
+    /// is measured against a grid the game did not field. The tab offers to copy the season's
+    /// roster back, which is the only fix — and it only takes effect once the session restarts.
+    roster: Option<RosterMismatch>,
+}
+
+/// The live tab's "the game is not loading this season's roster" banner.
+#[derive(serde::Serialize, Default, Debug)]
+struct RosterMismatch {
+    /// The season to restore — `POST /api/championships/:id/roster/restore`.
+    champ_id: String,
+    text: String,
 }
 
 /// A sentence about the live grid, and whether it is good news.
@@ -642,6 +785,7 @@ impl GridStatus {
 /// then falls back to the car names AMS2 reports.
 fn resolve_live_teams(
     dir: &std::path::Path,
+    career: &std::path::Path,
     champs: &[Championship],
     grid: &[ams2_championship::custom_ai::GridEntry],
     sp: bool,
@@ -679,7 +823,25 @@ fn resolve_live_teams(
             ..Default::default()
         };
     };
-    let seats = roster_seats(dir, file);
+    // The season's own copy once it is signed — the grid it is judged on, which is not
+    // necessarily the one AMS2 is about to load. `roster` says so when they differ.
+    let roster_path = ams2_championship::season_rosters::roster_file(career, Some(dir), champ)
+        .unwrap_or_else(|| dir.join(file));
+    let installed = ams2_championship::liveries::installed_livery_names(dir);
+    let seats = seats_at(&roster_path, installed.as_ref());
+    let roster = (ams2_championship::season_rosters::matches_game(career, dir, champ)
+        == Some(false))
+    .then(|| RosterMismatch {
+        champ_id: champ.id.clone(),
+        text: format!(
+            "The {file} AMS2 loads is not the roster “{}” was signed on. This season is judged \
+             on its own copy, so a session raced on the game's file is measured against a grid \
+             the game did not field. Copy the season's roster to the game's Custom AI Drivers \
+             folder — this replaces the file there — then restart the session in AMS2: it reads \
+             the roster when a session loads.",
+            champ.name
+        ),
+    });
     // An empty grid is the menu, not a problem with the grid.
     let fit = (!grid.is_empty() && !seats.is_empty())
         .then(|| ams2_championship::custom_ai::GridFit::measure(&seats, grid));
@@ -710,7 +872,7 @@ fn resolve_live_teams(
         }
     }
     LiveTeams {
-        teams: ams2_championship::custom_ai::parse_driver_teams(&dir.join(file)),
+        teams: ams2_championship::custom_ai::parse_driver_teams(&roster_path),
         player_team: champ.player_team.clone().filter(|t| !t.trim().is_empty()),
         // A multiplayer career is judged on no roster, so it is told nothing either way.
         grid: if sp {
@@ -726,6 +888,7 @@ fn resolve_live_teams(
         },
         fit,
         seat,
+        roster,
     }
 }
 
@@ -879,6 +1042,7 @@ fn driver_performance_json(config_path: &std::path::Path, store: &SharedStore) -
 /// left a caller free to forget the third one.
 fn champ_eligibility(
     config_path: &std::path::Path,
+    career: &std::path::Path,
     champ: &Championship,
     data: &CareerData,
 ) -> Option<(
@@ -890,14 +1054,28 @@ fn champ_eligibility(
     let file = champ.custom_ai_file.as_deref()?;
     let class = std::path::Path::new(file).file_stem()?.to_str()?;
     let classes = load_classes(config_path);
-    let own = classes.iter().position(|c| c.perf.class == class)?;
-    let expected = classes[own].ctx.expected.clone();
-    let skills = classes[own].skills.clone();
+    let seasons = season_contexts(config_path, career, data);
+    // A signed season's bars come from the roster it was signed on, like its results do;
+    // anything else reads the game's file.
+    let (expected, skills) = match seasons.iter().find(|(id, _)| id == &champ.id) {
+        Some((_, ctx)) => (
+            ctx.expected.clone(),
+            ams2_championship::custom_ai::parse_team_skills(&champ_roster_file(
+                config_path,
+                career,
+                champ,
+            )?),
+        ),
+        None => {
+            let own = classes.iter().find(|c| c.perf.class == class)?;
+            (own.ctx.expected.clone(), own.skills.clone())
+        }
+    };
 
     // The rating spans the driver's whole career — a seat is earned by racing, not by racing
     // this particular car — while the requirement comes from this class's own grid. Only
     // sessions committed to a championship count toward it.
-    let contexts: Vec<driver_rating::RatingContext> = classes.into_iter().map(|c| c.ctx).collect();
+    let contexts = rating_contexts(seasons, classes);
     let rated = driver_rating::assigned_sessions(&data.championships, &data.sessions);
     let params = career_rating_params(data, config_path);
     let reputation = driver_rating::compute_reputation_global_with(
@@ -933,16 +1111,17 @@ fn champ_class(champ: &Championship) -> String {
 /// livery mod. A missing picture is never worth a message of its own.
 fn champ_previews(
     config_path: &std::path::Path,
+    career: &std::path::Path,
     champ: &Championship,
 ) -> std::collections::HashMap<String, String> {
     let Some(dir) = cfg_custom_ai_dir(config_path) else {
         return Default::default();
     };
-    let Some(file) = champ.custom_ai_file.as_deref() else {
+    let Some(file) = champ_roster_file(config_path, career, champ) else {
         return Default::default();
     };
     let installed = ams2_championship::liveries::installed_liveries(&dir);
-    team_previews(installed.as_ref(), &dir.join(file))
+    team_previews(installed.as_ref(), &file)
 }
 
 /// The career ledger and the negotiating position it leaves the driver in.
@@ -1078,7 +1257,7 @@ fn handle(
                 } else {
                     ams2_championship::custom_ai::SeatProof::Possible
                 };
-                resolve_live_teams(&dir, &data.championships, &grid, sp, proof)
+                resolve_live_teams(&dir, &cur(&data_path), &data.championships, &grid, sp, proof)
             }
             // Nothing can be resolved without the folder, and in a singleplayer career that is
             // the first thing to fix rather than something to discover from an empty column.
@@ -1120,7 +1299,12 @@ fn handle(
         let data = store.read().unwrap();
         let cfg = ams2_championship::config::load_or_create(&config_path);
         let ai_dir = cfg.custom_ai_dir.as_deref().map(PathBuf::from);
-        let career = compute_career_full(&data.championships, &data.sessions, ai_dir.as_deref());
+        let career = compute_career_full(
+            &data.championships,
+            &data.sessions,
+            ai_dir.as_deref(),
+            &cur(&data_path),
+        );
         let json = serde_json::to_vec(&career).unwrap_or_default();
         json_ok(&mut stream, &json);
         return;
@@ -1216,7 +1400,7 @@ fn handle(
     // GET /api/car-performance — ranked power/weight/drag table per car class, each team's
     // required driver rating, and the rating of every human recorded in that class.
     if method == "GET" && path == "/api/car-performance" {
-        json_ok(&mut stream, &car_performance_json(&config_path, &store));
+        json_ok(&mut stream, &car_performance_json(&config_path, &cur(&data_path), &store));
         return;
     }
 
@@ -1290,7 +1474,7 @@ fn handle(
             json_err(&mut stream, "400 Bad Request", &e);
             return;
         }
-        json_ok(&mut stream, &car_performance_json(&config_path, &store));
+        json_ok(&mut stream, &car_performance_json(&config_path, &cur(&data_path), &store));
         return;
     }
 
@@ -1332,7 +1516,7 @@ fn handle(
             json_err(&mut stream, "400 Bad Request", &e);
             return;
         }
-        json_ok(&mut stream, &car_performance_json(&config_path, &store));
+        json_ok(&mut stream, &car_performance_json(&config_path, &cur(&data_path), &store));
         return;
     }
 
@@ -1647,13 +1831,9 @@ fn handle(
             json_err(&mut stream, "404 Not Found", "not found");
             return;
         };
-        let cfg = ams2_championship::config::load_or_create(&config_path);
-        let teams = match (cfg.custom_ai_dir, &champ.custom_ai_file) {
-            (Some(dir), Some(file)) => {
-                ams2_championship::custom_ai::list_teams(&std::path::Path::new(&dir).join(file))
-            }
-            _ => vec![],
-        };
+        let teams = champ_roster_file(&config_path, &cur(&data_path), champ)
+            .map(|file| ams2_championship::custom_ai::list_teams(&file))
+            .unwrap_or_default();
         let json = serde_json::to_vec(&teams).unwrap_or_default();
         json_ok(&mut stream, &json);
         return;
@@ -1686,7 +1866,7 @@ fn handle(
         let cfg = ams2_championship::config::load_or_create(&config_path);
         let enforced = cfg.enforce_team_eligibility;
         let hide_locked = cfg.hide_locked_teams;
-        let body = match champ_eligibility(&config_path, champ, &data) {
+        let body = match champ_eligibility(&config_path, &cur(&data_path), champ, &data) {
             Some((reputation, teams)) => Body {
                 enforced,
                 hide_locked,
@@ -1770,8 +1950,8 @@ fn handle(
         let open = signed.is_none() && champ.rounds.iter().all(|r| r.session_ids.is_empty());
 
         let (ledger, standing) = career_standing(&cfg, &data);
-        let rated = champ_eligibility(&config_path, champ, &data);
-        let previews = champ_previews(&config_path, champ);
+        let rated = champ_eligibility(&config_path, &cur(&data_path), champ, &data);
+        let previews = champ_previews(&config_path, &cur(&data_path), champ);
         let body = match &rated {
             Some((rep, eligibility)) => {
                 let offers = contracts::offers_for_with(
@@ -1783,7 +1963,7 @@ fn handle(
                     &standing,
                     &cfg.offer_params(),
                 );
-                let roster = champ_roster_seats(&config_path, champ);
+                let roster = champ_roster_seats(&config_path, &cur(&data_path), champ);
                 let seats = offers
                     .iter()
                     .map(|o| {
@@ -1903,7 +2083,7 @@ fn handle(
             return;
         }
 
-        let Some((reputation, eligibility)) = champ_eligibility(&config_path, &current, &data)
+        let Some((reputation, eligibility)) = champ_eligibility(&config_path, &cur(&data_path), &current, &data)
         else {
             json_err(
                 &mut stream,
@@ -1961,7 +2141,7 @@ fn handle(
         // when that is nobody, the team's weakest. Re-derived here rather than trusted from the
         // client, like the terms.
         let choices = ams2_championship::custom_ai::seat_choices(
-            &champ_roster_seats(&config_path, &current),
+            &champ_roster_seats(&config_path, &cur(&data_path), &current),
             &offer.team,
             reputation.value,
         );
@@ -1985,6 +2165,35 @@ fn handle(
                 }
             },
             None => choices.first().cloned(),
+        };
+
+        // ── The roster is fixed from here on ─────────────────────────────────
+        // The deal was offered on this grid, so the season keeps a copy of it and is judged on
+        // that copy from now on, whatever happens to the game's file. Taken before anything is
+        // recorded: a season that should have fixed its roster and could not is not signed. A
+        // legacy flat save has nowhere to keep one and signs as it always did.
+        let career = cur(&data_path);
+        let copied = match (
+            cfg_custom_ai_dir(&config_path),
+            current.custom_ai_file.as_deref(),
+        ) {
+            (Some(dir), Some(file))
+                if ams2_championship::season_rosters::rosters_dir(&career).is_some() =>
+            {
+                if let Err(e) =
+                    ams2_championship::season_rosters::store(&career, &id, &dir.join(file))
+                {
+                    json_err(
+                        &mut stream,
+                        "500 Internal Server Error",
+                        &format!("Not signed — could not keep this season's roster: {e}")
+                            .replace('"', "'"),
+                    );
+                    return;
+                }
+                true
+            }
+            _ => false,
         };
 
         let mut contract = contracts::Contract::from_offer(&id, offer, now_secs());
@@ -2017,7 +2226,11 @@ fn handle(
             })
             .unwrap_or_default();
         drop(data);
-        if !persisted(&store, &cur(&data_path), &mut stream) {
+        if !persisted(&store, &career, &mut stream) {
+            // Nothing was signed, so nothing is fixed either.
+            if copied {
+                ams2_championship::season_rosters::remove(&career, &id);
+            }
             return;
         }
         json_ok(&mut stream, &json);
@@ -2062,10 +2275,61 @@ fn handle(
             champ.player_seat = None;
         }
         drop(data);
-        if !persisted(&store, &cur(&data_path), &mut stream) {
+        let career = cur(&data_path);
+        if !persisted(&store, &career, &mut stream) {
             return;
         }
+        // The roster was kept because of the deal, so it goes with it: the season reads the
+        // game's file again until it is signed afresh, which takes a new copy.
+        ams2_championship::season_rosters::remove(&career, &id);
         json_ok(&mut stream, b"{\"released\":true}");
+        return;
+    }
+
+    // POST /api/championships/:id/roster/restore — copy the season's own roster over the file
+    // AMS2 loads, so the game races the grid the season is judged on. The live tab offers it
+    // when the two differ (`LiveTeams::roster`). AMS2 reads a roster when a session loads, so
+    // nothing changes on track until the session is restarted — the tab says so.
+    if method == "POST"
+        && segs.len() == 5
+        && segs[0] == "api"
+        && segs[1] == "championships"
+        && segs[3] == "roster"
+        && segs[4] == "restore"
+    {
+        let id = segs[2];
+        let Some(champ) = store
+            .read()
+            .unwrap()
+            .championships
+            .iter()
+            .find(|c| c.id == id)
+            .cloned()
+        else {
+            json_err(&mut stream, "404 Not Found", "not found");
+            return;
+        };
+        let Some(dir) = cfg_custom_ai_dir(&config_path) else {
+            json_err(
+                &mut stream,
+                "400 Bad Request",
+                "no Custom AI Drivers folder is configured",
+            );
+            return;
+        };
+        let career = cur(&data_path);
+        if ams2_championship::season_rosters::stored(&career, id).is_none() {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "This season keeps no roster of its own — it reads the game's file already.",
+            );
+            return;
+        }
+        match ams2_championship::season_rosters::restore(&career, &dir, &champ) {
+            Ok(()) => json_ok(&mut stream, b"{\"restored\":true}"),
+            Err(e) => json_err(&mut stream, "500 Internal Server Error", &e.replace('"', "'")),
+        }
         return;
     }
 
@@ -2133,7 +2397,7 @@ fn handle(
                     Some("This season has no Custom AI Drivers file, so there is no grid to check against.".into());
                 Vec::new()
             }
-            (Some(d), Some(file)) => roster_seats(d, file),
+            (Some(_), Some(_)) => champ_roster_seats(&config_path, &cur(&data_path), champ),
         };
         if body.reason.is_none() && seats.is_empty() {
             body.reason = Some("That Custom AI Drivers file lists no cars this install can field.".into());
@@ -2223,7 +2487,7 @@ fn handle(
             enforced: false,
             blocked: Default::default(),
         };
-        if let (Some(dir), Some(file), Some(_)) = (
+        if let (Some(_), Some(_), Some(_)) = (
             cfg_custom_ai_dir(&config_path),
             champ.custom_ai_file.as_deref(),
             champ
@@ -2231,7 +2495,7 @@ fn handle(
                 .as_deref()
                 .filter(|t| !t.trim().is_empty()),
         ) {
-            let seats = roster_seats(&dir, file);
+            let seats = champ_roster_seats(&config_path, &cur(&data_path), champ);
             out.enforced = true;
             // The same verdict the assignment route gives, so the picker never offers a session
             // that adding would refuse.
@@ -2385,6 +2649,19 @@ fn handle(
             );
             return;
         }
+        // Signing also commits it: the contract was offered on that grid, and the season keeps a
+        // copy of it (see `season_rosters`) that a different file would contradict.
+        if prospective.custom_ai_file != current.custom_ai_file
+            && ams2_championship::contracts::for_championship(&data.contracts, id).is_some()
+        {
+            json_err(
+                &mut stream,
+                "409 Conflict",
+                "The Custom AI Drivers file is locked once a contract is signed. Tear up the \
+                 contract first to change it.",
+            );
+            return;
+        }
 
         let claimed = prospective
             .player_team
@@ -2413,7 +2690,7 @@ fn handle(
         // switched enforcement off in Config.
         if ams2_championship::config::load_or_create(&config_path).enforce_team_eligibility {
             if let (true, Some(team)) = (changed, claimed) {
-                let refused = champ_eligibility(&config_path, &prospective, &data)
+                let refused = champ_eligibility(&config_path, &cur(&data_path), &prospective, &data)
                     .filter(|(_, elig)| !ams2_championship::driver_rating::is_allowed(elig, &team))
                     .map(|(rep, elig)| {
                         let need = elig
@@ -2529,9 +2806,13 @@ fn handle(
             return;
         }
         drop(data);
-        if !persisted(&store, &cur(&data_path), &mut stream) {
+        let career = cur(&data_path);
+        if !persisted(&store, &career, &mut stream) {
             return;
         }
+        // A season's roster belongs to the season; with nothing left to point at it, it is a
+        // stray file.
+        ams2_championship::season_rosters::remove(&career, id);
         json_ok(&mut stream, b"{}");
         return;
     }
@@ -2580,7 +2861,7 @@ fn handle(
             return;
         }
         champ.rounds.remove(ridx);
-        reseat(champ, &d.sessions, &d.contracts, &config_path);
+        reseat(champ, &d.sessions, &d.contracts, &config_path, &cur(&data_path));
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         if !persisted(&store, &cur(&data_path), &mut stream) {
@@ -2621,7 +2902,7 @@ fn handle(
         // Once the season's sessions have shown which of the team's cars the player drives, that
         // car is stored on the season (`player_seat`) and every later session must be in it —
         // the team name alone would accept the team-mate's car too.
-        let seats = champ_roster_seats(&config_path, champ);
+        let seats = champ_roster_seats(&config_path, &cur(&data_path), champ);
         let (rejection, lock) = check_session_seat(champ, &data.sessions, &seats, sid, data.mode.requires_exact_car());
         if let Some(reason) = rejection {
             // json_err interpolates the message straight into JSON — keep quotes out of it.
@@ -2673,7 +2954,7 @@ fn handle(
             return;
         }
         champ.rounds[ridx].session_ids.retain(|s| s != sid);
-        reseat(champ, &d.sessions, &d.contracts, &config_path);
+        reseat(champ, &d.sessions, &d.contracts, &config_path, &cur(&data_path));
         let json = serde_json::to_vec(&*champ).unwrap_or_default();
         drop(data);
         if !persisted(&store, &cur(&data_path), &mut stream) {
@@ -3014,6 +3295,9 @@ fn handle(
         struct PatchConfig {
             port: u16,
             host: String,
+            // Optional so a form that predates it carries the stored choice through.
+            #[serde(default)]
+            open_browser: Option<bool>,
             poll_ms: u64,
             record_practice: bool,
             record_qualify: bool,
@@ -3136,6 +3420,7 @@ fn handle(
         let new_cfg = ams2_championship::config::Config {
             port: req_body.port,
             host: req_body.host,
+            open_browser: req_body.open_browser.unwrap_or(old_cfg.open_browser),
             saves_dir: req_body.saves_dir,
             // A remembered career in the old folder means nothing in the new one — drop it so the
             // next startup picks a career from the folder itself.
@@ -3343,6 +3628,32 @@ mod tests;
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
+/// The address a local browser should use. A wildcard bind is reachable on loopback, but
+/// `http://0.0.0.0/` is not an address a browser can open.
+fn browser_url(host: &str, port: u16) -> String {
+    let host = match host.trim() {
+        "" | "0.0.0.0" | "::" | "[::]" => "127.0.0.1",
+        h => h,
+    };
+    format!("http://{host}:{port}/")
+}
+
+/// Hands the URL to the system's default browser. A failure is reported and otherwise ignored:
+/// the server is just as usable from a browser opened by hand.
+fn open_in_browser(url: &str) {
+    #[cfg(windows)]
+    let result = std::process::Command::new("rundll32")
+        .args(["url.dll,FileProtocolHandler", url])
+        .spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(url).spawn();
+    if let Err(e) = result {
+        eprintln!("Could not open a browser at {url}: {e}");
+    }
+}
+
 fn main() {
     let exe_dir = std::env::current_exe()
         .ok()
@@ -3431,6 +3742,11 @@ fn main() {
     println!("Serving at http://{addr}/  (Ctrl+C to stop)");
     println!("Live endpoint:  http://{addr}/live");
     println!("Career API:     http://{addr}/api/sessions  |  /api/championships");
+
+    // Only after the bind succeeded, so the page never opens onto a server that is not there.
+    if cfg.open_browser {
+        open_in_browser(&browser_url(&cfg.host, cfg.port));
+    }
 
     let config_path = Arc::new(config_path);
     let saves_dir = Arc::new(champ_dir);

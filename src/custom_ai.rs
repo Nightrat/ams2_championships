@@ -1140,33 +1140,7 @@ pub fn class_performance_with(
                 .and_then(|s| s.to_str())
                 .unwrap_or(&file)
                 .to_string();
-            let cars = parse_car_performance(&dir.join(&file));
-            let best = cars.iter().map(pace_score).fold(f32::INFINITY, f32::min);
-            let mut rows: Vec<CarPerformanceRow> = cars
-                .iter()
-                .map(|c| {
-                    let score = pace_score(c);
-                    CarPerformanceRow {
-                        team: c.team.clone(),
-                        drivers: c.drivers.clone(),
-                        power_scalar: c.power_scalar,
-                        weight_scalar: c.weight_scalar,
-                        drag_scalar: c.drag_scalar,
-                        pace_delta_pct: if best.is_finite() { score - best } else { 0.0 },
-                    }
-                })
-                .collect();
-            rows.sort_by(|a, b| {
-                a.pace_delta_pct
-                    .partial_cmp(&b.pace_delta_pct)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            let year = crate::season_years::season_year_with(&class, years);
-            ClassPerformance {
-                class,
-                year,
-                cars: rows,
-            }
+            class_performance_of(&class, &dir.join(&file), years)
         })
         .collect();
     classes.sort_by(|a, b| {
@@ -1176,6 +1150,42 @@ pub fn class_performance_with(
             .then_with(|| a.class.cmp(&b.class))
     });
     classes
+}
+
+/// One class's ranked performance table, read from `path` — the game's file, or a season's own
+/// copy of it (see [`crate::season_rosters`]), which is why the class is named separately rather
+/// than taken from the file's stem.
+pub fn class_performance_of(
+    class: &str,
+    path: &Path,
+    years: &BTreeMap<String, u16>,
+) -> ClassPerformance {
+    let cars = parse_car_performance(path);
+    let best = cars.iter().map(pace_score).fold(f32::INFINITY, f32::min);
+    let mut rows: Vec<CarPerformanceRow> = cars
+        .iter()
+        .map(|c| {
+            let score = pace_score(c);
+            CarPerformanceRow {
+                team: c.team.clone(),
+                drivers: c.drivers.clone(),
+                power_scalar: c.power_scalar,
+                weight_scalar: c.weight_scalar,
+                drag_scalar: c.drag_scalar,
+                pace_delta_pct: if best.is_finite() { score - best } else { 0.0 },
+            }
+        })
+        .collect();
+    rows.sort_by(|a, b| {
+        a.pace_delta_pct
+            .partial_cmp(&b.pace_delta_pct)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    ClassPerformance {
+        class: class.to_string(),
+        year: crate::season_years::season_year_with(class, years),
+        cars: rows,
+    }
 }
 
 /// Lowest `race_skill` among each team's drivers.

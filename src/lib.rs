@@ -10,6 +10,7 @@ pub mod lap_charts;
 pub mod livery_image;
 pub mod liveries;
 pub mod saves;
+pub mod season_rosters;
 pub mod season_years;
 pub mod session_recorder;
 pub mod spotter;

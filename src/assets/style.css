@@ -1396,6 +1396,9 @@ header h1 { flex: 1 1 100%; }
   background: #2e1212; border-color: #a33; color: #ff9b9b; font-weight: 600; font-size: 0.95rem;
 }
 .live-seat-wrong .live-grid-warning-icon { color: #e74c3c; font-size: 1.2rem; }
+/* The roster banner carries its own button, so the text no longer runs to the edge. */
+.live-roster-warning { align-items: center; }
+.live-roster-btn, .live-roster-dismiss { flex: none; }
 
 /* Dropping a per-track entry. The row button is a quiet × inside the Tracks cell — the entry it
    removes is named right beside it, so the button needs no label of its own. */

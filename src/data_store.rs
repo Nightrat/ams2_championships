@@ -661,15 +661,19 @@ fn constructors(
 /// no directory is configured, or the file can't be parsed.
 /// Seats a championship's roster can field, or an empty list when there is nothing to check
 /// against — no folder configured, no file assigned, or a file that will not parse.
-fn roster_seats_of(champ: &Championship, ai_dir: Option<&Path>) -> Vec<crate::custom_ai::SeatEntry> {
-    let (Some(dir), Some(file)) = (ai_dir, champ.custom_ai_file.as_deref()) else {
+///
+/// The roster is the season's own copy when it keeps one (see [`crate::season_rosters`]); the
+/// liveries it is checked against are still the install's, since those are what AMS2 can spawn.
+fn roster_seats_of(
+    champ: &Championship,
+    ai_dir: Option<&Path>,
+    career_file: &Path,
+) -> Vec<crate::custom_ai::SeatEntry> {
+    let Some(file) = crate::season_rosters::roster_file(career_file, ai_dir, champ) else {
         return Vec::new();
     };
-    let installed = crate::liveries::installed_livery_names(dir);
-    crate::custom_ai::without_phantom_seats(
-        crate::custom_ai::parse_seats(&dir.join(file)),
-        installed.as_ref(),
-    )
+    let installed = ai_dir.and_then(crate::liveries::installed_livery_names);
+    crate::custom_ai::without_phantom_seats(crate::custom_ai::parse_seats(&file), installed.as_ref())
 }
 
 /// The grid warning for one recorded session, if it has one.
@@ -740,11 +744,13 @@ pub fn derive_seat_lock(
 }
 
 fn resolve_team_map(
-champ: &Championship, ai_dir: Option<&Path>) -> HashMap<String, String> {
-    match (ai_dir, &champ.custom_ai_file) {
-        (Some(dir), Some(file)) => crate::custom_ai::parse_driver_teams(&dir.join(file)),
-        _ => HashMap::new(),
-    }
+    champ: &Championship,
+    ai_dir: Option<&Path>,
+    career_file: &Path,
+) -> HashMap<String, String> {
+    crate::season_rosters::roster_file(career_file, ai_dir, champ)
+        .map(|file| crate::custom_ai::parse_driver_teams(&file))
+        .unwrap_or_default()
 }
 
 /// Car classes the user is currently racing, used to pre-select the class filter on the
@@ -780,15 +786,18 @@ pub fn active_classes(champs: &[Championship]) -> Vec<String> {
 }
 
 pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> CareerResponse {
-    compute_career_full(champs, sessions, None)
+    compute_career_full(champs, sessions, None, Path::new(""))
 }
 
 /// Like [`compute_career`], but resolves each championship's assigned Custom AI Driver file
-/// (relative to `ai_dir`) to substitute team/livery names for driver car labels.
+/// (relative to `ai_dir`) to substitute team/livery names for driver car labels. A season that
+/// keeps its own roster beside `career_file` is read from that copy instead — see
+/// [`crate::season_rosters`].
 pub fn compute_career_full(
     champs: &[Championship],
     sessions: &[RecordedSession],
     ai_dir: Option<&Path>,
+    career_file: &Path,
 ) -> CareerResponse {
     #[derive(Default)]
     struct Accum {
@@ -811,11 +820,11 @@ pub fn compute_career_full(
     let mut championships: Vec<ChampionshipView> = Vec::new();
 
     for champ in champs {
-        let team_map = resolve_team_map(champ, ai_dir);
+        let team_map = resolve_team_map(champ, ai_dir, career_file);
         // The seats this season's roster can actually field, for the grid check below. Phantom
         // liveries are dropped first: a car AMS2 cannot spawn was never going to be on the grid,
         // so counting it would make every full grid look short.
-        let seats = roster_seats_of(champ, ai_dir);
+        let seats = roster_seats_of(champ, ai_dir, career_file);
         let driver_standings = standings_with(champ, sessions, &team_map);
         let constructor_standings = constructors(champ, sessions, &team_map);
 

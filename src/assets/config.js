@@ -68,6 +68,7 @@ function loadConfig() {
       _loadedConfig = cfg;
       document.getElementById('cfg-port').value       = cfg.port;
       document.getElementById('cfg-host').value       = cfg.host;
+      document.getElementById('cfg-open-browser').checked = cfg.open_browser;
       document.getElementById('cfg-saves-dir').value = cfg.saves_dir || '';
       document.getElementById('cfg-custom-ai-dir').value = cfg.custom_ai_dir || '';
       flagMissingAiDir(cfg.custom_ai_dir);
@@ -174,6 +175,7 @@ document.getElementById('config-form').addEventListener('submit', function (e) {
   var newCfg = {
     port:           parseInt(document.getElementById('cfg-port').value, 10),
     host:           document.getElementById('cfg-host').value.trim(),
+    open_browser:   document.getElementById('cfg-open-browser').checked,
     saves_dir:      document.getElementById('cfg-saves-dir').value.trim() || null,
     custom_ai_dir:  document.getElementById('cfg-custom-ai-dir').value.trim() || null,
     poll_ms:        parseInt(document.getElementById('cfg-poll-ms').value, 10),

@@ -7,6 +7,9 @@ function showTab(name) {
   var btn = document.querySelector('.tab-btn[data-tab="' + name + '"]');
   if (btn) btn.classList.add('tab-active');
   panel.classList.remove('tab-panel-hidden');
+  // A roster edited in another tab may now differ from the one the season was signed on, and
+  // the live banner only re-asks when the grid changes — so ask again on the way in.
+  if (name === 'live') loadLiveTeams();
 }
 
 document.querySelectorAll('.tab-btn').forEach(function (btn) {
