@@ -1,0 +1,433 @@
+// ── HTML generation ──────────────────────────────────────────────────────────
+
+fn generate_html() -> String {
+    format!(
+        r##"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMS2 Career Championships</title>
+<style>{css}</style>
+</head>
+<body>
+<header>
+  <h1>AMS2 Career Championships</h1>
+  <div class="tab-bar">
+    <button class="tab-btn tab-active" data-tab="live">&#9679; Live Session</button>
+    <button class="tab-btn" data-tab="career">&#127942; Career</button>
+    <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
+    <button class="tab-btn" data-tab="config">&#9965; Config<span id="tab-config-warn" class="tab-warn" title="No Custom AI Drivers folder is set" hidden>!</span></button>
+    <button class="tab-btn" data-tab="carperf">&#128202; Car Performance</button>
+    <button class="tab-btn" data-tab="driverperf">&#128100; Driver Performance</button>
+  </div>
+  <div class="save-switcher">
+    <label class="save-switcher-label" for="save-select">Career</label>
+    <select id="save-select" class="save-select"></select>
+  </div>
+</header>
+<main>
+  <div id="tab-career" class="tab-panel tab-panel-hidden">
+    <div class="sub-tab-bar">
+      <button class="sub-tab-btn sub-tab-active" data-career-sub="champs">Championships</button>
+      <button class="sub-tab-btn" data-career-sub="stats">Driver Stats</button>
+      <button class="sub-tab-btn" data-career-sub="tracks">Track Stats</button>
+      <button class="sub-tab-btn" data-career-sub="finances">Finances</button>
+      <button id="career-export-btn" class="career-export-btn">&#128229; Download HTML</button>
+    </div>
+    <div id="career-sub-champs" class="sub-tab-panel">
+      <div class="champ-master-detail">
+        <div id="career-champ-list" class="champ-list"></div>
+        <div id="career-champ-list-resize" class="champ-list-resize"></div>
+        <div id="career-champ-detail" class="champ-detail"></div>
+      </div>
+    </div>
+    <div id="career-sub-stats" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-stats-container"></div>
+    </div>
+    <div id="career-sub-tracks" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-tracks-container"></div>
+    </div>
+    <div id="career-sub-finances" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-finances-container"></div>
+    </div>
+  </div>
+  <div id="tab-live" class="tab-panel">
+    <section class="live-section">
+      <div id="live-status" class="live-status live-disconnected">
+        <span class="live-dot"></span>
+        <span id="live-status-text">Not connected — start AMS2 and open this page via the server</span>
+      </div>
+      <!-- Filled by live.js from /api/live-teams. This is the one moment a grid problem can
+           still be fixed — quit to the menu, set the opponent count, start again — so it sits
+           above the timing table rather than in a tab the user would have to go looking in. -->
+      <div id="live-grid-warning" class="live-grid-warning" hidden></div>
+      <!-- Whether the player is in the season's car. Separate from the grid banner: a wrong car
+           gets the session refused, and it can only be fixed from the menu. -->
+      <div id="live-seat-warning" class="live-grid-warning" hidden></div>
+      <!-- The game is not loading the roster the active season was signed on. Carries the one
+           fix there is — copying the season's roster back — and, once that is done, the reminder
+           that AMS2 only reads it when a session loads. -->
+      <div id="live-roster-warning" class="live-grid-warning live-roster-warning" hidden></div>
+      <div id="live-info" class="live-info">
+        <span id="live-session-type"></span>
+        <span id="live-race-state"></span>
+        <span id="live-track" class="live-track"></span>
+        <span id="live-raw-states" class="live-raw-states"></span>
+        <button id="live-record-btn" class="live-record-btn" disabled title="Save the current session now">&#9210; Save Session</button>
+        <span id="live-record-msg" class="live-record-msg"></span>
+      </div>
+      <nav class="live-subnav">
+        <button class="live-subtab live-subtab-active" data-sub="timing">Timing</button>
+        <button class="live-subtab" data-sub="setup">Telemetry</button>
+        <button id="spotter-btn" class="spotter-btn" title="Enable voice spotter">&#128362; Spotter</button>
+        <select id="spotter-voice" class="spotter-voice" title="TTS voice"></select>
+        <select id="spotter-focus" class="spotter-focus" title="Spotter focus: which driver to track">
+          <option value="">Auto (viewed player)</option>
+        </select>
+      </nav>
+      <div id="live-sub-timing" class="live-subpanel">
+        <div class="live-body">
+          <!-- Starts hidden: config.js reveals it only when show_track_map is on, so no frames
+               are accumulated or drawn in the window before /api/config resolves. -->
+          <canvas id="track-map" width="280" height="280" class="track-map" style="display:none"></canvas>
+          <div class="grid-scroll">
+            <table id="live-table" class="live-table">
+              <thead>
+                <tr>
+                  <th data-col="0" data-type="num">Pos</th>
+                  <th data-col="1" data-type="str">Driver</th>
+                  <th data-col="2" data-type="num">Laps</th>
+                  <th data-col="3" data-type="gap">Interval</th>
+                  <th data-col="4" data-type="gap">Gap</th>
+                  <th data-col="5" data-type="time">S1</th>
+                  <th data-col="6" data-type="time">S2</th>
+                  <th data-col="7" data-type="time">S3</th>
+                  <th data-col="8" data-type="time">Best Lap</th>
+                  <th data-col="9" data-type="time">Last Lap</th>
+                  <th data-col="10" data-type="str">Car / Team</th>
+                  <th data-col="11" data-type="str">Tyre</th>
+                </tr>
+              </thead>
+              <tbody id="live-tbody">
+                <tr><td colspan="12" class="live-empty">Waiting for session data&hellip;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div id="live-sub-setup" class="live-subpanel live-subpanel-hidden">
+        <div id="setup-panel" class="setup-panel">
+          <div class="setup-no-data">Connect to AMS2 to see telemetry.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div id="tab-manage" class="tab-panel tab-panel-hidden">
+    <div class="manage-layout">
+      <div id="manage-new-form" class="manage-new-form" style="display:none">
+        <h3>New Championship</h3>
+        <div class="manage-form-row">
+          <input id="new-champ-name" type="text" placeholder="Championship name" class="manage-input" style="flex:1">
+          <select id="new-champ-points" class="manage-select">
+            <option value="25,18,15,12,10,8,6,4,2,1">F1 Modern (25-18-15&hellip;)</option>
+            <option value="10,6,4,3,2,1">F1 1991-2002 (10-6-4-3-2-1)</option>
+            <option value="9,6,4,3,2,1">F1 Classic (9-6-4-3-2-1)</option>
+            <option value="custom">Custom&hellip;</option>
+          </select>
+          <input id="new-champ-custom" type="text" placeholder="e.g. 25,18,15,12,10" class="manage-input" style="display:none;flex:1">
+          <!-- Singleplayer only: manage.js fills and reveals it. A season is defined by the grid
+               it is raced on, so the roster is chosen here rather than after the fact. -->
+          <select id="new-champ-ai" class="manage-select" style="display:none" title="The grid this season is raced on"></select>
+          <!-- The calendar. Rounds are added as they are raced, so this is the only place the
+               length of a season can come from — and without it a salary has no denominator to
+               be paid out across. Required wherever contracts exist; manage.js reveals it. -->
+          <label id="new-champ-races-label" class="manage-inline-label" style="display:none">Races&nbsp;<input id="new-champ-races" type="number" min="1" max="99" value="15" class="manage-input manage-input-num" title="How many races the season runs — your salary is paid out across them"></label>
+          <label class="manage-checkbox-label"><input type="checkbox" id="new-champ-manufacturer"> Constructor Scoring</label>
+          <button id="new-champ-save" class="manage-btn manage-btn-primary">Create</button>
+          <button id="new-champ-cancel" class="manage-btn">Cancel</button>
+        </div>
+      </div>
+      <div class="manage-columns">
+        <div class="manage-left">
+          <div class="manage-left-header">
+            <span>Championships</span>
+            <button id="add-champ-btn" class="manage-btn manage-btn-primary">+ New</button>
+          </div>
+          <div id="champ-list"></div>
+        </div>
+        <div class="manage-right" id="manage-right">
+          <div class="manage-placeholder">Select a championship or create a new one.</div>
+        </div>
+      </div>
+      <div class="manage-danger-zone">
+        <button id="purge-sessions-btn" class="manage-btn manage-btn-danger">&#x1f5d1; Delete unassigned sessions</button>
+      </div>
+      <div id="manage-sessions-panel" class="manage-sessions-panel" style="display:none">
+        <div class="manage-sessions-header">
+          <span>Available Sessions</span>
+          <button id="close-sessions-btn" class="manage-btn">&#x2715; Close</button>
+        </div>
+        <div id="available-sessions"></div>
+      </div>
+    </div>
+  </div>
+  <div id="tab-config" class="tab-panel tab-panel-hidden">
+    <div class="config-panel config-panel-wide">
+      <h2 class="config-heading">Career Save Files</h2>
+      <p class="config-note">A career is <strong>singleplayer</strong> (race the AI: pick a roster, sign for a team, one season at a time)
+         or <strong>multiplayer</strong> (race people: no roster, no team, no contracts, as many seasons at once as you like).
+         The kind is chosen when the career is created and kept — make a new career to race the other way.</p>
+      <p class="config-note">Each save is a separate career — its own championships, sessions and stats.
+         A save is a folder in <code id="saves-dir-label">…</code> holding a <code>career.json</code>; recorded sessions
+         always go into the active one. Track radar maps are shared by all saves.
+         Change the folder under <em>Server Configuration</em> below.</p>
+      <ul id="saves-list" class="saves-list"></ul>
+      <div class="config-actions">
+        <input class="config-input" id="save-new-name" type="text" placeholder="New career name" maxlength="64" />
+        <select class="config-input" id="save-new-mode" title="A career keeps the kind it is created with">
+          <option value="singleplayer">Singleplayer</option>
+          <option value="multiplayer">Multiplayer</option>
+        </select>
+        <button id="save-new-btn" class="manage-btn manage-btn-primary" type="button">&#10010; New career</button>
+        <span id="saves-msg" class="config-save-msg"></span>
+      </div>
+    </div>
+    <div class="config-panel">
+      <h2 class="config-heading">Server Configuration</h2>
+      <p class="config-note">Changes are saved to <code>config.json</code> next to the executable.
+         Settings marked <span class="config-restart-badge">restart</span> take effect after restarting the server.</p>
+      <form id="config-form" autocomplete="off">
+        <div class="config-group">
+          <label class="config-label" for="cfg-port">Port <span class="config-restart-badge">restart</span></label>
+          <input class="config-input" id="cfg-port" name="port" type="number" min="1" max="65535" />
+          <span class="config-hint">HTTP and WebSocket port (default 8080)</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-host">Host <span class="config-restart-badge">restart</span></label>
+          <input class="config-input" id="cfg-host" name="host" type="text" />
+          <span class="config-hint">Bind address. Use <code>0.0.0.0</code> to allow LAN access (default 127.0.0.1)</span>
+        </div>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
+            <input id="cfg-open-browser" name="open_browser" type="checkbox" />
+            Open in browser on start
+          </label>
+          <span class="config-hint">Opens this page in the default browser when the server starts</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-saves-dir">Save files folder <span class="config-restart-badge">restart</span></label>
+          <input class="config-input config-input-wide" id="cfg-saves-dir" name="saves_dir" type="text" placeholder="(default: championships folder next to the executable)" />
+          <span class="config-hint">Folder holding your career save files and their track layouts. Leave empty for the default. The folder is created if it does not exist; after restarting, the server opens a career from it.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-custom-ai-dir">Custom AI Drivers folder</label>
+          <div id="cfg-custom-ai-dir-missing" class="config-warn" hidden><strong>!</strong> No folder is set, so this install has no rosters. Without one a singleplayer career cannot be rated, no team will make an offer, no money is earned, and the live grid shows AMS2 car models instead of team names. Point this at your AMS2 <code>UserData\CustomAIDrivers</code> folder and save.</div>
+          <input class="config-input config-input-wide" id="cfg-custom-ai-dir" name="custom_ai_dir" type="text" placeholder="e.g. D:\SteamLibrary\steamapps\common\Automobilista 2\UserData\CustomAIDrivers" />
+          <span class="config-hint">Folder with AMS2 Custom AI Driver XML files. Assign one to a championship (Manage tab) to show team/livery names instead of the AMS2 car class. A roster only works where the class&rsquo;s custom liveries are installed &mdash; AMS2 silently ignores an entry naming a livery it does not own. In a singleplayer career the rating, every team&rsquo;s requirement and every contract are derived from the season&rsquo;s roster, so a season raced on stock AI scores its points but cannot be judged. Race it at full grid size too: set as many opponents as the roster has cars, since your finish is judged against where your car ranks across the whole roster.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label">Class season years</label>
+          <div id="cfg-class-years" class="config-class-years"></div>
+          <span class="config-hint">The real-world season each class is raced in. It labels and orders the Car Performance and Driver Performance tables &mdash; nothing else reads it, so no rating, contract or result moves with it. Each box shows the built-in year greyed out; type over it to correct it, and clear it to go back. Classes AMS2 gives no year of its own &mdash; every mod, and Formula Edge (<code>FE-G1</code>), which is a fictional car and so is whatever season its liveries paint on it &mdash; are blank until you fill them in, and sort last until you do.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-poll-ms">Poll interval (ms)</label>
+          <input class="config-input" id="cfg-poll-ms" name="poll_ms" type="number" min="50" max="5000" />
+          <span class="config-hint">Shared memory read interval for the live view (default 500 ms)</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label">Auto-record <span class="config-restart-badge">restart</span></label>
+          <div class="config-check-group">
+            <label class="config-label-check"><input id="cfg-record-practice" type="checkbox" /> Practice</label>
+            <label class="config-label-check"><input id="cfg-record-qualify"  type="checkbox" /> Qualifying</label>
+            <label class="config-label-check"><input id="cfg-record-race"     type="checkbox" /> Race</label>
+          </div>
+          <span class="config-hint">Which session types to save automatically when AMS2 is running</span>
+        </div>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
+            <input id="cfg-enforce-team-eligibility" name="enforce_team_eligibility" type="checkbox" />
+            Enforce team eligibility
+          </label>
+          <span class="config-hint">Only let a championship's My Team be set to a team your driver rating has earned. Turn off to keep the ratings visible without blocking anything.</span>
+        </div>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
+            <input id="cfg-hide-locked-teams" name="hide_locked_teams" type="checkbox" />
+            Hide locked teams
+          </label>
+          <span class="config-hint">Leave off to list every team in the My Team picker with what it asks for, locked ones greyed out. On, teams you cannot claim are not shown at all.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label">Contracts</label>
+          <span class="config-hint">Contracts are on for every singleplayer career and off for every multiplayer one — the career's kind decides, so there is nothing to switch here. The settings below tune the money they deal in. The ledger is on the Career tab under <em>Finances</em>.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-contract-top-salary">Salary range</label>
+          <div class="config-check-group">
+            <input class="config-input" id="cfg-contract-top-salary" type="number" min="1" title="Per season, quickest car" />
+            <input class="config-input" id="cfg-contract-floor-salary" type="number" min="1" title="Per season, slowest car" />
+          </div>
+          <span class="config-hint">Per-season pay for the quickest and the slowest car on the grid. Everything between is interpolated by car pace, so the gap at the front is far larger than the gap at the back.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-champion-prize">Prize money</label>
+          <div class="config-check-group">
+            <input class="config-input" id="cfg-champion-prize" type="number" min="1" title="Winning the championship" />
+            <input class="config-input" id="cfg-last-place-prize" type="number" min="1" title="Last of the drivers who scored" />
+          </div>
+          <span class="config-hint">Paid on final championship position once a season is marked Final, scaled by the size of the field. The payout is settled at the moment a season is marked Final, so changing these never moves a season the career has already finished &mdash; only the ones still to come.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-starting-balance">Starting balance</label>
+          <input class="config-input" id="cfg-starting-balance" type="number" min="0" />
+          <span class="config-hint">Credits a <em>newly created</em> career begins with, before it has raced anything &mdash; by default enough to buy a seat on every shipped grid, and a choice of two on most of them, so there is a way in rather than one take-it-or-leave-it. Lower it if money should not open a seat at all. It only means anything alongside <em>Sponsorship required</em>, which sets what a rating shortfall costs, so the two have to be retuned together. Recorded on the save when the career is made, so changing this never moves the balance of a career that already exists.</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-contract-buy-in">Sponsorship required</label>
+          <input class="config-input" id="cfg-contract-buy-in" type="number" min="0" />
+          <span class="config-hint">Credits per rating point short of a team's bar that a pay driver must bring. Only the slowest third of the grid sells a seat this way — a team short of money takes the sponsorship, a front-runner has no budget hole to plug and will not have you at any price. Set to 0 to switch pay-driver seats off entirely.</span>
+        </div>
+        <details class="config-details">
+          <summary class="config-details-summary">Driver rating tuning</summary>
+          <div class="config-group">
+            <span class="config-hint">A career records these when it is created and keeps them, so retuning here changes <em>new</em> careers only. Everything the rating decides &mdash; which seats were ever open, what a team asked, whether a contract could have been signed &mdash; would otherwise be rewritten backwards through seasons already raced. Use the button below to move the career you are playing onto these settings deliberately.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-starting-rating">Starting rating</label>
+            <input class="config-input" id="cfg-starting-rating" name="starting_rating" type="number" min="0" max="100" step="1" />
+            <span class="config-hint">Where a driver with no results sits, 0&ndash;100 (default 50). Lower it to start unproven at the back of the grid. Fades out as races accumulate &mdash; by about twenty races your results have taken over entirely.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-rating-strictness">Requirement offset</label>
+            <input class="config-input" id="cfg-rating-strictness" name="rating_strictness" type="number" min="-50" max="50" step="1" />
+            <span class="config-hint">Rating points added to every team&rsquo;s requirement (default 5). Negative opens the whole grid up; positive makes every seat harder. Unlike the starting rating this never fades.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-offer-margin">Offer margin</label>
+            <input class="config-input" id="cfg-offer-margin" name="offer_margin" type="number" min="0" max="100" step="1" />
+            <span class="config-hint">How far <em>below</em> a team&rsquo;s requirement you may sit and still be offered the seat on merit. <strong>The default is 0</strong>, so every bar is one you must clear outright: fall short at all and the seat locks, and only a back-of-the-grid team will then sell it for sponsorship. Raise it to open a middle tier &mdash; at 10, a team asking 59 takes a 50 at its ordinary rate. This shifts how far short of a bar a team will look; the requirement offset above shifts the bars themselves.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-eligibility-gates">Requirement built from</label>
+            <select class="config-input" id="cfg-eligibility-gates" name="eligibility_gates">
+              <option value="both">Car pace and incumbent skill (stricter wins)</option>
+              <option value="grid">Car pace only</option>
+              <option value="incumbent">Incumbent skill only</option>
+            </select>
+            <span class="config-hint">Car pace ranks teams by their performance scalars; incumbent skill asks you to beat the weaker driver already in the seat. Incumbent only leaves every seat free on a roster that declares no race_skill.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-rating-half-life">Form half-life (results)</label>
+            <input class="config-input" id="cfg-rating-half-life" name="rating_half_life" type="number" min="0" max="200" step="1" />
+            <span class="config-hint">Results this far back count half (default 10, counted per session type). Raise it to weigh a long career evenly, lower it to track current form &mdash; and to let the rating recover faster after an AI difficulty change. 0 disables the decay.</span>
+          </div>
+          <div class="config-group config-group-check">
+            <label class="config-label config-label-check">
+              <input id="cfg-count-retirements" name="count_retirements" type="checkbox" />
+              Count retirements
+            </label>
+            <span class="config-hint">On, a DNF costs a point of finish rate. Off, retirements are skipped entirely &mdash; use it if AI contact is deciding your rating.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-retirement-min-laps-down">Retirement threshold (laps down)</label>
+            <input class="config-input" id="cfg-retirement-min-laps-down" name="retirement_min_laps_down" type="number" min="0" max="50" step="1" />
+            <span class="config-hint">Laps behind the leader before a car counts as retired rather than just lapped (default 3). Raise it for long races where being a few laps down is a bad afternoon, not a DNF; 0 leaves the distance test below to decide alone.</span>
+          </div>
+          <div class="config-group">
+            <label class="config-label" for="cfg-retirement-distance-pct">Retirement threshold (% of distance)</label>
+            <input class="config-input" id="cfg-retirement-distance-pct" name="retirement_distance_pct" type="number" min="0" max="100" step="1" />
+            <span class="config-hint">A car must finish short of this share of the leader&rsquo;s distance to count as retired (default 80%). Both thresholds have to agree, so loosening either one alone only makes retirements rarer. 100% calls anything off the lead lap a retirement; 0% means nothing ever is.</span>
+          </div>
+          <div class="config-group">
+            <div id="cfg-rating-diverged" class="config-diverged" hidden>The career you are playing is not using the settings above &mdash; it is still on the ones it was created with.</div>
+            <button id="cfg-rating-adopt" class="manage-btn" type="button">Apply these settings to the current career</button>
+            <span class="config-hint">Save first, then apply. This moves every rating and every team bar in the career, including the ones past seasons were judged against, so a seat you earned may read differently afterwards.</span>
+            <span id="cfg-rating-adopt-msg" class="config-hint"></span>
+          </div>
+        </details>
+        <div class="config-group config-group-check">
+          <label class="config-label config-label-check">
+            <input id="cfg-show-track-map" name="show_track_map" type="checkbox" />
+            Show track radar in live view
+          </label>
+          <span class="config-hint">Displays the track map canvas next to the timing table</span>
+        </div>
+        <div class="config-group">
+          <label class="config-label" for="cfg-track-map-max-points">Track radar max points</label>
+          <input class="config-input" id="cfg-track-map-max-points" name="track_map_max_points" type="number" min="100" max="50000" />
+          <span class="config-hint">Maximum number of unique grid cells accumulated before collection stops (default 5000)</span>
+        </div>
+        <div class="config-actions">
+          <button class="manage-btn manage-btn-primary" type="submit">Save</button>
+          <span id="config-save-msg" class="config-save-msg"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="tab-carperf" class="tab-panel tab-panel-hidden">
+    <div id="carperf-container"></div>
+  </div>
+  <div id="tab-driverperf" class="tab-panel tab-panel-hidden">
+    <div id="driverperf-container"></div>
+  </div>
+</main>
+<script>{js_utils}</script>
+<script>{js_telemetry}</script>
+<script>{js_track_map}</script>
+<script>{js_live}</script>
+<script>{js_career}</script>
+<script>{js_manage}</script>
+<script>{js_contracts}</script>
+<script>{js_config}</script>
+<script>{js_saves}</script>
+<script>{js_carperf}</script>
+<script>{js_driverperf}</script>
+<script>{js_main}</script>
+</body>
+</html>"##,
+        css = CSS,
+        js_utils = JS_UTILS,
+        js_telemetry = JS_TELEMETRY,
+        js_track_map = JS_TRACK_MAP,
+        js_live = JS_LIVE,
+        js_career = JS_CAREER,
+        js_manage = JS_MANAGE,
+        js_contracts = JS_CONTRACTS,
+        js_config = JS_CONFIG,
+        js_saves = JS_SAVES,
+        js_carperf = JS_CARPERF,
+        js_driverperf = JS_DRIVERPERF,
+        js_main = JS_MAIN,
+    )
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+pub fn build_base_html() -> String {
+    generate_html()
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+
+const CSS: &str = include_str!("assets/style.css");
+
+// ── Scripts ──────────────────────────────────────────────────────────────────
+
+const JS_UTILS: &str = include_str!("assets/utils.js");
+const JS_TELEMETRY: &str = include_str!("assets/telemetry.js");
+const JS_TRACK_MAP: &str = include_str!("assets/track_map.js");
+const JS_LIVE: &str = include_str!("assets/live.js");
+const JS_CAREER: &str = include_str!("assets/career.js");
+const JS_MANAGE: &str = include_str!("assets/manage.js");
+const JS_CONTRACTS: &str = include_str!("assets/contracts.js");
+const JS_CONFIG: &str = include_str!("assets/config.js");
+const JS_SAVES: &str = include_str!("assets/saves.js");
+const JS_CARPERF: &str = include_str!("assets/car_performance.js");
+const JS_DRIVERPERF: &str = include_str!("assets/driver_performance.js");
+const JS_MAIN: &str = include_str!("assets/main.js");
+
+#[cfg(test)]
+#[path = "../tests/web/assets.rs"]
+mod tests;

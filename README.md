@@ -66,6 +66,8 @@ On first run the server creates a `championships/` folder and a `config.json` fi
 
 Open the URL in a browser. Press **Ctrl+C** to stop.
 
+Only one copy of the program can use a saves folder at a time: a second one refuses to start and says which program already has it. It runs the session recorder too, and two recorders would overwrite each other's saves.
+
 ## Configuration
 
 On first run `config.json` is created next to the executable with all defaults. Edit it directly or use the **Config** tab in the UI.
@@ -209,7 +211,8 @@ Track layout data is stored as JSON files in `championships/track_layouts/`, one
 | `GET` | `/api/sessions` | List all recorded sessions |
 | `DELETE` | `/api/sessions/unassigned` | Delete every session not assigned to a round, and its lap chart |
 | `GET` | `/api/sessions/:id/lap-chart` | Lap chart for one session; `[]` when there is none |
-| `GET` | `/api/career` | Pre-computed career view: standings, constructor standings, rounds, driver stats, track stats |
+| `GET` | `/api/career` | Pre-computed career view: standings, constructor standings, rounds, driver stats, track stats (per car and across all cars) |
+| `GET` | `/api/career/export` | The whole career as one HTML file, offered as a download (built by `service::export`) |
 | `GET` | `/api/career/finances` | Balance, season ledger, and the season being raced |
 | `PATCH` | `/api/career/mode` | Set the career mode — allowed once, only from unset |
 | `POST` | `/api/career/rating/adopt` | Move the current career onto the rating tuning in config |
@@ -220,6 +223,7 @@ Track layout data is stored as JSON files in `championships/track_layouts/`, one
 | `GET` | `/api/championships/:id/teams` | Teams on that championship's roster |
 | `GET` | `/api/championships/:id/team-eligibility` | Per-team requirement, and whether the rating has earned it |
 | `GET` | `/api/championships/:id/session-eligibility` | Which recorded sessions may be assigned, and why not |
+| `GET` | `/api/championships/:id/available-sessions` | The sessions the picker offers for a round: unassigned and not refused, plus how many were hidden |
 | `GET` | `/api/championships/:id/grid-check` | How each of the season's recorded sessions lined up with its roster |
 | `GET` | `/api/championships/:id/offers` | Seat offers for the season, re-derived on every request |
 | `POST` | `/api/championships/:id/sign` | Sign for a team; the terms are regenerated server-side |
@@ -260,7 +264,7 @@ A `.vscode/launch.json` is included with a launch configuration selectable from 
 
 - **ams2_championship_server (serve on :8080)** — builds and starts the HTTP server
 
-Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
+Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt). **cargo build all (debug + release)** runs the debug and release builds one after the other.
 
 ### Running tests
 
@@ -268,16 +272,18 @@ Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt).
 cargo test
 ```
 
-Around 657 tests live in `src/tests/`, wired into their parent modules with `#[path = "tests/…"]` so they can reach `pub(crate)` items:
+Around 780 tests live in `src/tests/`, which mirrors the source folders. Each file is wired into its module with `#[path = "…"]` so it can reach `pub(crate)` items:
 
-- `data_store.rs` — JSON persistence round-trips, standings and the countback tiebreak, constructor scoring, `compute_career` aggregation, track stats
-- `session_recorder.rs` — session capture, `should_capture`, and the recorder state machine driven one poll at a time (replay freeze, restarts, disconnects)
+- `career/data_store.rs` — JSON persistence round-trips, standings and the countback tiebreak, constructor scoring, `compute_career` aggregation, track stats
+- `career/saves.rs`, `career/lap_charts.rs`, `career/signed_rosters.rs` — both save layouts and rename/duplicate/delete; externalised lap charts; a signed season's roster copy
+- `career/driver_rating.rs` — ratings and team requirements, pinned against a reference career
+- `career/contracts.rs` — offers, renewals, pay-driver seats, salary instalments, sealing
+- `roster/custom_ai.rs`, `roster/liveries.rs`, `roster/livery_image.rs`, `roster/season_years.rs` — roster parsing and writing, baselines, team-name resolution, DDS decoding
+- `game/recorder.rs` — session capture, `should_capture`, and the recorder state machine driven one poll at a time (replay freeze, restarts, disconnects)
 - `config.rs` — config load/create/defaults and economy clamping
-- `saves.rs` — both save layouts, name gating, rename/duplicate/delete
-- `lap_charts.rs` — externalising a chart, reading it back, the legacy inline fallback
-- `driver_rating.rs` — ratings and team requirements, pinned against a reference career
-- `contracts.rs` — offers, renewals, pay-driver seats, salary instalments, sealing
-- `custom_ai.rs`, `liveries.rs`, `season_years.rs` — roster parsing and writing, baselines, team-name resolution
+- `format.rs` — lap times, calendar dates, credits and ordinals as every Rust front end writes them
+- `service.rs` — the application layer called directly: mode rules, season creation, the live frame
+- `web/assets.rs` — checks on the served page
 - `server.rs` — HTTP request parsing, SHA-1, base64, WebSocket accept-key (RFC 6455), track slug generation, and route integration tests over real TCP loopback
 
 ### Project structure
@@ -285,38 +291,56 @@ Around 657 tests live in `src/tests/`, wired into their parent modules with `#[p
 ```
 src/
   lib.rs                         # Library crate entry point
-  championship_html.rs           # HTML template and embedded asset constants
-  ams2_shared_memory.rs          # AMS2 shared memory reader (Windows, $pcars2$ API)
   config.rs                      # Config struct, JSON load/create with per-field serde defaults
-  data_store.rs                  # Career data model, JSON persistence, standings/career computation
-  saves.rs                       # Career saves: folder layout, listing, create/rename/duplicate/delete
-  lap_charts.rs                  # Lap charts, stored beside the career in laps/
-  driver_rating.rs               # Driver rating and per-team requirements, derived from results
-  contracts.rs                   # Seat offers, contracts, salary, prize money, the ledger
-  custom_ai.rs                   # Custom AI Drivers roster XML: read, write, baselines
-  liveries.rs                    # Livery string to team name resolution
-  season_years.rs                # Season year parsing from roster and livery names
-  spotter.rs                     # Voice spotter state machine and TTS subprocess
-  http.rs                        # HTTP primitives: Request, send_response, json_ok/err, track_slug
-  session_recorder.rs            # Background thread: detects session end, captures results
-  websocket.rs                   # WebSocket handshake (SHA-1, base64, RFC 6455) and live push loop
-  tests/                         # Unit and integration tests, wired in with #[path]
-  assets/
-    style.css                    # Embedded at compile time via include_str!
-    utils.js                     # Shared helpers: formatting, sorting, sortable tables
-    telemetry.js                 # Telemetry panel: damage, tyre fields, ride-height record
-    track_map.js                 # Track radar: point accumulation, disk save/load, canvas rendering
-    live.js                      # Live timing table rendering and WebSocket connection
-    career.js                    # Career championships (master-detail), stats, lap charts
-    manage.js                    # Manage tab CRUD
-    contracts.js                 # Seat offers and the Finances page
-    config.js                    # Config tab: load/save config, adopt rating tuning
-    saves.js                     # Career switcher and save list; hides what a multiplayer career lacks
-    car_performance.js           # Car Performance tab
-    driver_performance.js        # Driver Performance tab
-    main.js                      # Tab init and sub-tab wiring
+  format.rs                      # Dates (local time), lap times, credits, track names — shared formatting
+  game/                          # The running AMS2 process (Windows-only code lives here)
+    shared_memory.rs             # AMS2 shared memory reader ($pcars2$ API)
+    recorder.rs                  # Background thread: detects session end, captures results
+    spotter.rs                   # Voice spotter state machine and TTS subprocess
+  roster/                        # The AI grid AMS2 can field, read from its install
+    custom_ai.rs                 # Custom AI Drivers roster XML: read, write, baselines
+    liveries.rs                  # Installed liveries, phantom entries, preview paths
+    livery_image.rs              # DDS livery previews decoded to PNG thumbnails
+    season_years.rs              # Season year per car class, plus user overrides
+  career/                        # The save and everything judged on it
+    data_store.rs                # Career data model, JSON persistence, standings/career computation
+    saves.rs                     # Career saves: folder layout, listing, create/rename/duplicate/delete
+    lap_charts.rs                # Lap charts, stored beside the career in laps/
+    signed_rosters.rs            # The roster copy a signed season keeps
+    driver_rating.rs             # Driver rating and per-team requirements, derived from results
+    contracts.rs                 # Seat offers, contracts, salary, prize money, the ledger
+  service.rs                     # Application layer: App, AppError, load-time upgrades, shared roster/rating helpers
+  service/                       # Every user operation as a method on App, by subject
+    championships.rs             # Seasons, rounds, session assignment and seat checks, grid check, career view
+    export.rs                    # The whole career as one HTML file (the web page's "Download HTML")
+    signing.rs                   # Seat offers, signing and tearing up contracts, roster restore, finances
+    career_saves.rs              # Create, switch, duplicate, rename and delete career saves
+    performance.rs               # Car and Driver Performance tabs and their edits, livery previews
+    live.rs                      # Live tab team names and grid/seat/roster banners
+    live_frame.rs                # What /ws streams each poll: session bests, ride-height record, can_record
+    settings.rs                  # Config tab, rating adoption, spotter, track layouts
+    startup.rs                   # Bringing the app up: config, saves, recorder and spotter threads; the saves-folder lock
+  web/                           # The HTTP front end's transport and browser UI
+    http.rs                      # HTTP primitives: Request, send_response, json_ok/err, track_slug
+    websocket.rs                 # WebSocket handshake (SHA-1, base64, RFC 6455) and push loop
+    html.rs                      # HTML template; embeds assets/ via include_str!
+    assets/
+      style.css                  # Embedded at compile time via include_str!
+      utils.js                   # Shared helpers: formatting, sortable tables
+      telemetry.js               # Telemetry panel: damage, tyre fields, ride-height record
+      track_map.js               # Track radar: point accumulation, disk save/load, canvas rendering
+      live.js                    # Live timing table rendering and WebSocket connection
+      career.js                  # Career championships (master-detail), stats, lap charts
+      manage.js                  # Manage tab CRUD
+      contracts.js               # Seat offers and the Finances page
+      config.js                  # Config tab: load/save config, adopt rating tuning
+      saves.js                   # Career switcher and save list; hides what a multiplayer career lacks
+      car_performance.js         # Car Performance tab
+      driver_performance.js      # Driver Performance tab
+      main.js                    # Tab init and sub-tab wiring
+  tests/                         # Unit and integration tests, mirroring the folders above
   bin/
-    ams2_championship_server.rs  # handle() route dispatcher and main(); HTTP/WebSocket via lib modules
+    ams2_championship_server.rs  # HTTP front end: route matching and main(); rules live in service
 ```
 
 ## Dependencies
@@ -325,4 +349,4 @@ src/
 |---|---|
 | [`serde`](https://crates.io/crates/serde) | Derive macros for JSON serialisation |
 | [`serde_json`](https://crates.io/crates/serde_json) | JSON serialisation for the career API, config file, and `/live` endpoint |
-| [`windows-sys`](https://crates.io/crates/windows-sys) | Windows shared memory API (`OpenFileMappingW`, `MapViewOfFile`) — Windows target only |
+| [`windows-sys`](https://crates.io/crates/windows-sys) | Windows shared memory API (`OpenFileMappingW`, `MapViewOfFile`) and local time for dates — Windows target only |

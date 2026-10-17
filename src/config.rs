@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::contracts::{OfferParams, PrizeParams};
-use crate::driver_rating::{Gates, RatingParams};
+use crate::career::contracts::{OfferParams, PrizeParams};
+use crate::career::driver_rating::{Gates, RatingParams};
 
 fn default_port() -> u16 {
     8080
@@ -76,7 +76,7 @@ fn default_starting_balance() -> i64 {
 
 /// Season-year overrides a new config is created with.
 ///
-/// Only classes the shipped [`crate::season_years::SEASON_YEARS`] table cannot answer belong
+/// Only classes the shipped [`crate::roster::season_years::SEASON_YEARS`] table cannot answer belong
 /// here — an entry that merely repeats the built-in year is dropped again by
 /// [`Config::class_years`]. `FE-G1` is the standing case: Formula Edge is a *fictional* car, so
 /// its season is whichever livery mod is installed rather than anything the table could ship.
@@ -92,7 +92,7 @@ fn default_class_years() -> BTreeMap<String, u16> {
 /// worth — just far enough out that a slipped digit cannot overflow the arithmetic downstream.
 const MONEY_MAX: i64 = 1_000_000_000;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     /// HTTP/WebSocket port.
     #[serde(default = "default_port")]
@@ -216,7 +216,7 @@ pub struct Config {
     #[serde(default = "default_offer_margin")]
     pub offer_margin: f32,
 
-    /// Season year per car class, overriding the table shipped in [`crate::season_years`].
+    /// Season year per car class, overriding the table shipped in [`crate::roster::season_years`].
     ///
     /// Keyed on the class name — the file stem AMS2 matches, the same key the built-in table
     /// uses. Only classes somebody has actually answered for are stored: [`Config::class_years`]
@@ -282,7 +282,7 @@ impl Config {
     }
 
     /// The season-year overrides, cleaned: names trimmed, years held inside
-    /// [`crate::season_years::YEAR_MIN`]..=[`crate::season_years::YEAR_MAX`], and any entry that
+    /// [`crate::roster::season_years::YEAR_MIN`]..=[`crate::roster::season_years::YEAR_MAX`], and any entry that
     /// merely repeats the built-in year dropped.
     ///
     /// Dropping the agreeing ones is what keeps the shipped table meaningful. Without it, saving
@@ -297,8 +297,8 @@ impl Config {
                 if class.is_empty() {
                     return None;
                 }
-                let year = (*year).clamp(crate::season_years::YEAR_MIN, crate::season_years::YEAR_MAX);
-                if crate::season_years::season_year(class) == Some(year) {
+                let year = (*year).clamp(crate::roster::season_years::YEAR_MIN, crate::roster::season_years::YEAR_MAX);
+                if crate::roster::season_years::season_year(class) == Some(year) {
                     return None;
                 }
                 Some((class.to_string(), year))
@@ -458,7 +458,7 @@ fn read_config(path: &Path) -> Result<Config, String> {
             .legacy_data_file
             .as_deref()
             .map(Path::new)
-            .and_then(crate::saves::save_name_of);
+            .and_then(crate::career::saves::save_name_of);
     }
     Ok(cfg)
 }

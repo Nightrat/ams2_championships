@@ -16,36 +16,82 @@ No separate frontend build step — JS/CSS are embedded at compile time via `inc
 
 ## Architecture
 
-This is a single-binary Rust application (`src/bin/ams2_championship_server.rs`) that:
+This is a single-binary Rust application (`src/bin/ams2_championship_server.rs`, a thin HTTP layer over `service::App`) that:
 - Reads AMS2 telemetry from a Windows shared memory segment (`$pcars2`)
 - Auto-records race/qualify/practice sessions into the active career save (`<saves dir>/<name>/career.json`, plus its lap charts in `laps/`)
 - Serves a single-page HTML app over a hand-rolled TCP HTTP server (no framework, no async runtime)
-- The entire UI — HTML, CSS, all JS — is compiled into the binary via `include_str!` in `championship_html.rs`
+- The entire UI — HTML, CSS, all JS — is compiled into the binary via `include_str!` in `web/html.rs` from `web/assets/`
 - usage of javascript shall be minimized
 
 ### Key data flow
 
 ```
 AMS2 shared memory
-  └─ ams2_shared_memory.rs   (reads LiveSessionData via Windows MapViewOfFile)
-  └─ session_recorder.rs     (background thread: polls every N ms, calls capture() on session end)
-       └─ data_store.rs      (CareerData persisted to the active save's career.json)
-       └─ lap_charts.rs      (each session's chart written beside it, never held in the store)
+  └─ game/shared_memory.rs   (reads LiveSessionData via Windows MapViewOfFile)
+  └─ game/recorder.rs        (background thread: polls every N ms, calls capture() on session end)
+       └─ career/data_store.rs   (CareerData persisted to the active save's career.json)
+       └─ career/lap_charts.rs   (each session's chart written beside it, never held in the store)
 
 HTTP request
-  └─ ams2_championship_server.rs  (handle() dispatches all routes manually, no router crate)
-       └─ data_store::compute_career()  (derives standings/stats from raw session data)
-       └─ championship_html::build_base_html()  (serves the compiled SPA on every non-API route)
+  └─ bin/ams2_championship_server.rs  (handle(): match path → parse body → call App → JSON; no rules)
+       └─ service.rs + service/   (App: every operation and every cross-module rule, typed)
+            └─ career/, roster/, game/, config.rs  (domain modules)
+       └─ web::html::build_base_html()  (serves the compiled SPA on every non-API route)
 ```
 
-### Frontend (src/assets/)
+### Source layout
 
-All JS files are concatenated into a single `<script>` block each — no bundler, no modules, plain ES5. Load order matters and is defined in `championship_html.rs`:
+`src/` holds four subject folders, plus the layer that strings them together and the HTTP front end. Each folder has a parent file (`src/game.rs`, …) that declares its modules — the same Rust 2018 layout as `service.rs` + `service/`, no `mod.rs`. Paths are always spelled in full (`crate::career::data_store`); there are no root re-exports, because they would hide the grouping again.
 
-1. `utils.js` — shared helpers (`esc`, `fmtLapTime`, `sortChamps`, `SESSION_TYPE_LABELS`, sortable tables)
+| Folder | Subject | Modules |
+|---|---|---|
+| `game/` | The running AMS2 process — the only Windows-specific and `unsafe` code | `shared_memory`, `recorder`, `spotter` |
+| `roster/` | The AI grid AMS2 can field, read from its install | `custom_ai`, `liveries`, `livery_image`, `season_years` |
+| `career/` | The save and everything judged on it | `data_store`, `lap_charts`, `saves`, `signed_rosters`, `driver_rating`, `contracts` |
+| `config.rs` | `config.json` — top-level because every folder reads it | |
+| `format.rs` | How dates (local time), lap times, credits and track names are written — for anything rendered in Rust (the HTML export), matching `utils.js` | |
+| `service/` | Every user operation as `App` methods — see below | |
+| `web/` | The HTTP front end only: transport, plus the browser UI it serves (`web/assets/`, embedded by `html`) | `http`, `websocket`, `html` |
+| `bin/` | The HTTP front end executable | |
+
+`src/tests/` mirrors the folders (`tests/career/data_store.rs`, …), so a test file sits at the same path as its module. `career/signed_rosters` is in `career/`, not `roster/`, on purpose: it is the copy of a roster a signed season keeps *inside the save*.
+
+### The application layer (`src/service.rs`, `src/service/`)
+
+**Every operation the app offers is a method on `service::App`, and the HTTP binary is only transport.** That split keeps every rule testable without TCP (`src/tests/service.rs`) and keeps rules out of the browser: anything a page needs computed becomes an `App` method and arrives as a value.
+
+- `App::new(store, data_path, saves_dir, layouts_dir, config_path, spotter_focus)` — every field a shared handle or a path, so it is cheap to clone and every clone sees the same career. Built by `service::startup`. Built through `new` because it also owns private shared state (the ride-height record) that no caller should have to supply.
+- Methods answer `AppResult<T>`; `AppError` is `BadRequest | NotFound | Conflict | Unsupported | Internal`, and the binary's `status_of` is the **only** place those become 400/404/409/415/500. Write the sentence once, in the service; never format an HTTP status there.
+- **Request and view types live in the service and are the wire format** — `NewChampionship`, `ChampionshipPatch`, `ConfigPatch`, `SignRequest`, `CarPerformance`, `OffersView`, `LiveTeams`, … derive `Deserialize`/`Serialize` with their serde attributes, so the JSON is defined once. A view returned *owned* (e.g. `OffersView.signed` is a cloned `Contract`) so a caller is not tied to the store's lock.
+- The split by subject: `championships.rs` (seasons, rounds, session assignment, `check_session_seat`, `reseat`, grid check), `signing.rs` (offers, sign/unsign, roster restore, finances), `career_saves.rs`, `performance.rs` (both performance tabs and the livery preview), `live.rs` (`resolve_live_teams`, the banners), `live_frame.rs` (what `/ws` streams each poll), `settings.rs` (config, rating adoption, spotter, track layouts). Roster/rating helpers shared between them (`champ_roster_file`, `season_contexts`, `champ_eligibility`, …) sit in `service.rs`.
+- A route that answers a fixed body (`{"ok":true}`, `{"removed":N}`, `{"mode":"…"}`) keeps that literal in the binary — the service returns `()` / the count / the mode, and the envelope is transport.
+- Body-parse failures are answered by the binary: most routes say `invalid body`; the saves and config routes report serde's own message (`parse_verbose`); the spotter route reads its body loosely as a `Value` (a non-string clears a setting) and builds a `SpotterPatch`.
+- `src/tests/service.rs` drives `App` directly with no TCP. Route behaviour stays covered end to end in `src/tests/server.rs`.
+
+### Starting up, and one owner per saves folder (`service::startup`, `saves::lock_folder`)
+
+- **`service::startup(exe_dir)` brings the app up**: config upgrade, saves folder, husk sweep, active career, `seal_career`, and the recorder and spotter threads. It returns `Startup { app, config, lock }`; the server's `main` is that call plus the listener.
+- **One process owns a saves folder.** The server runs a session recorder that writes the active career, so two servers on one folder would both file the same session and overwrite each other's saves. `startup` takes `saves::lock_folder` before writing anything; a second one is refused with a sentence naming the holder (`ams2_championship_server.exe (process 32984)`).
+- The lock is an **open handle**, not the file's existence: `.ams2_career.lock` is opened for writing with read-only sharing, so a second writer gets a sharing violation while the refusal can still read who holds it. Windows releases the handle when the process ends however it ends, so a crash cannot leave the folder locked (checked by force-killing the process). Keep `Startup::lock` bound for the life of `main` — `let _lock = …`, not `let _ = …`, which drops it at once. The name is not `.json`, so it can never be listed as a legacy flat save. Non-Windows builds take no lock: there is no AMS2 there to record from.
+
+### Moved out of the browser
+
+The service layer was extracted so that no rule lives in JavaScript; a native egui front end was built on it and then dropped as not worth maintaining. What stayed:
+
+- **Formatting for anything rendered in Rust lives in the library's `format` module** (dates in local time via `SystemTimeToTzSpecificLocalTime` — the DST rule of *that* date — lap times, credits, track names), matching `utils.js`.
+- **The HTML export is built by `service::export`** (`App::career_export_html`). The web page's "Download HTML" just fetches `GET /api/career/export`. It renders each race's lap chart from its file — the old browser-built export opened every `<details>` but the charts were fetched lazily, so they came out empty.
+- The session picker's list is built server-side (`App::available_sessions`, `GET /api/championships/:id/available-sessions`), from the same verdict adding a session applies.
+- **Two web-page bugs fixed alongside:** "Tear up" could never appear (`data.open || !data.offers` — `open` is false for every signed season, and `[]` is truthy), so it is now offered until the season's first session, the rule `unsign` enforces; and "Every recorded session raced the full roster" no longer shows for a season with no sessions.
+- **Testing roster edits by hand:** run a copy of the server against a scratch install — `UserData/CustomAIDrivers` as a *copy*, `GUI` and `Vehicles` as directory junctions to the real install (class registry, livery manifests, pictures) — and remove the junctions with `rmdir`, never a recursive delete. Don't edit the copies with Git Bash `sed -i`: it rewrites CRLF to LF across the whole file. The writer itself preserves CRLF (a per-track removal came back byte-identical).
+
+### Frontend (src/web/assets/)
+
+All JS files are concatenated into a single `<script>` block each — no bundler, no modules, plain ES5. Load order matters and is defined in `web/html.rs`:
+
+1. `utils.js` — shared helpers (`esc`, `fmtLapTime`, `SESSION_TYPE_LABELS`, sortable tables)
 2. `telemetry.js` — tyre/setup data helpers
 3. `track_map.js` — canvas radar rendering
-4. `live.js` — live timing tab (WebSocket to `/ws`)
+4. `live.js` — live timing tab (WebSocket to `/ws`, one `LiveFrame` per poll)
 5. `career.js` — career/championships/track-stats tab, lap charts
 6. `manage.js` — championship management tab
 7. `contracts.js` — seat offers (Manage) and the Finances sub-tab
@@ -59,22 +105,24 @@ All JS files are concatenated into a single `<script>` block each — no bundler
 
 ### include_str! caching gotcha
 
-`cargo` does **not** always detect changes to `include_str!` files when only the asset file changes. If CSS/JS edits aren't appearing, touch `championship_html.rs` or run `cargo build` with `--` to force a rebuild.
+`cargo` does **not** always detect changes to `include_str!` files when only the asset file changes. If CSS/JS edits aren't appearing, touch `web/html.rs` or run `cargo build` with `--` to force a rebuild.
 
 ### Test organisation
 
 Test files live in `src/tests/` and are wired into their parent module with `#[path = "tests/filename.rs"]` — **not** in the top-level `tests/` directory. This gives tests access to `pub(crate)` items.
 
-- `src/tests/data_store.rs` — `compute_career`, standings, the countback, track stats
-- `src/tests/session_recorder.rs` — `capture()`, `should_capture()`, and `RecorderState::poll` driven a poll at a time (replay freeze, restarts, disconnects)
+- `src/tests/career/data_store.rs` — `compute_career`, standings, the countback, track stats
+- `src/tests/game/recorder.rs` — `capture()`, `should_capture()`, and `RecorderState::poll` driven a poll at a time (replay freeze, restarts, disconnects)
 - `src/tests/config.rs` — config load/create/defaults, clamping, `normalize_economy`
-- `src/tests/saves.rs` — both save layouts, name gating, delete and the startup husk sweep
-- `src/tests/lap_charts.rs` — externalising a chart, reading it back, the legacy inline fallback
-- `src/tests/season_rosters.rs` — a signed season's roster copy: read instead of the game's file, mismatch, restore, flat saves
-- `src/tests/driver_rating.rs` — ratings and team requirements, incl. `test_reference_career_rating_snapshot`
-- `src/tests/contracts.rs` — offers, renewals, pay-driver seats, salary instalments, sealing
-- `src/tests/custom_ai.rs` — roster parsing/writing, baselines
-- `src/tests/liveries.rs`, `src/tests/season_years.rs` — team-name resolution, and the season-year table plus the user's overrides of it
+- `src/tests/format.rs` — lap times, the UTC calendar maths behind local dates, credits, ordinals
+- `src/tests/career/saves.rs` — both save layouts, name gating, delete and the startup husk sweep
+- `src/tests/career/lap_charts.rs` — externalising a chart, reading it back, the legacy inline fallback
+- `src/tests/career/signed_rosters.rs` — a signed season's roster copy: read instead of the game's file, mismatch, restore, flat saves
+- `src/tests/career/driver_rating.rs` — ratings and team requirements, incl. `test_reference_career_rating_snapshot`
+- `src/tests/career/contracts.rs` — offers, renewals, pay-driver seats, salary instalments, sealing
+- `src/tests/roster/custom_ai.rs` — roster parsing/writing, baselines
+- `src/tests/roster/liveries.rs`, `src/tests/roster/season_years.rs` — team-name resolution, and the season-year table plus the user's overrides of it
+- `src/tests/service.rs` — `App` operations called directly: mode rules, season creation, not-found, the spotter patch
 - `src/tests/server.rs` — integration tests for HTTP routes via real TCP loopback (`TcpListener::bind("127.0.0.1:0")`)
 
 ### Data files (saves folder — `championships/` next to the exe by default)
@@ -83,10 +131,10 @@ Test files live in `src/tests/` and are wired into their parent module with `#[p
 |---|---|
 | `<name>/career.json` | One career save — sessions and championships. `ams2_career` is the default |
 | `*.json` | **Legacy** flat save, written before folders. Still read, never migrated |
-| `<name>/rosters/<champ id>.xml` | The Custom AI file a season was signed on — see `season_rosters` |
+| `<name>/rosters/<champ id>.xml` | The Custom AI file a season was signed on — see `signed_rosters` |
 | `track_layouts/` | Per-track radar point arrays (`{slug}.json`), shared by all saves |
 
-### Career mode: singleplayer or multiplayer (`CareerMode` in `data_store.rs`)
+### Career mode: singleplayer or multiplayer (`CareerMode` in `career/data_store.rs`)
 
 Every save holds a `mode`, chosen when the career is created and **never changed after** — the two kinds allow different things, so switching would leave a career holding seasons it could not have made. Ask `CareerMode`'s methods rather than testing the variant:
 
@@ -108,7 +156,7 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - **The UI hides what MP cannot use.** `saves.js` holds the active `careerMode` and `applyCareerMode()` hides the Car Performance and Driver Performance tabs plus the Career → Finances sub-tab, switching away first if one of them is showing. The Manage tab leaves the roster and team pickers out entirely rather than showing them disabled — so their change listeners are `if (el)`-guarded. All three describe a Custom AI roster, which an MP career does not have.
 - `main.js` exposes `showTab(name)` so the hide logic can move off a tab it is about to remove.
 
-### Multiple career saves (`src/saves.rs`)
+### Multiple career saves (`src/career/saves.rs`)
 
 - **A save is a folder holding `career.json`**, and the folder's name is the save's name. `config.saves_dir` picks the parent folder (resolved by `saves::resolve_dir` at startup only), `config.active_career` holds the **name** of the active career.
 - `active_career` is a name, not a path, because that is how everything else addresses a save — the routes take names, `sanitize_name` gates them, `existing_save_path` resolves them. It replaced `data_file`, a full path that could contradict `saves_dir` and needed a special case in `list_saves` for an active save outside the folder. That case is gone. A config still carrying `data_file` is folded into `active_career` by `config::read_config` (in the parser, so every reader agrees whether or not the startup rewrite has run) and the old field is dropped on the next write.
@@ -126,9 +174,9 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - What the evidence does **not** support is a clean rule about when it lets go. A fresh process is usually able to remove a husk, but not always: one startup sweep cleared one of two husks and was denied the other, which had been made by the process it had just replaced. Treat it as intermittent, resistant to in-process retry, and reliably cleared by a later run. It only bites once Drive has taken the folder up, so a folder created and deleted within a second or two is fine — which is also why no test against a temp directory can see it.
 - **The cure, rather than the mitigation, is to keep `saves_dir` off a synced drive.** Nothing here makes a sync client behave; it only stops the app reporting a failure that did not happen and tidies up when it can.
 - So `delete_save` tries briefly (`remove_dir_all_briefly` — worth it for genuinely transient cross-process holders like a virus scanner), and if the folder survives with `career.json` gone it reports **success** and says so on the console. A 500 would be wrong twice over: the switcher has already stopped listing the career, and there is nothing the user could usefully retry.
-- **`saves::sweep_empty_husks` finishes the job at startup**, called once from `main` — the next launch is a different process, which is exactly the condition that succeeds. It removes only **empty** directories in the saves folder, which is what makes it safe to do unasked: a save always has its `career.json`, `track_layouts` has files, and an empty directory holds nothing that can be lost.
+- **`saves::sweep_empty_husks` finishes the job at startup**, called once from `service::startup`, **before** `track_layouts` is created (an empty one is exactly what it removes, and it used to be made and swept away in the same startup) — the next launch is a different process, which is exactly the condition that succeeds. It removes only **empty** directories in the saves folder, which is what makes it safe to do unasked: a save always has its `career.json`, `track_layouts` has files, and an empty directory holds nothing that can be lost.
 - `test_delete_survives_something_holding_the_folder_for_a_moment` covers the transient case by opening a file inside the save **without `FILE_SHARE_DELETE`** — a plain `File::open` shares delete access and blocks nothing, so it would pass without testing anything.
-- The active path is `SavePath = Arc<RwLock<PathBuf>>` (`data_store.rs`), cloned into both the HTTP handler and the recorder thread, so `POST /api/saves/activate` repoints both without a restart. Read it via `cur(&data_path)` in the server — never hold the guard across a file write.
+- The active path is `SavePath = Arc<RwLock<PathBuf>>` (`career/data_store.rs`), cloned into both the HTTP handler and the recorder thread, so `POST /api/saves/activate` repoints both without a restart. Read it via `App::active_path()` — never hold the guard across a file write.
 - Switching replaces the store's **contents** (`*store.write() = load_data(&new)`), never the `Arc` — the recorder thread holds a clone of the same one.
 - `sanitize_name` gates every user-supplied name (rejects separators, `..`, non-`[A-Za-z0-9 _-]`); path segments go through `http::url_decode` first.
 - **A save that cannot be read is never written over.** `try_load_data` returns `Result`; `load_data` is the lenient wrapper that reports to the console and yields an empty career, and it is only safe because `persist` independently re-checks the destination before every write. That guard is *stateless* — it re-parses the target with `serde::de::IgnoredAny` (no allocation) rather than trusting a flag set at load time, so it cannot desync and it also catches a file damaged while the server is running. `persist` returns `Result`; routes go through `persisted(...)`, which answers 500 rather than reporting a save that did not happen.
@@ -136,7 +184,7 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - `POST /api/saves/activate` reads the incoming save *before* swapping anything and refuses with 409 if it will not parse. `saves::SaveInfo.error` carries the reason for a broken save so the switcher can list it, disabled, instead of showing it as an empty career.
 - `PATCH /api/config` deliberately has **no** `active_career` field — it carries the old value through, like the spotter fields. Changing `saves_dir` is restart-required and clears `active_career`, so `saves::resolve_active` re-picks from the new folder (remembered name if a career of that name is still there → `ams2_career` in either layout → first save → fresh default).
 
-### Standings order: points, then the FIA countback (`data_store.rs`)
+### Standings order: points, then the FIA countback (`career/data_store.rs`)
 
 - `rank` is the single comparator both tables sort through, so the driver and constructor standings cannot drift apart. It is **points → countback → name**, and position is nothing more than the index of the result (`i + 1` in `careerStandingsHtml`).
 - `Countback` is a driver's finishing positions as counts indexed by `position - 1`, and its **derived `Ord` *is* the FIA rule** — lexicographic comparison walks the order and stops at the first position that differs, which is exactly "most wins; if equal, most seconds; if equal, most thirds…". That only works because a trailing zero can never occur: `record` pads up to the position it is about to increment, so the last element is always ≥ 1 and an entry that never finished is the empty vec, which sorts below everyone who finished anything.
@@ -144,7 +192,7 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - **Name is the final key, and is not an FIA rule.** The regulations hand a genuine dead heat to the stewards, which is not available here. Without *some* total order, tied entries kept whatever order the `HashMap` iterated in — and `RandomState` is seeded per map, not per process, so the order was re-rolled on **every request**. That was not a rare edge case: `points_system` is typically top-ten, so every driver outside the points was on 0/0 and the whole tail of the table reshuffled on each page load. It also reached `compute_career`, which credits `champ_wins` to `driver_standings.first()` on a `Final` season — an all-zero season crowned a random champion.
 - `MAX_GRID` (64, the shared memory's participant array) caps what `record` will index. Career files are hand-edited, and the countback indexes by a parsed number.
 
-### Lap charts live beside the career (`src/lap_charts.rs`)
+### Lap charts live beside the career (`src/career/lap_charts.rs`)
 
 - A lap chart is one row per driver per completed lap, so it is the biggest thing a session carries and the only part **nothing aggregate reads** — standings, the rating, track stats and contracts are all built from `results`. Measured on `career_reference.json` it was **44% of every byte**: 1,139,950 → 638,449 after the split, on the same 72 sessions.
 - It therefore lives in `laps/<session id>.json` inside the career's folder, and **the store never holds it**. That matters because `persist` rewrites the whole career on every mutation — on a saves folder inside Google Drive, every added round re-uploads the file.
@@ -156,27 +204,27 @@ Every save holds a `mode`, chosen when the career is created and **never changed
 - Charts are written once and never edited, so unlike `career.json` there is no overwrite guard here — but a leading BOM is still stripped on read, for the same reason it is everywhere else.
 - Purging unassigned sessions deletes their charts too; a chart nothing points at is a stray file, and these are the big ones.
 
-### A signed season keeps its own roster (`src/season_rosters.rs`)
+### A signed season keeps its own roster (`src/career/signed_rosters.rs`)
 
 The Custom AI file lives in the game's install, where the Car and Driver Performance tabs edit it and the user may swap it outright — and the rating, every team bar, the seat checks, the live grid's team names and the standings' team names were all read from it on every request. So a season raced, paid and finished was re-judged every time the file changed.
 
 - **`POST .../sign` copies the roster into the career** as `rosters/<champ id>.xml`, before anything is recorded; a folder save that cannot take the copy is not signed (500). From then on that season reads its roster from the copy and nowhere else.
-- **`season_rosters::roster_file` is the one way to ask which file a season reads** — the copy if there is one, else `<custom_ai_dir>/<custom_ai_file>`. In the server it is `champ_roster_file` / `champ_roster_seats`; `compute_career_full` takes the career path for the same reason. The liveries a roster is checked against for phantoms are still the install's — they are what AMS2 can spawn, whichever file names them.
+- **`signed_rosters::roster_file` is the one way to ask which file a season reads** — the copy if there is one, else `<custom_ai_dir>/<custom_ai_file>`. In the service it is `champ_roster_file` / `champ_roster_seats`; `compute_career_full` takes the career path for the same reason. The liveries a roster is checked against for phantoms are still the install's — they are what AMS2 can spawn, whichever file names them.
 - **The rating scores a signed season's sessions against its copy.** `RatingContext::for_season` restricts a context to one season's session ids; `season_contexts` builds one per signed season and `rating_contexts` puts them **ahead of** the class contexts, because a session is scored against the first context that covers it. Every other session in the class still reads the game's file. That season's own team bars come from the copy too (`champ_eligibility`).
 - The Car and Driver Performance tabs keep showing and editing the **game's** files. That is the point: a roster can still be developed for seasons to come without reaching back into signed ones.
-- **The live tab says when the game will load something else** (`LiveTeams.roster`, from `season_rosters::matches_game`, byte for byte) and offers `POST /api/championships/:id/roster/restore`, which copies the season's roster over the game's file — `ensure_baseline` first, like every other write to a roster. AMS2 reads a roster when a session loads, so the banner then tells the user to restart the session, and stays up until dismissed: nothing the server can see says when that has happened. `main.js` re-asks `/api/live-teams` whenever the Live tab is opened, since an edit made in another tab changes the answer without changing the grid.
+- **The live tab says when the game will load something else** (`LiveTeams.roster`, from `signed_rosters::matches_game`, byte for byte) and offers `POST /api/championships/:id/roster/restore`, which copies the season's roster over the game's file — `ensure_baseline` first, like every other write to a roster. AMS2 reads a roster when a session loads, so the banner then tells the user to restart the session, and stays up until dismissed: nothing the server can see says when that has happened. `main.js` re-asks `/api/live-teams` whenever the Live tab is opened, since an edit made in another tab changes the answer without changing the grid.
 - A signed season's `custom_ai_file` is locked (409 on `PATCH`) — the copy would contradict any other file. `DELETE .../sign` and deleting the championship remove the copy.
 - `seal_career` → `keep_signed_rosters` gives every season signed before this existed a copy of the game's file as it is at load — what those seasons were being judged on until then, so nothing moves on the upgrade.
 - **Legacy flat saves get no copy** — nowhere to keep one, and never migrated — so they sign and read the game's file exactly as before.
 
 ### HTTP server notes
 
-- All routes are matched in sequence inside a single `handle()` function — add new routes before the catch-all HTML fallback at the bottom
-- `data_path` is `SavePath` (`Arc<RwLock<PathBuf>>`) — the active save, swappable at runtime
+- All routes are matched inside a single `handle()` — first a `match (method, path)` for fixed paths, then the livery-preview prefix, then a `match (method, segs.as_slice())` for paths with segments, ending in the HTML fallback. Add new routes to the right match, and put the logic in a new `App` method rather than in the arm.
+- `App::data_path` is `SavePath` (`Arc<RwLock<PathBuf>>`) — the active save, swappable at runtime
 - WebSocket (`/ws`) streams `LiveSessionData` JSON at configurable poll interval
 - CI runs on `windows-latest` only (shared memory code is Windows-specific)
 
-### Shared memory layout (`ams2_shared_memory.rs`)
+### Shared memory layout (`game/shared_memory.rs`)
 
 - Always read all fields from `ptr` **before** calling `UnmapViewOfFile` — reading after unmap is an access violation.
 - `ParticipantInfo` stride is 100 bytes; `mCurrentSector` (i32) at +96 is `-1` when the car is in the pit lane or garage (`in_pits` field).
@@ -185,7 +233,7 @@ The Custom AI file lives in the game's install, where the Car and Driver Perform
 - **`mFuelLevel` is a fraction (0..1), not litres.** The reader multiplies it by `mFuelCapacity` so `fuel_level` matches its name and `fuel_level / fuel_capacity` means what it reads as. Without that conversion the spotter's percentage check divides a fraction by a litre count and calls fuel critical on a full tank.
 - Damage lives in two runs: per-corner `mBrakeDamage` (7152) and `mSuspensionDamage` (7168) sit between `mTyreWear` and `mBrakeTempCelsius`; `mCrashState` / `mAeroDamage` / `mEngineDamage` (7280–7288) follow the five tyre-temperature arrays. `mLastOpponentCollisionIndex` (6892) and its magnitude register a tap that causes no damage at all, which none of the 0–1 values do.
 
-### A replay freezes the recorder (`session_recorder.rs`)
+### A replay freezes the recorder (`game/recorder.rs`)
 
 - **A replay refills the live participant rows**, stepping backwards through a race that is already over. Watching one after the flag therefore rewrote the snapshot the recorder was holding, and since the usual way out of a replay is to quit the session, the *disconnect* capture filed a lap-20-of-30 picture as the result — with the standings computed off it. The lap chart went too: a falling lap count is how `accumulate_lap_chart` recognises a restart, so a replay wiped the real chart and rebuilt it from the playback.
 - `is_replay(game_state)` is the whole test — `mGameState` 6 (from the pause or results screen) or 7 (loaded from the main menu). The `ams2` constants now follow the PCars2 header's declaration order, and the recorder's own observed values confirm that order: 2 while driving, 4 in the garage and on the results screen, both menus with the clock still running.
@@ -194,7 +242,7 @@ The Custom AI file lives in the game's install, where the Car and Driver Perform
 - The poll body lives in `RecorderState::poll`, which returns a `Taken` rather than writing — the thread owns the store and the save path, and the state machine can then be driven a poll at a time in tests, which cannot run AMS2.
 - **A replay is not a disconnect and not a restart**, which is why neither existing reset point caught it: AMS2 stays connected and keeps `session_state` where it was.
 
-### Driver rating (`src/driver_rating.rs`)
+### Driver rating (`src/career/driver_rating.rs`)
 
 - **The grid raced must be the roster: `expected` is a rank within the roster, `field` is the size of the recorded session.** `expected_positions` ranks every seat the roster can field (phantoms already removed) and `positional_score` divides by `s.results.len()`, so the two agree only when AMS2 fielded the whole roster. Race 10 opponents on a 22-seat roster and a back-marker is still expected around P18 in an 11-car result — the score is inflated to the clamp. Nothing here can correct for it: which seats AMS2 left out is not recorded, and rescaling `expected` to the raced field would assume the absent cars were spread evenly through the order, which is exactly what it cannot know. It is therefore a **documented user requirement** (`docs/Getting-Started.md`, "Set the grid size to the roster"), not a code fix. The opposite case is self-correcting: a grid padded with stock AI trips `RosterNotDetected` once they outnumber the roster cars, and the session is skipped.
 - No rating is persisted
@@ -203,7 +251,7 @@ The Custom AI file lives in the game's install, where the Car and Driver Perform
 **The tuning belongs to the career, not to config**
 
 - **`CareerData.rating_params` is copied from `config.rating_params()` when a career is created and then kept**, for the same reason `starting_balance` is. The rating decides which seats a career was ever allowed to take, so retuning it in Config would rewrite backwards whether every contract it has signed could have been signed at all. Only the *tuning* stops moving; the rating itself is still derived from results on every request.
-- **`career_rating_params()` in the server is the single way to ask what a career is judged on.** It falls back to config only for a save that predates stamping and has not been loaded since. `champ_eligibility` takes the whole `CareerData` rather than its championships and sessions, because the tuning to judge them on is part of the career too and a caller passing pieces was free to forget the third one.
+- **`App::career_rating_params()` is the single way to ask what a career is judged on.** It falls back to config only for a save that predates stamping and has not been loaded since. `champ_eligibility` takes the whole `CareerData` rather than its championships and sessions, because the tuning to judge them on is part of the career too and a caller passing pieces was free to forget the third one.
 - `RatingParams` is therefore `Serialize`/`Deserialize` with a **container-level `#[serde(default)]`** — a hand-edited stamp that drops a field falls back to that field's shipped value rather than to zero, which for `starting_rating` would put every driver on the floor. This is the same hazard the per-field config defaults guard against, one level down.
 - `seal_career` stamps a career that has none as it is **loaded** — startup and `POST /api/saves/activate` — at the config it has been judged on all along, so no rating moves on the upgrade and none moves afterwards. Same timing rule as the payout seal it sits beside.
 - **`POST /api/career/rating/adopt` is the one way to change it afterwards**, and it is the deliberate exception in the shape of `custom_ai::set_baseline` against one-time `ensure_baseline`: retuning difficulty mid-career has to be possible, but not as a side effect of editing a form. It moves every rating and team bar in the career, including those past seasons were judged against, so `config.js` confirms first.
@@ -213,7 +261,7 @@ The Custom AI file lives in the game's install, where the Car and Driver Perform
 - `Config::rating_params()` clamps on the way out and `PATCH /api/config` clamps on the way in — config.json is hand-edited often enough that neither side can be trusted alone. New rating fields need a non-zero serde default (`#[serde(default = "…")]`), or a form that omits them silently resets every driver.
 - A championship's Custom AI file and player team are both locked once it has its first assigned session. This is a championship integrity rule: `enforce_team_eligibility` does **not** disable it.
 
-### A class's season year can be answered by the user (`src/season_years.rs`)
+### A class's season year can be answered by the user (`src/roster/season_years.rs`)
 
 `SEASON_YEARS` is the shipped table and cannot be the whole answer: it covers Reiza's historic ladder, and for a **modded class there is no answer to ship** — the season is whichever livery mod is installed. `FE-G1` is the case that makes this unavoidable even for a stock class: Formula Edge is a *fictional* car, so one install's is a 1995 F1 grid and another's is not. (It was also the class the module doc called "no plausible match": the registry spells it `FE-G1`, not `F-Edge`.)
 
@@ -223,7 +271,7 @@ The Custom AI file lives in the game's install, where the Car and Driver Perform
 - `GET /api/config` carries `classes` (every class the folder holds **plus** every class an override names, so one left behind by a deleted roster can still be cleared) and the `year_min`/`year_max` the boxes enforce — the same reason `/api/car-performance` ships `scalar_min`/`scalar_max`. `PATCH` answers with the list rebuilt, since saving may have changed the Custom AI folder.
 - `PATCH /api/config`'s `class_years` is `Option`, like the money: omitted carries the stored map through, an explicit `{}` clears it. `config.js` omits it entirely until the form has been filled from the server, so a tab that never loaded cannot wipe overrides it never showed.
 
-### A roster only exists if the liveries do (`src/liveries.rs`)
+### A roster only exists if the liveries do (`src/roster/liveries.rs`)
 
 **Everything singleplayer is downstream of the Custom AI file actually being the grid AMS2 ran.** The rating scores results against the roster's pace scalars, team requirements come from the same place, and contracts are priced off those requirements — so a season raced on stock AI produces no rating movement, no offers and no money, and the live grid falls back to car models. This is one dependency, not four, and the docs say so in those terms.
 
@@ -235,14 +283,14 @@ The Custom AI file lives in the game's install, where the Car and Driver Perform
 - Separately, `infer_player_seat` gives up with `RosterNotDetected` when **fewer than half** the AI on a recorded grid are named in the file. That is the "this session did not use it" case, and it is a *skip*, never a failure: it means the session was run on stock AI, which is not something to accuse the user of.
 - **Which files are rosters at all** is `known_class_names`: Reiza's registry (`HUD_ColoursDefs.xml`) **plus** the `Vehicle Class` of every installed car mod's `<install>/Vehicles/<car>/*.crd` (`mod_class_names`). The registry knows nothing of mods, so without the second half a mod's roster (`Formula Renault.xml` for the FR3.5 mod) was hidden although AMS2 reads it. Reiza's own cars are sealed in the paks, so any `.crd` lying there as a plain file is a mod's. The mod scan only ever adds, so an unreadable file just hides that roster as before.
 
-### Showing the car (`src/livery_image.rs`, `GET /api/livery-preview/`)
+### Showing the car (`src/roster/livery_image.rs`, `GET /api/livery-preview/`)
 
 The same manifest that says a livery exists usually also says what it looks like: `<PREVIEWIMAGE PATH="...">` inside a `<LIVERY_OVERRIDE>`, a wide render of the car on a transparent background that the game shows in its own car picker. The Car Performance tab puts it beside the team name, so a row is a car rather than three numbers.
 
 - **`.dds` is the whole difficulty.** It is a block-compressed texture (BC1/BC2/BC3 — `DXT1`/`DXT3`/`DXT5` — 2048×768 or 2048×640 across the shipped mods) and no browser reads one. Decoding is therefore hand-rolled, along with the PNG it comes back out as, because an image crate would pull in more dependencies than the rest of the program has together. BC7 and anything else is reported as unsupported and the row simply shows no picture.
 - **The thumbnail is produced in one pass, never as a full-size image**: each block's pixels go straight into the target's bins. A full decode would be 6 MB built only to be thrown away, since the output is a sixth the width.
 - **Colour is averaged weighted by alpha.** The background is fully transparent and its hidden RGB is arbitrary (usually black), so a plain average draws a dark halo round every edge of the car.
-- The PNG writer is a real deflate — fixed Huffman codes with greedy LZ77 — not stored blocks. A 320px preview is 32 KB compressed against roughly 200 KB uncompressed, and a class is two dozen of them. `src/tests/livery_image.rs` carries a matching **inflater** so every test goes the whole way round: an encoder checked only for a plausible header would pass just as happily on a stream no browser could read.
+- The PNG writer is a real deflate — fixed Huffman codes with greedy LZ77 — not stored blocks. A 320px preview is 32 KB compressed against roughly 200 KB uncompressed, and a class is two dozen of them. `src/tests/roster/livery_image.rs` carries a matching **inflater** so every test goes the whole way round: an encoder checked only for a plausible header would pass just as happily on a stream no browser could read.
 - **A livery name does not identify a car model**, and this is the one place that matters. "McLaren-Honda #1 A. Senna" is declared by both the 1991 and the 1992 McLaren; a `CustomAIDrivers` file names no model, and the game resolves it per grid slot in a way nothing readable records. `InstalledLiveries::previews_for` therefore takes the **whole roster** and, for a shared name, picks the model that declares more of the rest of it — a 1991 grid matches the 1991 manifest almost entirely and the 1992 one barely at all. Ties fall to the first model alphabetically so the answer cannot depend on directory order. Eight of the 328 names in a full install need this.
 - `liveries::installed_liveries` is now the single scan of the `Overrides` folder and `installed_livery_names` is a wrapper on it, so the phantom check and the pictures do not read every manifest twice.
 - The route serves a *file path under `Overrides`*, handed out by the payload that lists the teams. It comes back through a URL anyone can type, so `liveries::preview_file` re-checks it: plain path components only, `.dds` only, and the resolved file must still be inside `Overrides`.
@@ -262,7 +310,7 @@ An entry naming a livery the game owns no car for is silently ignored, so it exi
 - **It is the one route that may be cached** (`http::send_with_cache`, an hour). Everything else this server answers is live state; this is a file in the game's install, and re-decoding two dozen of them on every repaint is work nobody asked for.
 - Nothing here is required for anything: a class with no livery mod, an entry with no `PREVIEWIMAGE` and an unreadable file all end the same way, with no picture and no message. The tab already says elsewhere when a roster is the problem.
 
-### A per-track override is not a driver (`custom_ai.rs`)
+### A per-track override is not a driver (`roster/custom_ai.rs`)
 
 **`tracks` is what marks an override, not the absence of a `<name>`.** AMS2 lets a per-track block name a *substitute*: F-Vintage_Gen2 puts Tino Brambilla in Amon's Ferrari for Monza 1971. Reading overrides the old way made that file 27 drivers of a 26-car grid and handed Ferrari the stand-in's 0.68 as its incumbent bar instead of Rodríguez's 0.73. It bites F-Junior (+11 entries) and F-Retro_Gen1 (+17) too; the F-Classic files are untouched because every one of their overrides is unnamed.
 
@@ -303,14 +351,14 @@ The dependency above is invisible from inside the game, so the app says it out l
 - **In singleplayer it is picked when signing.** `custom_ai::seat_choices` lists the team's cars whose regular driver's `race_skill × 100` (the same scale the team bar is built from) is **no higher than the player's rating**; when that is none, only the team's weakest car (all of them, if tied). A driver with no declared skill cannot be judged and is not held against the player; a per-track stand-in is never offered. The offers payload carries the list as `seats` (keyed by team, beside `previews`), `POST .../sign` takes `{team, seat}`, re-derives the list and refuses (409) a car not on it, and stores the lock at once. A `sign` without `seat` takes the first open car, so an older caller still signs.
 - A signed car is **never re-derived from sessions**: `reseat` skips a season with a contract, and only tearing up the contract (`DELETE .../sign`) releases it.
 - **Otherwise it is stored from the sessions** (an unset career, whose team comes from the picker, or a season signed before this existed). `custom_ai::settle_seat` intersects the team's free cars across every assigned session plus the one being added; the moment one car is left it is stored, with `replaced_driver` naming the regular holder (never a per-track stand-in — `SeatEntry.stand_in`). An ambiguous session (short grid, both cars empty) stores nothing and a later one settles it.
-- `check_session_seat` in the server is the one verdict, used by both the assignment route and `session-eligibility`, so the picker never offers a session adding would refuse. Stored car → `check_locked_seat`; none yet → the team check, plus a refusal when *this* session would leave no single car consistent. A season that already disagreed with itself before this existed is not blocked — it stays on the team check.
+- `service::check_session_seat` is the one verdict, used by both the assignment route and `session-eligibility` (and through it `App::available_sessions`, which builds the picker's list server-side), so the picker never offers a session adding would refuse. Stored car → `check_locked_seat`; none yet → the team check, plus a refusal when *this* session would leave no single car consistent. A season that already disagreed with itself before this existed is not blocked — it stays on the team check.
 - **In singleplayer a stored car must be *proven*, not merely not contradicted** (`custom_ai::SeatProof::Exact`, chosen by `CareerMode::requires_exact_car`). The car is found by elimination, so a short grid cannot tell "drove the signed car" from "drove another while AMS2 left the signed car's driver out" — both leave the signed car empty. `Exact` therefore refuses a race or qualifying session whose grid leaves the signed car empty *alongside* another car, and the reason says how many opponents to set. An empty car whose team is seen on track in a different model from the player's is ruled out and does not count; a team with nobody on track has no known model and does. **Practice is exempt** (nothing is paid or rated on it), as is an unset career, which keeps `Possible`. A stock-AI session is still `Skipped`, not refused. The live seat banner is held to the same proof the route will apply. Consequence worth knowing: a car whose `livery_name` matches no livery AMS2 has is empty on every grid, so with a stock-livery roster (where `phantom_liveries` cannot catch it) every session is refused — the refusal names that car and says so.
 - **Cleared only when the season has no sessions**, the same condition that unlocks the team; removing some re-derives it (`reseat`), so a car taken from a session assigned by mistake does not outlive it. With no readable roster it is kept, not cleared.
 - `seal_career` → `seat_unseated` stores it for seasons already under way on load.
 - The live tab gets `LiveTeams.seat`, a **separate red banner** (`#live-seat-warning`) from the grid one: a wrong car gets the session refused, and the menu is the only place to fix it. The reason text is the same sentence the route refuses with.
 - Singleplayer / unset only: multiplayer has no roster, so nothing here applies.
 
-### Roster baselines (`custom_ai.rs`)
+### Roster baselines (`roster/custom_ai.rs`)
 
 A class's **baseline** is the roster as it was before the app first wrote to it — `<class>.xml.bak`, beside the file it describes. It is the reset source, and it is what any derived "how far has this been developed" figure is measured against.
 
@@ -321,7 +369,7 @@ A class's **baseline** is the roster as it was before the app first wrote to it 
 - Routes: `POST /api/car-performance/baseline` (adopt) and `POST /api/car-performance/reset`. Both answer with the whole recomputed table — either one moves every scalar in the class, and with them the pace deltas and the ratings derived from them. `/api/car-performance` carries `has_baseline` per class so the tab knows whether there is anything to reset to.
 - `car_performance.js` puts both buttons in the class heading and delegates their click handler from `#carperf-classes`, because `carPerfApplyData` replaces the controls when the first edit creates a baseline.
 
-### Contracts and offers (`src/contracts.rs`)
+### Contracts and offers (`src/career/contracts.rs`)
 
 - The rating decides *whether* a seat is allowed; this module decides *on what terms*. It consumes `driver_rating::TeamEligibility` and never modifies it, so the rating's snapshot test is unaffected by anything here.
 - **`Contract` is the only persisted part** — `CareerData.contracts`, a `#[serde(default)]` field, so saves written before it still load. Offers are re-derived on every request exactly like the rating: an offer is only what a team would say *today*, and regenerating it after the rating moves is intended. Accepted terms are history and must never be re-derived.
@@ -347,7 +395,7 @@ A class's **baseline** is the roster as it was before the app first wrote to it 
 - Only the **money** is stamped. Position, field and `objective_met` stay derived, because this module records only what results cannot recover. So reassigning a session to an old championship still moves the standings that season is shown against — the money is settled, the history is not rewritten to match it.
 - `settle` is **one-time**, like `custom_ai::ensure_baseline`: the first stamp was taken under the economy the season was raced under, and re-taking it later would quietly redefine what the season paid, which is the exact problem sealing removes.
 - **Reopening still takes the payout back.** `unsettle` runs on the transition *out* of `Final`, which is why the server keys off the transition rather than the resulting status. Finishing again takes a fresh stamp at whatever the economy is then. (In singleplayer this never arises — `final_is_terminal()` refuses to reopen at all.)
-- `seal_finished` is the **one-time upgrade** for careers finished before this existed, and *when* it runs is the whole of its correctness. It runs where a career is **loaded** — startup, and `POST /api/saves/activate`, both via `seal_career` in the server — against the economy that career has been running on, so every figure it writes is the one the ledger was already showing and the upgrade is invisible. Run it on the request path instead and it would seal those seasons at whatever the economy had since been retuned to, with no way back. Its stamps carry `at: 0`: there is no record of when those seasons were actually finished, and inventing "now" would date a 2023 season to the day the app was upgraded.
+- `seal_finished` is the **one-time upgrade** for careers finished before this existed, and *when* it runs is the whole of its correctness. It runs where a career is **loaded** — startup, and `POST /api/saves/activate`, both via `service::seal_career` — against the economy that career has been running on, so every figure it writes is the one the ledger was already showing and the upgrade is invisible. Run it on the request path instead and it would seal those seasons at whatever the economy had since been retuned to, with no way back. Its stamps carry `at: 0`: there is no record of when those seasons were actually finished, and inventing "now" would date a 2023 season to the day the app was upgraded.
 - An unsealed `Final` season still derives its prize, so a save that predates this behaves exactly as it did until the upgrade has run.
 - There is no `settled` flag on `SeasonLedger`. Loading is what seals, so every `complete` season is a settled one and a second field would only ever repeat the first.
 - The balance may go negative. Reassigning a session can move standings that were already paid out, so spending can end up ahead of earnings; show it as debt rather than clamping it. Persisting a ledger to avoid this would turn a derived system into a bookkeeping one.
@@ -368,12 +416,12 @@ A class's **baseline** is the roster as it was before the app first wrote to it 
 
 - `offers_for_with` takes a `Standing` — the team of the most recent *completed* contracted season, **the class it was in**, whether its target was met, and consecutive seasons served. `offers_for` is the same call on a `Standing::default()`, mirroring the `*_with` convention in `driver_rating`.
 - **An incumbency never leaves its series.** `offers_for_with` takes the current championship's class and only treats a team as held when it matches `Standing::class`; `standing()` breaks tenure on a class change too. Team names are *not* unique across rosters — "Ferrari" appears in seven of the eight shipped classes, spanning thirty years — so matching on the name alone renewed a 1967 drive into a 1990 car, granted regardless of rating because delivering keeps the seat. An empty class matches nothing, so a roster-less or deleted championship holds no seat either way.
-- The class is a required *parameter* rather than something the caller is trusted to pre-scope: that is the one thing this rule cannot afford to have a call site forget. `champ_class()` in the server derives it via `custom_ai::class_of_file`.
+- The class is a required *parameter* rather than something the caller is trusted to pre-scope: that is the one thing this rule cannot afford to have a call site forget. `champ_class()` in the service derives it via `custom_ai::class_of_file`.
 - Changing series is a fresh start, not a punishment — the rating still earns whatever it earns on the new grid. `F-Classic_Gen1` → `Gen2` counts as a change: different grid, different bar, different cars, and the user chose to switch.
 - **Two offer kinds, by which way the money flows:** `Paid` (the team pays the driver) and `Pay` (the driver brings sponsorship). A `Provisional` trial used to sit between them, but it only meant something while deals could run several seasons — as the one-year prove-it deal against a multi-year one. With every deal a single season it was just a paid offer that paid less, and that gradient is better carried by leverage, which already slides to nothing at the team's bar. So clearing the bar and merely coming within reach of it now produce **identical** terms.
 - `Renewal` is not a kind either: it is how an offer was come by, not what it is. It survives as `Offer::renewal`, a flag on a paid deal that carries the loyalty rise and is the only reason a team out of reach offers at all.
 - **The offers table badges only the exceptions** — a bought seat and a renewal. Most rows are an ordinary paid deal and get no badge: a column reading the same word on every row is decoration, and it was what made the old four-kind table hard to read.
-- Each offer carries a second row (`contract-why`) explaining itself: the car's place on pace, where it should finish, the team's bar against the driver's rating, and which rule set the money. `offerWhy()` is assembled **only** from fields already in the payload — it never recomputes a rate or a threshold, because a second copy of those in the browser would drift from the server's. It says *which* rule applied, not what the rule is.
+- Each offer carries a second row (`contract-why`) explaining itself: the car's place on pace, where it should finish, the team's bar against the driver's rating, and which rule set the money. The sentence is built **server-side** by `service::signing::offer_why` and rides the offers payload as `notes[team].why` (with `affordable`), beside `summary` for the line above the table (`offers_summary`, which says when the last seat was another series). The browser prints it as given; it used to be `offerWhy()` in the browser. It is assembled only from fields of the offer — it never recomputes a rate or a threshold. It says *which* rule applied, not what the rule is.
 - The "short of their bar but within reach" wording is load-bearing: a team asking 57 offering a seat to a 50 looks like a bug otherwise. That was the one thing the removed `Trial` badge did usefully, and the sentence now carries it.
 - The offers payload includes `teams` (the whole grid size) so a client can say "9th-fastest of 21 teams" — `Offer::rank` is a position within the grid, and the teams that make no offer are precisely the ones missing from the list.
 - Say **teams**, not cars. `rank` counts teams, so a 9th-placed team expects to finish around P18 on a grid running two cars each; calling it "car 9" makes those two numbers look contradictory.
@@ -402,12 +450,12 @@ A class's **baseline** is the roster as it was before the app first wrote to it 
 - A leading BOM is stripped here too.
 - **An unset `custom_ai_dir` is flagged, not defaulted.** There is no path worth guessing — an AMS2 install can be on any drive — but an empty one means this install has no rosters at all, which silently takes the rating, every team requirement, every offer, the money and the live grid's team names with it. So `flagMissingAiDir` in `config.js` unhides two things: the amber notice beside the box that fixes it (`#cfg-custom-ai-dir-missing`) and a `!` on the **Config tab button** itself (`#tab-config-warn`). The badge is the point — someone who has never opened the tab is exactly the person who has not set the folder — which is why `config.js` calls `loadConfig()` once at startup rather than only on tab click, and why `saveConfig` re-reads the flag from the response instead of waiting for a reload. `saves_dir` gets no such warning: unset there has a real answer (`championships` beside the executable), so there is nothing to fill in.
 
-**Frontend (`src/assets/contracts.js`)**
+**Frontend (`src/web/assets/contracts.js`)**
 
 - Two views, both read fresh from the server: the offers table in the Manage tab (inside `#champ-contract-panel`, filled by `loadOffers` from `renderChampDetail`) and the finances page under **Career → Finances**. Both render nothing when `enabled` is false, so the old team picker stays the whole story for anyone not using contracts.
 - The sub-tab is keyed `finances` (`#career-sub-finances`, `#career-finances-container`). It was `contracts` until the page grew past the contract table; money is the larger half of what it shows, and a contract is one row in it.
 - `renderFinances` is four sections over one payload — `financeSummary` (what the career is worth), `runningSeason` (the season being raced, as a running total), `seasonLedger` (the table), `whereItWent` (wages vs prizes vs sponsorship). `runningSeason` returns `''` when nothing is being raced rather than drawing an empty card, and it only became worth showing once a wage was paid per race: before that every figure in it was zero until the season ended.
-- **Nothing here recomputes a rule the server owns** — same discipline as `offerWhy()`. "Still to race for" is `salary_contracted - salary`, a subtraction of two payload fields, because racing the full calendar draws exactly the contracted figure. The per-race instalment is deliberately *not* shown as a rate: stating it would put a second copy of the wage formula in the browser, so the card says what is left and over how many races instead.
+- **Nothing here recomputes a rule the server owns** — same discipline as the offer sentences. "Still to race for" is `salary_contracted - salary`, a subtraction of two payload fields, because racing the full calendar draws exactly the contracted figure. The per-race instalment is deliberately *not* shown as a rate: stating it would put a second copy of the wage formula in the browser, so the card says what is left and over how many races instead.
 - `SeasonLedger.projected_prize` is what today's standings would pay, derived server-side for the same reason. `None` once the season is complete, because then `prize` is the fact rather than a forecast — two numbers claiming to be the payout is one too many. Rendered amber (`.ledger-projected`, `.finance-projected`) and prefixed `~`, so money not yet banked never reads like money that is.
 
 ### `ChampionshipStatus::Active` is a singleton
@@ -417,7 +465,7 @@ A class's **baseline** is the roster as it was before the app first wrote to it 
 - Do **not** reintroduce roster-matching heuristics here. Scoring Custom AI files by how many on-track drivers they name cannot separate two seasons of one series — historic packs reuse a single `.xml` across seasons, so the scores tie and the player's team resolves to the wrong season.
 - Every championship mutation goes through `loadManage()`, which is why the live team-name refresh hangs off it — the status, roster file and player team all feed `/api/live-teams`.
 
-### Spotter (`src/spotter.rs`)
+### Spotter (`src/game/spotter.rs`)
 
 - `SpotterState::update()` returns a `Vec<String>` of TTS phrases each poll; the background thread writes them line-by-line to a persistent PowerShell `SpeechSynthesizer` subprocess.
 - Position announcements are **debounced** (~2 s): `pending_position` tracks the real-time position; `prev_position` is only updated (and the announcement emitted) once `pos_cooldown` reaches zero. This prevents a queue of stale "Position N" calls after a spin.
@@ -430,13 +478,25 @@ The tab shows the player car's **damage** (crash state, aero, engine, per-corner
 
 - `mTyreSlipSpeed`, `mTyreGrip` and `mTyreLateralStiffness` are marked OBSOLETE in the header ("kept for backward compatibility only"). They are read and shown dimmed at the foot of the panel rather than dropped, so whether AMS2 still fills them is answered on screen instead of being re-investigated each time someone wants slip or grip data.
 - The five structure temperatures (`mTyreTreadTemp`, `mTyreLayerTemp`, `mTyreCarcassTemp`, `mTyreRimTemp`, `mTyreInternalAirTemp`) are **Kelvin** in the header while every other temperature in the struct is Celsius. `kelvin4` converts them on read and holds unset (0.0) at zero — a plain subtraction would report an unset wheel as −273 °C, which reads as a bad offset rather than as no data.
-- It freezes on the last on-track reading (`dmgLastOnTrack`) whenever the car is not out on track, and resumes when it is. **Two signals are needed**, and neither is sufficient alone: `in_pits` (`mCurrentSector < 0`) flips at the pit entry, but ESC → "Return to pits" teleports the car into the garage without it ever driving down a pit lane — only `mPitMode` catches that. On track is `!in_pits && pit_mode == 0`.
+- It freezes on the last on-track reading (`dmgLastOnTrack`) whenever the car is not out on track, and resumes when it is. **Two signals are needed**, and neither is sufficient alone: `in_pits` (`mCurrentSector < 0`) flips at the pit entry, but ESC → "Return to pits" teleports the car into the garage without it ever driving down a pit lane — only `mPitMode` catches that. On track is `!in_pits && pit_mode == 0` — decided server-side by `service::on_track` and sent as the frame's `on_track`, since the ride-height record needs the same test.
 - The held panel is not repainted each poll. `dmgFrozenLabel` stores the reason currently painted rather than a boolean, so the label still updates as the car moves through the pit modes, while an unchanged panel keeps any text selection the user made in it.
 - With no on-track reading yet it says so, rather than painting zeroes that look like an undamaged car.
 
 **Ride height is also kept as a record of the run**
 
-- The instantaneous reading says what the car is doing now; the **lowest** a corner ever reached is what says how much floor was left, which is the number a setup is chosen against. `rideSeen` accumulates a per-corner min/max across the run, shown on the damage panel as "Lowest this run / highest" and per wheel as "Seen this run".
-- **Per corner, not one overall minimum.** Front and rear ride height are separate setup values, so an overall figure alone would not say which end to lower. `rideExtremes` skips corners at zero — zero is unset, not a car resting on its floor, and it would otherwise always win the minimum.
-- `recordRideHeight` is called from the `onTrack` branch **before** the panel's visibility check, on purpose: a lap driven with the Live tab closed is still a lap. It is keyed on track + variation (`rideSeenKey`), so a new track starts a new record rather than answering a question about Monza with a lap of Bathurst; a WebSocket disconnect clears it too, since the next run is a different car on a different setup.
-- The **Reset** button is delegated from `document` because the panel is rebuilt on every on-track poll, and it clears `dmgFrozenLabel` to force a repaint — the button is most useful in the box, which is exactly when the panel is held and would not otherwise redraw.
+- The instantaneous reading says what the car is doing now; the **lowest** a corner ever reached is what says how much floor was left, which is the number a setup is chosen against. The record is a per-corner min/max across the run, shown on the damage panel as "Lowest this run / highest" and per wheel as "Seen this run".
+- **It is kept server-side** (`RideRecord` in `service/live_frame.rs`, one per `App`) and arrives on every frame as `ride_seen`; `telemetry.js` only displays it. One record for the app, not one per viewer: two browsers watching the same run are watching the same car, and a page reloaded mid-stint keeps the stint. It accumulates while any viewer's WebSocket is polling — `App::live_frame` is what folds a reading in.
+- **Per corner, not one overall minimum.** Front and rear ride height are separate setup values, so an overall figure alone would not say which end to lower. Corners at zero are skipped — zero is unset, not a car resting on its floor, and it would otherwise always win the minimum (`rideExtremes` in the JS applies the same rule to the instantaneous reading).
+- Only on-track readings count, and a new **run** starts a new record: keyed on track + variation + car, so neither Monza nor last car's setup answers for this one. Losing the game (`connected: false`) clears it; a browser reconnecting does not.
+- The **Reset** button posts `POST /api/live/ride-height/reset`. It is delegated from `document` because the panel is rebuilt on every on-track poll, and it clears `dmgFrozenLabel` to force a repaint — **after** the reset lands, so the repaint cannot pick up a frame still carrying the old record. The button is most useful in the box, which is exactly when the panel is held and would not otherwise redraw.
+
+### The live frame (`service/live_frame.rs`)
+
+`/ws` streams a `LiveFrame` per poll: the `LiveSessionData` snapshot (flattened, so every old field is where it was) plus what is derived from it, so no front end re-derives it:
+
+- `session_best` — fastest lap and best of each sector across the field (0 = nobody yet): the gap-to-fastest column and the purple sectors.
+- `ride_seen`, `on_track` — above.
+- `can_record` — `recorder::recordable`, the **same** test `capture_current` refuses with, so the Record button is never enabled for a click the route would turn down. An active career is deliberately not part of it: the refusal explains itself, a greyed-out button would not.
+- `handle_websocket` takes the frame from its caller (`FnMut() -> Option<Vec<u8>>`) and stays transport. `/live` still answers the raw snapshot.
+
+Other things the browser used to derive and now receives: `track_stats_all` on `/api/career` (the Tracks tab's "All cars" view, built by the same `track_stats_by` as the per-car rows), `winner` on every session in `/api/sessions` and in the career view (`RecordedSession::winner`), and both championship lists already in display order (`data_store::display_order` — status, then name ignoring case).
