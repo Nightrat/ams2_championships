@@ -38,7 +38,7 @@ pub struct ParticipantData {
 
 /// Player car telemetry from the AMS2 shared memory (player's car only).
 /// Wheel order for all arrays: FL=0, FR=1, RL=2, RR=3.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Default)]
 pub struct PlayerTelemetry {
     /// Left-edge tyre temperature, °C.
     pub tyre_temp_left: [f32; 4],

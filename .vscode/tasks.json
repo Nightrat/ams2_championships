@@ -17,13 +17,21 @@
             "label": "cargo build release",
             "type": "shell",
             "command": "cargo",
-            "args": ["build","--release"],
+            "args": ["build", "--release"],
             "group": "build",
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
             },
             "problemMatcher": "$rustc"
+        },
+        {
+            "label": "cargo build all (debug + release)",
+            "detail": "The server in both profiles",
+            "dependsOn": ["cargo build", "cargo build release"],
+            "dependsOrder": "sequence",
+            "group": "build",
+            "problemMatcher": []
         },
         {
             "label": "cargo test",
@@ -41,7 +49,7 @@
             "label": "cargo clippy",
             "type": "shell",
             "command": "cargo",
-            "args": ["clippy"],
+            "args": ["clippy", "--all-targets"],
             "group": "build",
             "presentation": {
                 "reveal": "always",

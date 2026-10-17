@@ -1,9 +1,11 @@
 use super::*;
-use ams2_championship::data_store::{
+use ams2_championship::service::{resolve_live_teams, seal_career};
+use std::path::PathBuf;
+use ams2_championship::career::data_store::{
     CareerData, Championship, ChampionshipStatus, RecordedSession, Round, SessionResult,
 };
-use ams2_championship::http::{parse_request, track_slug, Request};
-use ams2_championship::websocket::{base64_encode, sha1, ws_accept_key, ws_send_text};
+use ams2_championship::web::http::{parse_request, track_slug, Request};
+use ams2_championship::web::websocket::{base64_encode, sha1, ws_accept_key, ws_send_text};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex, RwLock};
@@ -15,7 +17,7 @@ fn req(raw: &[u8]) -> Request {
 // ── HTTP route integration helpers ────────────────────────────────────────────
 
 fn make_test_store() -> (
-    ams2_championship::data_store::SharedStore,
+    ams2_championship::career::data_store::SharedStore,
     std::path::PathBuf,
 ) {
     let store = Arc::new(RwLock::new(CareerData::default()));
@@ -29,7 +31,7 @@ fn make_test_store() -> (
 
 /// Send `request_bytes` to a temporary `handle()` invocation and return the full response.
 fn call(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     request_bytes: Vec<u8>,
 ) -> String {
@@ -39,7 +41,7 @@ fn call(
 /// [`call`] with a caller-supplied `config.json`, for routes that read configured folders.
 /// `None` gives each call a fresh path, so the defaults apply.
 fn call_with_config(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     request_bytes: Vec<u8>,
     config: Option<std::path::PathBuf>,
@@ -55,7 +57,7 @@ fn call_with_config(
 /// [`call_with_config`] with the saves folder given explicitly — needed when there is no active
 /// career, since then there is no career path to derive it from.
 fn call_full(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     saves_dir: std::path::PathBuf,
     request_bytes: Vec<u8>,
@@ -74,7 +76,7 @@ fn call_full(
 /// [`call_full`] without the lossy conversion — for the one route that answers with an image,
 /// whose bytes would not survive being read as text.
 fn call_full_raw(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     saves_dir: std::path::PathBuf,
     request_bytes: Vec<u8>,
@@ -83,33 +85,25 @@ fn call_full_raw(
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let html = Arc::new(b"<html/>".to_vec());
-    let saves_dir = Arc::new(saves_dir);
-    let dp: ams2_championship::data_store::SavePath = Arc::new(RwLock::new(data_path));
     let ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let layouts_dir = Arc::new(std::env::temp_dir().join(format!("ams2_layouts_{ns}")));
-    std::fs::create_dir_all(layouts_dir.as_ref()).unwrap();
-    let config_path = Arc::new(
+    let layouts_dir = std::env::temp_dir().join(format!("ams2_layouts_{ns}"));
+    std::fs::create_dir_all(&layouts_dir).unwrap();
+    let app = App::new(
+        store,
+        Arc::new(RwLock::new(data_path)),
+        saves_dir,
+        layouts_dir,
         config.unwrap_or_else(|| std::env::temp_dir().join(format!("ams2_cfg_{ns}.json"))),
+        Arc::new(Mutex::new(
+            ams2_championship::game::spotter::SpotterConfig::default(),
+        )),
     );
-    let s = store;
     std::thread::spawn(move || {
         let (conn, _) = listener.accept().unwrap();
-        handle(
-            conn,
-            html,
-            s,
-            dp,
-            saves_dir,
-            layouts_dir,
-            config_path,
-            200,
-            Arc::new(Mutex::new(
-                ams2_championship::spotter::SpotterConfig::default(),
-            )),
-        );
+        handle(conn, html, &app, 200);
     });
     let mut client = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
     client.write_all(&request_bytes).unwrap();
@@ -119,7 +113,7 @@ fn call_full_raw(
 }
 
 fn get(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     path: &str,
 ) -> String {
@@ -131,7 +125,7 @@ fn get(
 }
 
 fn post(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     path: &str,
     body: &[u8],
@@ -146,7 +140,7 @@ fn post(
 }
 
 fn patch(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     path: &str,
     body: &[u8],
@@ -161,7 +155,7 @@ fn patch(
 }
 
 fn delete(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     path: &str,
 ) -> String {
@@ -186,11 +180,11 @@ fn body_json(resp: &str) -> serde_json::Value {
 
 /// A store for a singleplayer career — the only kind that signs contracts.
 fn make_sp_store() -> (
-    ams2_championship::data_store::SharedStore,
+    ams2_championship::career::data_store::SharedStore,
     std::path::PathBuf,
 ) {
     let (store, path) = make_test_store();
-    store.write().unwrap().mode = ams2_championship::data_store::CareerMode::Singleplayer;
+    store.write().unwrap().mode = ams2_championship::career::data_store::CareerMode::Singleplayer;
     (store, path)
 }
 
@@ -898,7 +892,7 @@ fn test_route_delete_session_from_round_removes_it() {
 
 #[test]
 fn test_route_delete_unassigned_sessions_removes_orphans() {
-    use ams2_championship::data_store::RecordedSession;
+    use ams2_championship::career::data_store::RecordedSession;
     let (store, path) = make_test_store();
     {
         let mut data = store.write().unwrap();
@@ -1243,7 +1237,7 @@ fn test_ws_send_text_large_payload() {
 fn make_saves_dir(
     tag: &str,
 ) -> (
-    ams2_championship::data_store::SharedStore,
+    ams2_championship::career::data_store::SharedStore,
     std::path::PathBuf,
 ) {
     let ns = std::time::SystemTime::now()
@@ -1255,7 +1249,7 @@ fn make_saves_dir(
     let path = dir.join("ams2_career.json");
     let store = Arc::new(RwLock::new(CareerData::default()));
     store.write().unwrap().championships.push(make_champ("c1"));
-    ams2_championship::data_store::persist(&store, &path).expect("fixture save must be written");
+    ams2_championship::career::data_store::persist(&store, &path).expect("fixture save must be written");
     (store, path)
 }
 
@@ -1289,11 +1283,11 @@ fn test_route_post_saves_creates_empty_and_activates() {
     // The in-memory store was swapped to the new, empty career.
     assert!(store.read().unwrap().championships.is_empty());
     // A new career is created in the folder layout: <saves>/GT3 Career/career.json
-    assert!(ams2_championship::saves::save_path(path.parent().unwrap(), "GT3 Career").exists());
+    assert!(ams2_championship::career::saves::save_path(path.parent().unwrap(), "GT3 Career").exists());
     // The kind is recorded at creation and is what every rule below turns on.
-    assert_eq!(store.read().unwrap().mode, ams2_championship::data_store::CareerMode::Multiplayer);
+    assert_eq!(store.read().unwrap().mode, ams2_championship::career::data_store::CareerMode::Multiplayer);
     // The previous career is untouched on disk.
-    let old = ams2_championship::data_store::load_data(&path);
+    let old = ams2_championship::career::data_store::load_data(&path);
     assert_eq!(old.championships.len(), 1);
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
@@ -1336,7 +1330,7 @@ fn test_route_activate_swaps_store_contents() {
         .unwrap()
         .championships
         .push(make_champ("x2"));
-    ams2_championship::data_store::persist(&other_store, &other)
+    ams2_championship::career::data_store::persist(&other_store, &other)
         .expect("fixture save must be written");
 
     let resp = post(
@@ -1382,11 +1376,11 @@ fn test_route_duplicate_copies_without_switching() {
     assert_eq!(v["active"], "ams2_career", "duplicating does not switch");
     // The source here is a legacy flat save; the copy is a new save, so it is written the way
     // new saves are written.
-    let copy = ams2_championship::saves::save_path(path.parent().unwrap(), "backup");
+    let copy = ams2_championship::career::saves::save_path(path.parent().unwrap(), "backup");
     assert!(copy.exists());
     assert!(path.exists(), "the original stays where it was");
     assert_eq!(
-        ams2_championship::data_store::load_data(&copy)
+        ams2_championship::career::data_store::load_data(&copy)
             .championships
             .len(),
         1
@@ -1456,7 +1450,7 @@ fn test_route_delete_active_save_rejected() {
 /// Put a file in a subfolder of a save, standing in for whatever a career comes to own beside
 /// its sessions — the reason the folder layout exists.
 fn seed_nested(career: &std::path::Path) -> std::path::PathBuf {
-    let dir = ams2_championship::saves::career_dir(career).unwrap().join("extra");
+    let dir = ams2_championship::career::saves::career_dir(career).unwrap().join("extra");
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("notes.txt");
     std::fs::write(&file, "nested").unwrap();
@@ -1468,8 +1462,8 @@ fn test_route_rename_folder_save_carries_everything_in_it() {
     let (store, path) = make_saves_dir("rename_folder");
     let dir = path.parent().unwrap().to_path_buf();
     // A folder save beside the legacy active one.
-    let career = ams2_championship::saves::save_path(&dir, "Project");
-    ams2_championship::saves::prepare_save_dir(&career).unwrap();
+    let career = ams2_championship::career::saves::save_path(&dir, "Project");
+    ams2_championship::career::saves::prepare_save_dir(&career).unwrap();
     std::fs::copy(&path, &career).unwrap();
     seed_nested(&career);
 
@@ -1481,10 +1475,10 @@ fn test_route_rename_folder_save_carries_everything_in_it() {
     );
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert!(!dir.join("Project").exists(), "the old folder is gone");
-    let moved = ams2_championship::saves::save_path(&dir, "Renamed");
+    let moved = ams2_championship::career::saves::save_path(&dir, "Renamed");
     assert!(moved.exists());
     assert!(
-        ams2_championship::saves::career_dir(&moved)
+        ams2_championship::career::saves::career_dir(&moved)
             .unwrap()
             .join("extra")
             .join("notes.txt")
@@ -1498,8 +1492,8 @@ fn test_route_rename_folder_save_carries_everything_in_it() {
 fn test_route_delete_folder_save_removes_everything_in_it() {
     let (store, path) = make_saves_dir("delete_folder");
     let dir = path.parent().unwrap().to_path_buf();
-    let career = ams2_championship::saves::save_path(&dir, "Scratch");
-    ams2_championship::saves::prepare_save_dir(&career).unwrap();
+    let career = ams2_championship::career::saves::save_path(&dir, "Scratch");
+    ams2_championship::career::saves::prepare_save_dir(&career).unwrap();
     std::fs::copy(&path, &career).unwrap();
     seed_nested(&career);
 
@@ -1534,7 +1528,7 @@ fn test_route_post_saves_creates_the_first_career_when_none_is_active() {
     let resp = call_full(store.clone(), std::path::PathBuf::new(), dir.clone(), req, None);
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert_eq!(body_json(&resp)["active"], "First");
-    assert!(ams2_championship::saves::save_path(&dir, "First").exists());
+    assert!(ams2_championship::career::saves::save_path(&dir, "First").exists());
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -1586,7 +1580,7 @@ fn config_remembering(tag: &str, career: &str) -> std::path::PathBuf {
 }
 
 fn patch_config_with(
-    store: ams2_championship::data_store::SharedStore,
+    store: ams2_championship::career::data_store::SharedStore,
     data_path: std::path::PathBuf,
     body: &[u8],
     config: std::path::PathBuf,
@@ -1723,7 +1717,7 @@ fn test_route_patch_car_performance_writes_the_xml_and_returns_the_new_table() {
     );
     assert!(resp.starts_with("HTTP/1.1 200 OK"), "{resp}");
 
-    let cars = ams2_championship::custom_ai::parse_car_performance(&dir.join("F-Test.xml"));
+    let cars = ams2_championship::roster::custom_ai::parse_car_performance(&dir.join("F-Test.xml"));
     let ags = cars.iter().find(|c| c.team == "AGS").unwrap();
     assert_eq!(ags.power_scalar, 1.10);
     assert_eq!(ags.weight_scalar, 0.97);
@@ -1945,7 +1939,7 @@ fn test_route_get_driver_performance_lists_entries_with_the_editable_attrs() {
     let attrs = v["attrs"].as_array().unwrap();
     assert_eq!(
         attrs.len(),
-        ams2_championship::custom_ai::DRIVER_ATTRS.len()
+        ams2_championship::roster::custom_ai::DRIVER_ATTRS.len()
     );
     assert_eq!(attrs[0], "race_skill");
 
@@ -1981,7 +1975,7 @@ fn test_route_patch_driver_performance_writes_and_returns_the_row() {
     assert_eq!(v["driver"], "Ivan Capelli");
     assert_eq!(v["attrs"]["race_skill"], 0.72);
 
-    let drivers = ams2_championship::custom_ai::parse_driver_attributes(&dir.join("F-Test.xml"));
+    let drivers = ams2_championship::roster::custom_ai::parse_driver_attributes(&dir.join("F-Test.xml"));
     assert_eq!(drivers[1].attrs.get("race_skill"), Some(&0.72));
     // The other entry is untouched, and the original file is preserved.
     assert_eq!(drivers[0].attrs.get("race_skill"), None);
@@ -2180,7 +2174,7 @@ fn two_seasons() -> Vec<Championship> {
 #[test]
 fn test_live_teams_come_from_the_active_championship() {
     let dir = make_live_teams_dir();
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &[], false, ams2_championship::roster::custom_ai::SeatProof::Possible);
 
     assert_eq!(out.player_team.as_deref(), Some("Brabham"));
     assert_eq!(
@@ -2206,7 +2200,7 @@ fn test_live_teams_follow_the_active_flag_when_it_moves() {
     champs[1].status = ChampionshipStatus::Active;
     champs[1].player_team = Some("March".into());
 
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::roster::custom_ai::SeatProof::Possible);
     assert_eq!(out.player_team.as_deref(), Some("March"));
     assert_eq!(
         out.teams.get("Dan Delta").map(String::as_str),
@@ -2224,7 +2218,7 @@ fn test_live_teams_empty_when_no_championship_is_active() {
     let mut champs = two_seasons();
     champs[0].status = ChampionshipStatus::Progress;
 
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::roster::custom_ai::SeatProof::Possible);
     assert!(out.teams.is_empty());
     assert_eq!(out.player_team, None);
 
@@ -2237,7 +2231,7 @@ fn test_live_teams_empty_when_the_active_championship_has_no_roster() {
     let mut champs = two_seasons();
     champs[0].custom_ai_file = None;
 
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::roster::custom_ai::SeatProof::Possible);
     assert!(out.teams.is_empty());
     assert_eq!(
         out.player_team, None,
@@ -2253,7 +2247,7 @@ fn test_live_teams_treats_a_blank_player_team_as_unset() {
     let mut champs = two_seasons();
     champs[0].player_team = Some("   ".into());
 
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &[], false, ams2_championship::roster::custom_ai::SeatProof::Possible);
     assert!(!out.teams.is_empty(), "the roster still resolves");
     assert_eq!(out.player_team, None);
 
@@ -2521,7 +2515,7 @@ fn test_route_offers_shows_a_signed_deal() {
     {
         let mut data = store.write().unwrap();
         data.championships.push(rated_champ("c1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: "Osella".into(),
             signed_at: 42,
@@ -2598,7 +2592,7 @@ fn test_route_finances_pays_a_completed_season() {
         }];
         data.championships.push(champ);
         data.sessions.push(win_session("s1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: "Osella".into(),
             signed_at: 1,
@@ -2631,7 +2625,7 @@ fn test_route_finances_withholds_an_unfinished_season() {
     {
         let mut data = store.write().unwrap();
         data.championships.push(make_champ("c1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: "Osella".into(),
             signed_at: 1,
@@ -2658,7 +2652,7 @@ fn sign_call(
     config: &std::path::Path,
     method: &str,
     body: &str,
-) -> (String, ams2_championship::data_store::SharedStore) {
+) -> (String, ams2_championship::career::data_store::SharedStore) {
     let (store, data_path) = make_sp_store();
     let id = champ.id.clone();
     store.write().unwrap().championships.push(champ);
@@ -2730,7 +2724,7 @@ fn test_route_sign_stores_the_chosen_car_with_the_season() {
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert_eq!(
         store.read().unwrap().championships[0].player_seat,
-        Some(ams2_championship::data_store::SeatLock {
+        Some(ams2_championship::career::data_store::SeatLock {
             seat: "Osella #21".into(),
             replaces: "Piercarlo Ghinzani".into(),
         })
@@ -2885,7 +2879,7 @@ fn test_route_sign_buys_a_seat_the_career_can_afford() {
         }];
         data.championships.push(past);
         data.sessions.push(win_session("s1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "past".into(),
             team: OPEN_SEAT.into(),
             signed_at: 1,
@@ -2929,8 +2923,8 @@ fn test_route_sign_refused_in_a_career_that_does_not_sign() {
     // unset one would put money in a ledger the user never opted into.
     let (root, config) = make_offer_fixture(true);
     for mode in [
-        ams2_championship::data_store::CareerMode::Unset,
-        ams2_championship::data_store::CareerMode::Multiplayer,
+        ams2_championship::career::data_store::CareerMode::Unset,
+        ams2_championship::career::data_store::CareerMode::Multiplayer,
     ] {
         let (store, data_path) = make_test_store();
         {
@@ -2955,7 +2949,7 @@ fn test_route_sign_refused_in_a_career_that_does_not_sign() {
 }
 
 
-// ── A signed season keeps its own roster (`season_rosters`) ────────────────────
+// ── A signed season keeps its own roster (`signed_rosters`) ────────────────────
 
 /// A folder save inside the fixture, so there is somewhere to keep a season's roster — the
 /// shared test store is a flat file, which never gets one.
@@ -2966,7 +2960,7 @@ fn folder_career(root: &std::path::Path) -> std::path::PathBuf {
 }
 
 fn routed(
-    store: &ams2_championship::data_store::SharedStore,
+    store: &ams2_championship::career::data_store::SharedStore,
     career: &std::path::Path,
     config: &std::path::Path,
     method: &str,
@@ -2986,7 +2980,7 @@ fn routed(
 fn signed_in_folder(
     root: &std::path::Path,
     config: &std::path::Path,
-) -> (ams2_championship::data_store::SharedStore, std::path::PathBuf) {
+) -> (ams2_championship::career::data_store::SharedStore, std::path::PathBuf) {
     let (store, _) = make_sp_store();
     store.write().unwrap().championships.push(rated_champ("c1"));
     let career = folder_career(root);
@@ -3011,7 +3005,7 @@ fn edited_roster() -> String {
 fn test_route_sign_keeps_a_copy_of_the_roster_with_the_season() {
     let (root, config) = make_offer_fixture(true);
     let (_, career) = signed_in_folder(&root, &config);
-    let copy = ams2_championship::season_rosters::stored(&career, "c1").expect("a stored roster");
+    let copy = ams2_championship::career::signed_rosters::stored(&career, "c1").expect("a stored roster");
     assert_eq!(std::fs::read_to_string(copy).unwrap(), OFFER_ROSTER);
     std::fs::remove_dir_all(&root).ok();
 }
@@ -3070,7 +3064,7 @@ fn test_route_tearing_up_a_contract_forgets_the_roster() {
     let (store, career) = signed_in_folder(&root, &config);
     let resp = routed(&store, &career, &config, "DELETE", "/api/championships/c1/sign", "");
     assert!(status_line(&resp).contains("200"), "{resp}");
-    assert!(ams2_championship::season_rosters::stored(&career, "c1").is_none());
+    assert!(ams2_championship::career::signed_rosters::stored(&career, "c1").is_none());
     std::fs::remove_dir_all(&root).ok();
 }
 
@@ -3099,7 +3093,7 @@ fn test_seal_career_keeps_the_roster_of_a_season_signed_before_rosters_were_fixe
         let mut data = store.write().unwrap();
         data.championships.push(rated_champ("c1"));
         data.championships.push(rated_champ("c2"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: OPEN_SEAT.into(),
             signed_at: 1,
@@ -3111,9 +3105,9 @@ fn test_seal_career_keeps_the_roster_of_a_season_signed_before_rosters_were_fixe
     }
     let career = folder_career(&root);
     seal_career(&store, &career, &config).unwrap();
-    assert!(ams2_championship::season_rosters::stored(&career, "c1").is_some());
+    assert!(ams2_championship::career::signed_rosters::stored(&career, "c1").is_some());
     // Unsigned: it reads the game's file, as before.
-    assert!(ams2_championship::season_rosters::stored(&career, "c2").is_none());
+    assert!(ams2_championship::career::signed_rosters::stored(&career, "c2").is_none());
     std::fs::remove_dir_all(&root).ok();
 }
 
@@ -3159,7 +3153,7 @@ fn test_route_sign_refuses_a_second_deal_for_one_season() {
     {
         let mut data = store.write().unwrap();
         data.championships.push(rated_champ("c1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: OPEN_SEAT.into(),
             signed_at: 1,
@@ -3304,7 +3298,7 @@ fn test_route_release_refused_once_the_season_has_started() {
             ..rated_champ("c1")
         };
         data.championships.push(champ);
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: OPEN_SEAT.into(),
             signed_at: 1,
@@ -3528,7 +3522,7 @@ fn test_route_offers_does_not_renew_a_seat_held_in_another_series() {
         }];
         data.championships.push(past);
         data.sessions.push(win_session("s1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "past".into(),
             team: "Williams".into(),
             signed_at: 1,
@@ -3567,9 +3561,9 @@ fn test_route_offers_does_not_renew_a_seat_held_in_another_series() {
 
 // ── Career mode ───────────────────────────────────────────────────────────────
 
-use ams2_championship::data_store::CareerMode;
+use ams2_championship::career::data_store::CareerMode;
 
-fn mode_store(mode: CareerMode) -> (ams2_championship::data_store::SharedStore, PathBuf) {
+fn mode_store(mode: CareerMode) -> (ams2_championship::career::data_store::SharedStore, PathBuf) {
     let (store, path) = make_saves_dir("mode");
     store.write().unwrap().mode = mode;
     (store, path)
@@ -3833,8 +3827,8 @@ fn test_route_new_career_is_founded_with_the_configured_balance() {
 
     // Recorded on the save, not left to be read from config later.
     assert_eq!(store.read().unwrap().starting_balance, 750_000);
-    let written = ams2_championship::data_store::load_data(
-        &ams2_championship::saves::save_path(path.parent().unwrap(), "Rookie"),
+    let written = ams2_championship::career::data_store::load_data(
+        &ams2_championship::career::saves::save_path(path.parent().unwrap(), "Rookie"),
     );
     assert_eq!(written.starting_balance, 750_000);
 
@@ -4070,7 +4064,7 @@ fn raced_champ(id: &str, status: ChampionshipStatus) -> Championship {
 }
 
 fn finances_of(
-    store: &ams2_championship::data_store::SharedStore,
+    store: &ams2_championship::career::data_store::SharedStore,
     data_path: &std::path::Path,
     config: &std::path::Path,
 ) -> serde_json::Value {
@@ -4093,7 +4087,7 @@ fn test_route_finishing_a_season_seals_its_payout_against_the_config_tab() {
         data.championships
             .push(raced_champ("c1", ChampionshipStatus::Active));
         data.sessions.push(win_session("s1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: OPEN_SEAT.into(),
             signed_at: 1,
@@ -4153,7 +4147,7 @@ fn test_route_reopening_a_season_takes_its_settlement_back() {
         data.championships
             .push(raced_champ("c1", ChampionshipStatus::Active));
         data.sessions.push(win_session("s1"));
-        data.contracts.push(ams2_championship::contracts::Contract {
+        data.contracts.push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: OPEN_SEAT.into(),
             signed_at: 1,
@@ -4210,7 +4204,7 @@ fn test_route_a_season_finished_before_sealing_is_stamped_when_its_career_is_act
     std::fs::create_dir_all(&legacy_dir).unwrap();
 
     let mut legacy = CareerData {
-        mode: ams2_championship::data_store::CareerMode::Singleplayer,
+        mode: ams2_championship::career::data_store::CareerMode::Singleplayer,
         ..CareerData::default()
     };
     legacy
@@ -4219,7 +4213,7 @@ fn test_route_a_season_finished_before_sealing_is_stamped_when_its_career_is_act
     legacy.sessions.push(win_session("s1"));
     legacy
         .contracts
-        .push(ams2_championship::contracts::Contract {
+        .push(ams2_championship::career::contracts::Contract {
             champ_id: "c1".into(),
             team: OPEN_SEAT.into(),
             signed_at: 1,
@@ -4279,7 +4273,7 @@ fn retune(config: &std::path::Path, to: f64) {
 }
 
 fn reputation_of(
-    store: &ams2_championship::data_store::SharedStore,
+    store: &ams2_championship::career::data_store::SharedStore,
     data_path: &std::path::Path,
     config: &std::path::Path,
 ) -> f64 {
@@ -4318,7 +4312,7 @@ fn test_route_a_new_career_records_the_rating_tuning_it_was_created_with() {
     assert_eq!(stamped.starting_rating, 20.0);
 
     // Written into the save, not just held in memory.
-    let on_disk = ams2_championship::data_store::load_data(&ams2_championship::saves::save_path(
+    let on_disk = ams2_championship::career::data_store::load_data(&ams2_championship::career::saves::save_path(
         path.parent().unwrap(),
         "Stamped",
     ));
@@ -4384,7 +4378,7 @@ fn test_route_adopting_moves_the_career_onto_the_current_settings() {
     store.write().unwrap().championships.push(rated_champ("c1"));
     retune(&config, 80.0);
 
-    let save = ams2_championship::saves::save_path(path.parent().unwrap(), "Adopt");
+    let save = ams2_championship::career::saves::save_path(path.parent().unwrap(), "Adopt");
     let resp = call_with_config(
         store.clone(),
         save.clone(),
@@ -4398,7 +4392,7 @@ fn test_route_adopting_moves_the_career_onto_the_current_settings() {
     assert!((after - 80.0).abs() < 0.001, "{after}");
     // Persisted, so the change survives a restart rather than lasting until the next load.
     assert_eq!(
-        ams2_championship::data_store::load_data(&save)
+        ams2_championship::career::data_store::load_data(&save)
             .rating_params
             .unwrap()
             .starting_rating,
@@ -4462,7 +4456,7 @@ fn test_route_a_career_created_before_stamping_adopts_its_tuning_when_activated(
     std::fs::create_dir_all(&legacy_dir).unwrap();
 
     let mut legacy = CareerData {
-        mode: ams2_championship::data_store::CareerMode::Singleplayer,
+        mode: ams2_championship::career::data_store::CareerMode::Singleplayer,
         ..CareerData::default()
     };
     legacy.championships.push(rated_champ("c1"));
@@ -4493,7 +4487,7 @@ fn test_route_a_career_created_before_stamping_adopts_its_tuning_when_activated(
         "stamped at what it was already judged on"
     );
     assert_eq!(
-        ams2_championship::data_store::load_data(&career).rating_params,
+        ams2_championship::career::data_store::load_data(&career).rating_params,
         Some(stamped),
         "written through, not just held in memory"
     );
@@ -4511,12 +4505,12 @@ fn test_route_a_career_created_before_stamping_adopts_its_tuning_when_activated(
 fn test_a_stamp_missing_a_field_falls_back_to_the_shipped_value_not_zero() {
     // `#[serde(default)]` on the container is what makes storing this safe: a hand-edited stamp
     // that drops `starting_rating` must not put every driver on the floor.
-    let p: ams2_championship::driver_rating::RatingParams =
+    let p: ams2_championship::career::driver_rating::RatingParams =
         serde_json::from_str(r#"{"strictness":5.0}"#).unwrap();
     assert_eq!(p.strictness, 5.0);
     assert_eq!(
         p.starting_rating,
-        ams2_championship::driver_rating::RatingParams::default().starting_rating
+        ams2_championship::career::driver_rating::RatingParams::default().starting_rating
     );
 }
 
@@ -4526,7 +4520,7 @@ fn test_a_stamp_missing_a_field_falls_back_to_the_shipped_value_not_zero() {
 fn make_folder_store(
     tag: &str,
 ) -> (
-    ams2_championship::data_store::SharedStore,
+    ams2_championship::career::data_store::SharedStore,
     std::path::PathBuf,
 ) {
     let ns = std::time::SystemTime::now()
@@ -4535,21 +4529,21 @@ fn make_folder_store(
         .as_nanos();
     let dir = std::env::temp_dir().join(format!("ams2_laps_route_{tag}_{ns}"));
     std::fs::create_dir_all(&dir).unwrap();
-    let career = ams2_championship::saves::save_path(&dir, "career");
-    ams2_championship::saves::prepare_save_dir(&career).unwrap();
+    let career = ams2_championship::career::saves::save_path(&dir, "career");
+    ams2_championship::career::saves::prepare_save_dir(&career).unwrap();
     let store = Arc::new(RwLock::new(CareerData::default()));
-    ams2_championship::data_store::persist(&store, &career).unwrap();
+    ams2_championship::career::data_store::persist(&store, &career).unwrap();
     (store, career)
 }
 
-fn chart_entries() -> Vec<ams2_championship::data_store::LapChartEntry> {
+fn chart_entries() -> Vec<ams2_championship::career::data_store::LapChartEntry> {
     vec![
-        ams2_championship::data_store::LapChartEntry {
+        ams2_championship::career::data_store::LapChartEntry {
             lap: 1,
             driver: "Nightrat".into(),
             position: 1,
         },
-        ams2_championship::data_store::LapChartEntry {
+        ams2_championship::career::data_store::LapChartEntry {
             lap: 1,
             driver: "Berg".into(),
             position: 2,
@@ -4586,7 +4580,7 @@ fn test_route_career_no_longer_ships_every_lap_chart() {
 #[test]
 fn test_route_lap_chart_is_served_one_session_at_a_time() {
     let (store, career) = make_folder_store("fetch_one");
-    ams2_championship::lap_charts::write(&career, "s1", &chart_entries()).unwrap();
+    ams2_championship::career::lap_charts::write(&career, "s1", &chart_entries()).unwrap();
     store.write().unwrap().sessions.push(win_session("s1"));
 
     let resp = get(store, career.clone(), "/api/sessions/s1/lap-chart");
@@ -4631,8 +4625,8 @@ fn test_route_a_flat_saves_chart_still_comes_back_from_the_career() {
 fn test_route_purging_unassigned_sessions_takes_their_charts_too() {
     // A chart nothing points at any more is a stray file, and charts are the big ones.
     let (store, career) = make_folder_store("purge");
-    ams2_championship::lap_charts::write(&career, "keep", &chart_entries()).unwrap();
-    ams2_championship::lap_charts::write(&career, "drop", &chart_entries()).unwrap();
+    ams2_championship::career::lap_charts::write(&career, "keep", &chart_entries()).unwrap();
+    ams2_championship::career::lap_charts::write(&career, "drop", &chart_entries()).unwrap();
     {
         let mut data = store.write().unwrap();
         let mut champ = make_champ("c1");
@@ -4648,10 +4642,10 @@ fn test_route_purging_unassigned_sessions_takes_their_charts_too() {
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert_eq!(body_json(&resp)["removed"], 1);
     assert_eq!(
-        ams2_championship::lap_charts::read(&career, "keep").len(),
+        ams2_championship::career::lap_charts::read(&career, "keep").len(),
         2
     );
-    assert!(ams2_championship::lap_charts::read(&career, "drop").is_empty());
+    assert!(ams2_championship::career::lap_charts::read(&career, "drop").is_empty());
 
     let _ = std::fs::remove_dir_all(career.parent().unwrap().parent().unwrap());
 }
@@ -4821,7 +4815,7 @@ fn grid_check_resp(sessions: Vec<RecordedSession>, config: &std::path::Path) -> 
     let mut champ = rated_champ("c1");
     champ.rounds = sessions
         .iter()
-        .map(|s| ams2_championship::data_store::Round {
+        .map(|s| ams2_championship::career::data_store::Round {
             session_ids: vec![s.id.clone()],
         })
         .collect();
@@ -4893,7 +4887,7 @@ fn test_route_grid_check_flags_a_session_raced_on_another_roster() {
 fn test_route_grid_check_ignores_practice() {
     let (root, config) = make_offer_fixture(true);
     let mut practice = grid_session("s1", &["Nigel Mansell"]);
-    practice.session_type = ams2_championship::data_store::SESSION_PRACTICE;
+    practice.session_type = ams2_championship::career::data_store::SESSION_PRACTICE;
     let resp = grid_check_resp(vec![practice], &config);
     let v = body_json(&resp);
 
@@ -4930,10 +4924,10 @@ fn test_route_grid_check_unknown_championship_is_404() {
 // The live tab is the only place a grid problem can still be fixed, so this is the one warning
 // that interrupts.
 
-fn live_grid<'a>(names: &'a [(&'a str, bool)]) -> Vec<ams2_championship::custom_ai::GridEntry<'a>> {
+fn live_grid<'a>(names: &'a [(&'a str, bool)]) -> Vec<ams2_championship::roster::custom_ai::GridEntry<'a>> {
     names
         .iter()
-        .map(|(name, is_player)| ams2_championship::custom_ai::GridEntry {
+        .map(|(name, is_player)| ams2_championship::roster::custom_ai::GridEntry {
             name,
             car_name: "",
             is_player: *is_player,
@@ -4945,7 +4939,7 @@ fn live_grid<'a>(names: &'a [(&'a str, bool)]) -> Vec<ams2_championship::custom_
 fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
     let dir = make_live_teams_dir();
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::roster::custom_ai::SeatProof::Possible);
 
     let grid = out.grid.expect("a short grid is worth interrupting for");
     assert!(!grid.ok, "{grid:?}");
@@ -4958,7 +4952,7 @@ fn test_live_warning_names_a_short_grid_while_there_is_still_time_to_fix_it() {
 fn test_live_warning_is_silent_for_a_career_with_no_roster() {
     let dir = make_live_teams_dir();
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, false, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, false, ams2_championship::roster::custom_ai::SeatProof::Possible);
 
     assert!(out.grid.is_none());
     // The team names still resolve — nothing about the warning switches those off.
@@ -4974,7 +4968,7 @@ fn test_live_warning_when_no_championship_is_active() {
         c.status = ChampionshipStatus::Progress;
     }
     let grid = live_grid(&[("Carl Charlie", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::roster::custom_ai::SeatProof::Possible);
 
     let grid = out.grid.expect("no Active season is worth saying");
     assert!(!grid.ok, "{grid:?}");
@@ -4987,7 +4981,7 @@ fn test_live_warning_when_no_championship_is_active() {
 #[test]
 fn test_live_warning_says_nothing_before_a_session_loads() {
     let dir = make_live_teams_dir();
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &[], true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &[], true, ams2_championship::roster::custom_ai::SeatProof::Possible);
 
     // Not `ok: false` and not `ok: true` — there is nothing to report on yet, and saying
     // either would be a claim about a grid that has not loaded.
@@ -4997,11 +4991,11 @@ fn test_live_warning_says_nothing_before_a_session_loads() {
 }
 
 /// The served page must actually carry the elements the scripts fill in. They are wired by id
-/// across three files — markup in `championship_html.rs`, the fetch in one asset, the render in
+/// across three files — markup in `web/html.rs`, the fetch in one asset, the render in
 /// another — so a rename that misses one would leave a warning that is computed and never seen.
 #[test]
 fn test_the_page_carries_the_hooks_the_grid_warning_needs() {
-    let html = ams2_championship::championship_html::build_base_html();
+    let html = ams2_championship::web::html::build_base_html();
     for id in [
         "live-grid-warning",   // live banner, filled by live.js
         "champ-grid-panel",    // Manage tab season panel, filled by manage.js
@@ -5018,7 +5012,7 @@ fn test_live_says_so_when_the_grid_is_the_roster() {
     let dir = make_live_teams_dir();
     // CORE_XML fields three cars; the player takes one of them.
     let grid = live_grid(&[("Alan Alpha", false), ("Ben Bravo", false), ("Me", true)]);
-    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible);
+    let out = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::roster::custom_ai::SeatProof::Possible);
 
     let status = out.grid.expect("a full grid is worth confirming");
     assert!(status.ok, "{status:?}");
@@ -5043,7 +5037,7 @@ fn williams_6_session(id: &str) -> RecordedSession {
 /// An SP store holding a Williams season with two empty rounds, and `sessions` recorded.
 fn seat_store(
     sessions: Vec<RecordedSession>,
-) -> (ams2_championship::data_store::SharedStore, std::path::PathBuf) {
+) -> (ams2_championship::career::data_store::SharedStore, std::path::PathBuf) {
     let (store, data_path) = make_sp_store();
     let mut champ = rated_champ("c1");
     champ.player_team = Some("Williams".into());
@@ -5057,7 +5051,7 @@ fn seat_store(
 }
 
 fn seat_call(
-    store: &ams2_championship::data_store::SharedStore,
+    store: &ams2_championship::career::data_store::SharedStore,
     data_path: &std::path::Path,
     config: &std::path::Path,
     method: &str,
@@ -5078,9 +5072,9 @@ fn seat_call(
 fn test_route_singleplayer_refuses_a_race_whose_grid_cannot_show_the_car() {
     let (root, config) = make_offer_fixture(true);
     let short = || grid_session("s1", &["Piercarlo Ghinzani", "Allan Berg"]);
-    let locked = |store: &ams2_championship::data_store::SharedStore| {
+    let locked = |store: &ams2_championship::career::data_store::SharedStore| {
         store.write().unwrap().championships[0].player_seat =
-            Some(ams2_championship::data_store::SeatLock {
+            Some(ams2_championship::career::data_store::SeatLock {
                 seat: "Williams #5".into(),
                 replaces: "Nigel Mansell".into(),
             });
@@ -5097,7 +5091,7 @@ fn test_route_singleplayer_refuses_a_race_whose_grid_cannot_show_the_car() {
     assert!(resp.contains("\"s1\""), "listed as blocked: {resp}");
 
     let mut practice = short();
-    practice.session_type = ams2_championship::data_store::SESSION_PRACTICE;
+    practice.session_type = ams2_championship::career::data_store::SESSION_PRACTICE;
     let (store, data_path) = seat_store(vec![practice]);
     locked(&store);
     let resp = seat_call(&store, &data_path, &config, "POST", add);
@@ -5105,7 +5099,7 @@ fn test_route_singleplayer_refuses_a_race_whose_grid_cannot_show_the_car() {
 
     let (store, data_path) = seat_store(vec![short()]);
     locked(&store);
-    store.write().unwrap().mode = ams2_championship::data_store::CareerMode::Unset;
+    store.write().unwrap().mode = ams2_championship::career::data_store::CareerMode::Unset;
     let resp = seat_call(&store, &data_path, &config, "POST", add);
     assert!(status_line(&resp).contains("200"), "an unset career is not held to it: {resp}");
     let _ = std::fs::remove_dir_all(&root);
@@ -5120,7 +5114,7 @@ fn test_route_the_first_session_stores_the_car_and_refuses_the_team_mates() {
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert_eq!(
         store.read().unwrap().championships[0].player_seat,
-        Some(ams2_championship::data_store::SeatLock {
+        Some(ams2_championship::career::data_store::SeatLock {
             seat: "Williams #5".into(),
             replaces: "Nigel Mansell".into(),
         })
@@ -5184,25 +5178,25 @@ fn test_live_says_wrong_car_when_the_player_is_in_the_team_mates() {
     let dir = make_live_teams_dir();
     let mut champs = two_seasons();
     champs[0].player_team = Some("Lotus".into());
-    champs[0].player_seat = Some(ams2_championship::data_store::SeatLock {
+    champs[0].player_seat = Some(ams2_championship::career::data_store::SeatLock {
         seat: "Lotus #1".into(),
         replaces: "Alan Alpha".into(),
     });
 
     // Alpha is on track, Bravo is not: the player is in Lotus #2.
     let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("a wrong car is said");
+    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::roster::custom_ai::SeatProof::Possible).seat.expect("a wrong car is said");
     assert!(!seat.ok, "{seat:?}");
     assert!(seat.text.contains("WRONG CAR"), "{seat:?}");
     assert!(seat.text.contains("Lotus #2 (in place of Ben Bravo)"), "{seat:?}");
     assert!(seat.text.contains("Lotus #1 in place of Alan Alpha"), "it says what to pick: {seat:?}");
 
     let grid = live_grid(&[("Ben Bravo", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("the right car is said too");
+    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, true, ams2_championship::roster::custom_ai::SeatProof::Possible).seat.expect("the right car is said too");
     assert!(seat.ok, "{seat:?}");
 
     // Multiplayer has no seat to be in.
-    assert!(resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, false, ams2_championship::custom_ai::SeatProof::Possible).seat.is_none());
+    assert!(resolve_live_teams(&dir, std::path::Path::new(""), &champs, &grid, false, ams2_championship::roster::custom_ai::SeatProof::Possible).seat.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -5211,7 +5205,7 @@ fn test_live_says_wrong_team_before_any_car_is_stored() {
     let dir = make_live_teams_dir();
     // two_seasons declares Brabham; with Charlie on track the only free car is a Lotus.
     let grid = live_grid(&[("Alan Alpha", false), ("Carl Charlie", false), ("Me", true)]);
-    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::custom_ai::SeatProof::Possible).seat.expect("said");
+    let seat = resolve_live_teams(&dir, std::path::Path::new(""), &two_seasons(), &grid, true, ams2_championship::roster::custom_ai::SeatProof::Possible).seat.expect("said");
     assert!(!seat.ok, "{seat:?}");
     assert!(seat.text.contains("a Brabham car"), "{seat:?}");
     let _ = std::fs::remove_dir_all(&dir);
@@ -5219,7 +5213,7 @@ fn test_live_says_wrong_team_before_any_car_is_stored() {
 
 #[test]
 fn test_the_page_carries_the_seat_banner() {
-    let html = ams2_championship::championship_html::build_base_html();
+    let html = ams2_championship::web::html::build_base_html();
     assert!(html.contains("live-seat-warning"));
     assert!(html.contains("renderSeatStatus"));
 }

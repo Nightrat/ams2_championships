@@ -323,6 +323,75 @@ fn remove_dir_all_briefly(folder: &Path) -> std::io::Result<()> {
     Err(last)
 }
 
+/// File in the saves folder whose open handle marks it as owned. Not `.json`, so it can never be
+/// mistaken for a legacy flat save.
+pub const LOCK_FILE: &str = ".ams2_career.lock";
+
+/// Proof that this process owns a saves folder. Hold it for the life of the process; dropping it
+/// releases the folder.
+///
+/// Only one process may own a folder, because each one runs a session recorder that writes the
+/// active career: two servers started on the same folder would both file the same session and
+/// overwrite each other's saves.
+pub struct FolderLock {
+    // The lock *is* this handle, not the file's existence: Windows releases it when the process
+    // ends however it ends, so a crash cannot leave the folder locked.
+    _file: fs::File,
+}
+
+/// Takes ownership of the saves folder `dir`, or says which process already has it.
+///
+/// The lock file is opened for writing with read-only sharing, so a second owner is refused with
+/// a sharing violation while anyone may still *read* it — which is how the refusal can name the
+/// process holding it.
+#[cfg(windows)]
+pub fn lock_folder(dir: &Path) -> Result<FolderLock, String> {
+    use std::io::{Read, Write};
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_SHARE_READ: u32 = 1;
+    const ERROR_SHARING_VIOLATION: i32 = 32;
+
+    let path = dir.join(LOCK_FILE);
+    match fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .share_mode(FILE_SHARE_READ)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            let exe = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                .unwrap_or_else(|| "another instance".into());
+            // Best effort: the handle is the lock, the text only names its holder.
+            let _ = write!(file, "{exe} (process {})", std::process::id());
+            let _ = file.flush();
+            Ok(FolderLock { _file: file })
+        }
+        Err(e) if e.raw_os_error() == Some(ERROR_SHARING_VIOLATION) => {
+            let mut holder = String::new();
+            let _ = fs::File::open(&path).and_then(|mut f| f.read_to_string(&mut holder));
+            let holder = holder.trim();
+            Err(format!(
+                "{} is already in use by {}. Only one AMS2 Career program can run on a saves \
+                 folder at a time — close the other one first.",
+                dir.display(),
+                if holder.is_empty() { "another AMS2 Career program" } else { holder }
+            ))
+        }
+        Err(e) => Err(format!("could not lock {}: {e}", path.display())),
+    }
+}
+
+/// Elsewhere there is no AMS2 to record from, so nothing to collide over.
+#[cfg(not(windows))]
+pub fn lock_folder(_dir: &Path) -> Result<FolderLock, String> {
+    let file = fs::File::open(_dir).map_err(|e| e.to_string())?;
+    Ok(FolderLock { _file: file })
+}
+
 /// Removes empty directories left in the saves folder by a delete that could not finish.
 ///
 /// Called once at startup, and the timing is the whole of why it works. Measured against a real

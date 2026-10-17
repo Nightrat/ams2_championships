@@ -110,6 +110,47 @@ pub struct ConfigPatch {
     pub class_years: Option<BTreeMap<String, u16>>,
 }
 
+impl ConfigPatch {
+    /// The form a front end holding a whole [`Config`] would send: every field as it stands,
+    /// with the class-year overrides given separately because the form edits them as text.
+    ///
+    /// The fields the form does not own — the active career, the spotter — are not part of a
+    /// patch at all, so [`App::patch_config`] carries the stored ones through either way.
+    pub fn from_config(cfg: &Config, class_years: BTreeMap<String, u16>) -> Self {
+        Self {
+            port: cfg.port,
+            host: cfg.host.clone(),
+            open_browser: Some(cfg.open_browser),
+            poll_ms: cfg.poll_ms,
+            record_practice: cfg.record_practice,
+            record_qualify: cfg.record_qualify,
+            record_race: cfg.record_race,
+            show_track_map: cfg.show_track_map,
+            track_map_max_points: cfg.track_map_max_points,
+            saves_dir: cfg.saves_dir.clone().filter(|s| !s.trim().is_empty()),
+            custom_ai_dir: cfg.custom_ai_dir.clone().filter(|s| !s.trim().is_empty()),
+            enforce_team_eligibility: cfg.enforce_team_eligibility,
+            hide_locked_teams: cfg.hide_locked_teams,
+            contract_top_salary: Some(cfg.contract_top_salary),
+            contract_floor_salary: Some(cfg.contract_floor_salary),
+            contract_buy_in_per_point: Some(cfg.contract_buy_in_per_point),
+            contract_pay_driver_margin: Some(cfg.contract_pay_driver_margin),
+            champion_prize: Some(cfg.champion_prize),
+            last_place_prize: Some(cfg.last_place_prize),
+            starting_balance: Some(cfg.starting_balance),
+            starting_rating: cfg.starting_rating,
+            rating_strictness: cfg.rating_strictness,
+            eligibility_gates: cfg.eligibility_gates,
+            rating_half_life: cfg.rating_half_life,
+            count_retirements: cfg.count_retirements,
+            retirement_min_laps_down: cfg.retirement_min_laps_down,
+            retirement_distance_pct: cfg.retirement_distance_pct,
+            offer_margin: cfg.offer_margin,
+            class_years: Some(class_years),
+        }
+    }
+}
+
 fn yes() -> bool {
     true
 }

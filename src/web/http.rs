@@ -64,6 +64,20 @@ pub fn send_with_cache(
     let _ = stream.write_all(body);
 }
 
+/// Answers with a file for the browser to save rather than show, under `file_name`.
+pub fn send_download(stream: &mut TcpStream, content_type: &str, file_name: &str, body: &[u8]) {
+    // The name is ours (a date and a fixed stem), but a quote in it would end the header value.
+    let file_name = file_name.replace('"', "");
+    let header = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\
+         Content-Disposition: attachment; filename=\"{file_name}\"\r\n\
+         Cache-Control: no-store\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(header.as_bytes());
+    let _ = stream.write_all(body);
+}
+
 pub fn json_ok(stream: &mut TcpStream, body: &[u8]) {
     send_response(stream, "200 OK", "application/json", body);
 }

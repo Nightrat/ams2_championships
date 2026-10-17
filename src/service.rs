@@ -7,12 +7,12 @@
 //! session locks, which roster a season reads.
 //!
 //! **Nothing here knows about HTTP.** Every method answers with a typed value or an [`AppError`],
-//! and the server maps those to JSON and status codes. That is the whole point of the split: a
-//! second front end (a native GUI) calls the same methods and gets the same rules, rather than
-//! re-implementing them against the JSON API and drifting from it.
+//! and the server maps those to JSON and status codes. That is the whole point of the split: the
+//! rules can be tested by calling them directly, the binary stays transport, and the browser gets
+//! values to show rather than rules to re-implement in JavaScript and drift from.
 //!
 //! The view types are `Serialize` because they are also exactly what the HTTP routes answer with
-//! — the wire format is defined here, once, and both front ends read the same shapes.
+//! — the wire format is defined here, once.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -23,15 +23,18 @@ use crate::game::spotter::Focus;
 
 mod career_saves;
 mod championships;
+mod export;
 mod live;
 mod live_frame;
 mod performance;
 mod settings;
 mod signing;
+mod startup;
 
 pub use career_saves::SavesView;
 pub use championships::{
-    check_session_seat, ChampionshipPatch, GridCheck, GridCheckSession, NewChampionship, SessionListing,
+    check_session_seat, AvailableSessions, ChampionshipPatch, GridCheck, GridCheckSession,
+    NewChampionship, SessionListing,
     SessionEligibility, TeamEligibilityView,
 };
 pub use live::{live_seat_status, resolve_live_teams, GridStatus, LiveTeams, RosterMismatch};
@@ -44,11 +47,11 @@ pub use settings::{
     class_year_rows, ClassYearRow, ConfigPatch, ConfigPatched, ConfigView, SpotterPatch,
     SpotterStatus,
 };
-pub use signing::{FinancesView, OffersView, SignRequest, Signed};
+pub use signing::{FinancesView, OfferNote, OffersView, SignRequest, Signed};
+pub use startup::{exe_dir, startup, Startup};
 
-/// Why an operation was refused. The variant says what *kind* of refusal it is, so each front
-/// end can present it its own way — the server as a status code, a GUI as a dialog — while the
-/// sentence itself is written once, here.
+/// Why an operation was refused. The variant says what *kind* of refusal it is, which the server
+/// turns into a status code, while the sentence itself is written once, here.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppError {
     /// The request itself is malformed or incomplete.

@@ -128,9 +128,7 @@ function careerRoundsHtml(champ) {
     var trackName = raceSess
       ? raceSess.track
       : (roundSessions[0] ? roundSessions[0].track : 'Unknown');
-    var winner = raceSess
-      ? raceSess.results.find(function (r) { return r.race_position === 1; })
-      : null;
+    var winner = raceSess ? raceSess.winner : null;
 
     var sessionsHtml = roundSessions.map(function (s) {
       var typeLabel = SESSION_TYPE_LABELS[s.session_type] || '?';
@@ -178,7 +176,7 @@ function careerRoundsHtml(champ) {
 
     return '<details class="events-detail">' +
       '<summary>R' + (rIdx + 1) + ' \u2014 ' + esc(trackName) +
-        (winner ? ' &nbsp;&#127942; ' + esc(winner.name) : '') +
+        (winner ? ' &nbsp;&#127942; ' + esc(winner) : '') +
       '</summary>' +
       '<div class="events-grid">' + sessionsHtml + '</div>' +
       '</details>';
@@ -222,7 +220,7 @@ function selectChamp(idx) {
 }
 
 function renderCareerChampionships(champs) {
-  careerChamps = sortChamps(champs || []);
+  careerChamps = champs || []; // already in display order
   var list = document.getElementById('career-champ-list');
   var detail = document.getElementById('career-champ-detail');
   if (!list || !detail) return;
@@ -299,47 +297,11 @@ function renderCareerStats(driverStats) {
   initSortableTableEl(document.getElementById('career-stats-table'));
 }
 
+// Per (track, layout, car), and the same records merged across every car — both from the
+// server (`track_stats` / `track_stats_all`), most recently visited first.
 var allTrackStats = [];
+var allCarsTrackStats = [];
 var careerDriverStats = [];
-
-function aggregateTrackStats(rows) {
-  var byKey = {};
-  rows.forEach(function (t) {
-    var key = t.track + '\x00' + t.track_variation;
-    var a = byKey[key];
-    if (!a) {
-      byKey[key] = { track: t.track, track_variation: t.track_variation, car: '',
-        races: t.races, qualifyings: t.qualifyings,
-        best_lap: t.best_lap, best_lap_driver: t.best_lap_driver, best_lap_car: t.best_lap_car,
-        second_lap: t.second_lap, second_lap_driver: t.second_lap_driver, second_lap_car: t.second_lap_car,
-        third_lap: t.third_lap, third_lap_driver: t.third_lap_driver, third_lap_car: t.third_lap_car,
-        last_visited: t.last_visited };
-      return;
-    }
-    a.races += t.races;
-    a.qualifyings += t.qualifyings;
-    if (t.last_visited > a.last_visited) a.last_visited = t.last_visited;
-    // Merge all per-driver bests across cars, keep top 3 unique drivers by lap time
-    var allLaps = [
-      { t: a.best_lap,   d: a.best_lap_driver,   c: a.best_lap_car },
-      { t: a.second_lap, d: a.second_lap_driver, c: a.second_lap_car },
-      { t: a.third_lap,  d: a.third_lap_driver,  c: a.third_lap_car },
-      { t: t.best_lap,   d: t.best_lap_driver,   c: t.best_lap_car },
-      { t: t.second_lap, d: t.second_lap_driver, c: t.second_lap_car },
-      { t: t.third_lap,  d: t.third_lap_driver,  c: t.third_lap_car },
-    ].filter(function (l) { return l.t > 0 && l.d; });
-    // Keep best lap per driver, then sort
-    var byDriver = {};
-    allLaps.forEach(function (l) {
-      if (!byDriver[l.d] || l.t < byDriver[l.d].t) byDriver[l.d] = l;
-    });
-    var top3 = Object.values(byDriver).sort(function (x, y) { return x.t - y.t; }).slice(0, 3);
-    a.best_lap          = top3[0] ? top3[0].t : 0; a.best_lap_driver   = top3[0] ? top3[0].d : ''; a.best_lap_car    = top3[0] ? top3[0].c : '';
-    a.second_lap        = top3[1] ? top3[1].t : 0; a.second_lap_driver = top3[1] ? top3[1].d : ''; a.second_lap_car  = top3[1] ? top3[1].c : '';
-    a.third_lap         = top3[2] ? top3[2].t : 0; a.third_lap_driver  = top3[2] ? top3[2].d : ''; a.third_lap_car   = top3[2] ? top3[2].c : '';
-  });
-  return Object.values(byKey);
-}
 
 function buildTrackCarFilter(trackStats) {
   var cars = [];
@@ -348,8 +310,9 @@ function buildTrackCarFilter(trackStats) {
   return cars;
 }
 
-function renderTrackStats(trackStats) {
+function renderTrackStats(trackStats, allCars) {
   allTrackStats = trackStats || [];
+  allCarsTrackStats = allCars || [];
   var container = document.getElementById('career-tracks-container');
   if (!container) return;
   if (!allTrackStats.length) {
@@ -380,8 +343,7 @@ function fmtLapHolder(time, driver, car, showCar) {
 }
 
 function applyTrackCarFilter(car) {
-  var rows = car ? allTrackStats.filter(function (t) { return t.car === car; }) : aggregateTrackStats(allTrackStats);
-  rows.sort(function (a, b) { return b.last_visited - a.last_visited; });
+  var rows = car ? allTrackStats.filter(function (t) { return t.car === car; }) : allCarsTrackStats;
   var showCar = !car;
   var col = 0;
   function th(cls, type, label) { return '<th class="' + cls + '" data-col="' + (col++) + '" data-type="' + type + '">' + label + '</th>'; }
@@ -420,7 +382,7 @@ function loadCareerChampionships() {
     .then(function (career) {
       renderCareerChampionships(career.championships || []);
       renderCareerStats(career.driver_stats || []);
-      renderTrackStats(career.track_stats || []);
+      renderTrackStats(career.track_stats || [], career.track_stats_all || []);
     }).catch(function () {
       var el = document.getElementById('career-champ-detail');
       if (el) el.innerHTML = '<div class="manage-placeholder" style="padding:2rem">Career data requires the server binary.</div>';
@@ -462,140 +424,11 @@ document.querySelectorAll('.tab-btn').forEach(function (btn) {
 }());
 
 // ── HTML export ───────────────────────────────────────────────────────────────
-var EXPORT_CSS = [
-  'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1200px;margin:0 auto;padding:1.5rem 2rem;color:#111;font-size:14px}',
-  'h1{font-size:1.5rem;border-bottom:2px solid #ddd;padding-bottom:0.4rem;margin-bottom:0.3rem}',
-  'h2{font-size:1.15rem;margin:2rem 0 0.8rem;border-bottom:1px solid #eee;padding-bottom:0.2rem}',
-  'h3{font-size:0.95rem;margin:0.6rem 0 0.3rem;color:#333}',
-  '.export-date{color:#888;font-size:0.82rem;margin:0 0 1rem}',
-  '.champ-block{border:1px solid #ddd;border-radius:6px;margin-bottom:1.5rem;padding:1rem}',
-  '.champ-title{display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem}',
-  '.champ-title h2{margin:0;border:none;padding:0;font-size:1.05rem}',
-  '.badge{font-size:0.7rem;font-weight:700;padding:1px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:0.04em;border:1px solid}',
-  '.badge-active{border-color:#c0392b;color:#c0392b;background:#fdf0ef}',
-  '.badge-progress{border-color:#27ae60;color:#27ae60;background:#edfaf1}',
-  '.badge-final{border-color:#2980b9;color:#2980b9;background:#eaf4fb}',
-  '.champ-body{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start}',
-  '.standings-panel{min-width:200px;flex:0 0 auto}',
-  '.results-panel{flex:2;min-width:300px}',
-  'table{border-collapse:collapse;width:100%;margin-bottom:0.5rem;font-size:0.83rem}',
-  'th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}',
-  'th{background:#f5f5f5;font-weight:600;color:#333}',
-  '.pos,.pts,.stat-num{text-align:center}',
-  '.stat-name{font-weight:600}',
-  '.stat-group-start{border-left:2px solid #bbb}',
-  '.result-car{color:#777;font-size:0.78rem}',
-  '.manage-empty,.manage-placeholder{color:#888;font-style:italic}',
-  'details{margin-bottom:0.4rem}',
-  'summary{font-weight:600;font-size:0.88rem;cursor:pointer;padding:0.2rem 0}',
-  '.events-grid{margin-top:0.5rem}',
-  '.round-session{margin-bottom:1rem}',
-  '.round-session-label{font-size:0.79rem;color:#555;margin-bottom:0.3rem}',
-  '.session-type-badge{font-size:0.68rem;font-weight:700;border:1px solid #bbb;border-radius:2px;padding:0 3px}',
-  '.session-track{font-weight:600}',
-  '.session-date,.session-drivers{color:#888}',
-  '.session-track-var{color:#777;font-size:0.85em}',
-  '.lap-chart-wrap{margin-top:0.5rem}',
-  '.lap-chart-label{font-size:0.79rem;font-weight:600;color:#555;margin-bottom:0.2rem}',
-  '.lap-chart-scroll{overflow-x:auto}',
-  '.lap-chart-table th,.lap-chart-table td{padding:2px 4px;font-size:0.72rem;text-align:center;min-width:22px}',
-  '.lc-driver,.lc-driver-h{text-align:left;white-space:nowrap;min-width:100px}',
-  '.lap-p1{background:#8e44ad!important;color:#fff;font-weight:700}',
-  '.lap-p2{background:#2980b9!important;color:#fff}',
-  '.lap-p3{background:#16a085!important;color:#fff}',
-  '.lap-top{background:#eaf6e8}',
-  '.track-lap-driver{color:#444}',
-  '.track-lap-cell{white-space:nowrap}',
-  '.champ-sessions-list details+details{margin-top:0.25rem}',
-].join('');
-
+// The document is built by the server (`service::export`), so the browser and the native GUI
+// export the same file — lap charts included, which the old browser-built export left empty.
 var careerExportBtn = document.getElementById('career-export-btn');
 if (careerExportBtn) {
   careerExportBtn.addEventListener('click', function () {
-    if (!careerChamps.length) { loadCareerChampionships(); return; }
-
-    var champsHtml = careerChamps.map(function (champ) {
-      var badgeCls = champ.status === 'Final' ? 'badge-final' : champ.status === 'Progress' ? 'badge-progress' : 'badge-active';
-      return '<div class="champ-block">' +
-        '<div class="champ-title"><h2>' + esc(champ.name) + '</h2>' +
-          '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span></div>' +
-        '<div class="champ-body">' +
-          '<div class="standings-panel"><h3>Driver Standings</h3>' + careerStandingsHtml(champ.driver_standings) + '</div>' +
-          (champ.constructor_standings.length ? '<div class="standings-panel"><h3>Constructor Standings</h3>' + careerConstructorsHtml(champ.constructor_standings) + '</div>' : '') +
-          '<div class="results-panel"><h3>Rounds</h3>' + careerRoundsHtml(champ) + '</div>' +
-        '</div></div>';
-    }).join('').replace(/<details /g, '<details open ');
-
-    var statsRows = careerDriverStats.map(function (d) {
-      return '<tr><td class="stat-name">' + esc(d.name) + '</td>' +
-        '<td class="stat-num">' + d.races + '</td>' +
-        '<td class="stat-num">' + d.p1 + '</td>' +
-        '<td class="stat-num">' + d.p2 + '</td>' +
-        '<td class="stat-num">' + d.p3 + '</td>' +
-        '<td class="stat-num">' + d.top10 + '</td>' +
-        '<td class="stat-num">' + (d.races ? d.avg_pos.toFixed(1) : '—') + '</td>' +
-        '<td class="stat-num">' + (d.dnf || 0) + '</td>' +
-        '<td class="stat-num stat-group-start">' + (d.quali_p1 || 0) + '</td>' +
-        '<td class="stat-num">' + (d.quali_p2 || 0) + '</td>' +
-        '<td class="stat-num">' + (d.quali_p3 || 0) + '</td>' +
-        '<td class="stat-num">' + (d.quali_top10 || 0) + '</td>' +
-        '<td class="stat-num stat-group-start">' + (d.champ_wins || 0) + '</td>' +
-        '<td class="stat-num">' + (d.champ_p2 || 0) + '</td>' +
-        '<td class="stat-num">' + (d.champ_p3 || 0) + '</td></tr>';
-    }).join('');
-    var statsHtml = statsRows
-      ? '<table class="stats-table"><thead><tr>' +
-          '<th class="stat-name">Driver</th><th class="stat-num">Races</th>' +
-          '<th class="stat-num">1st</th><th class="stat-num">2nd</th><th class="stat-num">3rd</th>' +
-          '<th class="stat-num">Top 10</th><th class="stat-num">Avg Pos</th><th class="stat-num">DNF</th>' +
-          '<th class="stat-num stat-group-start">Q Pole</th><th class="stat-num">Q 2nd</th>' +
-          '<th class="stat-num">Q 3rd</th><th class="stat-num">Q Top 10</th>' +
-          '<th class="stat-num stat-group-start">C 1st</th><th class="stat-num">C 2nd</th><th class="stat-num">C 3rd</th>' +
-        '</tr></thead><tbody>' + statsRows + '</tbody></table>'
-      : '<p class="manage-empty">No data.</p>';
-
-    var trackRows = aggregateTrackStats(allTrackStats);
-    trackRows.sort(function (a, b) { return b.last_visited - a.last_visited; });
-    var tracksHtml = trackRows.length
-      ? '<table class="stats-table"><thead><tr>' +
-          '<th class="stat-name">Track</th><th class="stat-num">Races</th><th class="stat-num">Qualifyings</th>' +
-          '<th class="stat-num">Best Lap</th><th class="stat-num">2nd Lap</th><th class="stat-num">3rd Lap</th>' +
-          '<th class="stat-num">Last Visited</th>' +
-        '</tr></thead><tbody>' +
-        trackRows.map(function (t) {
-          var name = t.track_variation && t.track_variation !== t.track
-            ? esc(t.track) + ' <span class="session-track-var">(' + esc(t.track_variation) + ')</span>'
-            : esc(t.track);
-          return '<tr>' +
-            '<td class="stat-name">' + name + '</td>' +
-            '<td class="stat-num">' + t.races + '</td>' +
-            '<td class="stat-num">' + t.qualifyings + '</td>' +
-            '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.best_lap,   t.best_lap_driver,   t.best_lap_car,   true) + '</td>' +
-            '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.second_lap, t.second_lap_driver, t.second_lap_car, true) + '</td>' +
-            '<td class="stat-num track-lap-cell">' + fmtLapHolder(t.third_lap,  t.third_lap_driver,  t.third_lap_car,  true) + '</td>' +
-            '<td class="stat-num">' + fmtDate(t.last_visited) + '</td>' +
-          '</tr>';
-        }).join('') + '</tbody></table>'
-      : '<p class="manage-empty">No data.</p>';
-
-    var html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n' +
-      '<meta charset="UTF-8">\n<title>AMS2 Career Championships</title>\n' +
-      '<style>' + EXPORT_CSS + '</style>\n</head>\n<body>\n' +
-      '<h1>AMS2 Career Championships</h1>\n' +
-      '<p class="export-date">Exported ' + new Date().toLocaleDateString() + '</p>\n' +
-      '<h2>Championships</h2>\n' + champsHtml +
-      '<h2>Driver Statistics</h2>\n' + statsHtml +
-      '<h2>Track Statistics</h2>\n' + tracksHtml +
-      '\n</body>\n</html>';
-
-    var blob = new Blob([html], { type: 'text/html' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'ams2_career_' + new Date().toISOString().slice(0, 10) + '.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    location.href = '/api/career/export';
   });
 }

@@ -411,22 +411,22 @@ pub fn build_base_html() -> String {
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
-const CSS: &str = include_str!("../assets/style.css");
+const CSS: &str = include_str!("assets/style.css");
 
 // ── Scripts ──────────────────────────────────────────────────────────────────
 
-const JS_UTILS: &str = include_str!("../assets/utils.js");
-const JS_TELEMETRY: &str = include_str!("../assets/telemetry.js");
-const JS_TRACK_MAP: &str = include_str!("../assets/track_map.js");
-const JS_LIVE: &str = include_str!("../assets/live.js");
-const JS_CAREER: &str = include_str!("../assets/career.js");
-const JS_MANAGE: &str = include_str!("../assets/manage.js");
-const JS_CONTRACTS: &str = include_str!("../assets/contracts.js");
-const JS_CONFIG: &str = include_str!("../assets/config.js");
-const JS_SAVES: &str = include_str!("../assets/saves.js");
-const JS_CARPERF: &str = include_str!("../assets/car_performance.js");
-const JS_DRIVERPERF: &str = include_str!("../assets/driver_performance.js");
-const JS_MAIN: &str = include_str!("../assets/main.js");
+const JS_UTILS: &str = include_str!("assets/utils.js");
+const JS_TELEMETRY: &str = include_str!("assets/telemetry.js");
+const JS_TRACK_MAP: &str = include_str!("assets/track_map.js");
+const JS_LIVE: &str = include_str!("assets/live.js");
+const JS_CAREER: &str = include_str!("assets/career.js");
+const JS_MANAGE: &str = include_str!("assets/manage.js");
+const JS_CONTRACTS: &str = include_str!("assets/contracts.js");
+const JS_CONFIG: &str = include_str!("assets/config.js");
+const JS_SAVES: &str = include_str!("assets/saves.js");
+const JS_CARPERF: &str = include_str!("assets/car_performance.js");
+const JS_DRIVERPERF: &str = include_str!("assets/driver_performance.js");
+const JS_MAIN: &str = include_str!("assets/main.js");
 
 #[cfg(test)]
 #[path = "../tests/web/assets.rs"]

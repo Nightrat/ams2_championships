@@ -31,60 +31,6 @@ function fmtTarget(pos) {
   return pos ? 'finish P' + pos + ' or better' : 'no target';
 }
 
-function ordinal(n) {
-  var teens = n % 100;
-  if (teens >= 11 && teens <= 13) return n + 'th';
-  var last = n % 10;
-  return n + (last === 1 ? 'st' : last === 2 ? 'nd' : last === 3 ? 'rd' : 'th');
-}
-
-/// Why this offer reads the way it does, in plain words.
-///
-/// Every part comes from a field already in the payload. Nothing here recomputes a rate or a
-/// threshold — those are the server's, and a second copy in the browser would drift from them.
-/// What it can say without duplicating anything is *which* rule applied.
-function offerWhy(o, data) {
-  var bits = [];
-  // `rank` is a position among *teams*, not cars — which is why a 9th-place team expects to
-  // finish somewhere around P18 on a grid running two cars each. Saying "team" rather than
-  // "car" is what makes those two numbers agree instead of looking contradictory.
-  if (data.teams) {
-    bits.push(ordinal(o.rank + 1) + '-fastest of ' + data.teams + ' teams');
-  }
-  bits.push('its car should finish around P' + Math.round(o.expected_position));
-
-  var asks = Math.round(o.required);
-  var you = Math.round(data.reputation);
-  if (o.kind === 'pay' && you >= asks) {
-    // Clearing the bar of a team this far back is not the same as being wanted by it. Without
-    // this the row reads as a bug: a team asking 49 charging a driver rated 50.
-    bits.push('you clear their bar of ' + asks +
-      ', but not by enough for a team this far back to pay you — they want sponsorship' +
-      (o.buy_in ? '' : ', and will take whatever the career has'));
-  } else if (o.kind === 'pay') {
-    bits.push('wants a rating of ' + asks + ' and you have ' + you +
-      ' — they will take sponsorship instead, which only teams this far back do');
-  } else if (o.renewal) {
-    var st = data.standing || {};
-    bits.push('your own team: they re-sign you whatever the rating says' +
-      (st.delivered === true ? ', and pay more for the seasons you have served' : ''));
-  } else if (you > asks) {
-    bits.push('wants ' + asks + ' and you have ' + you +
-      ' — clear of their bar, so they pay over their rate');
-  } else if (you < asks) {
-    // Without this the row looks wrong: a team asking 57 is offering a seat to a 50. It is the
-    // rating's offer margin, and it used to be signalled by a "trial" badge that no longer
-    // exists — so the sentence has to carry it.
-    bits.push('wants ' + asks + ' and you have ' + you +
-      ' — short of their bar but within reach, so they will take you at their rate');
-  } else {
-    bits.push('exactly on their bar of ' + asks + ', so they pay their rate and no more');
-  }
-
-  if (!o.objective) bits.push('too far back for a finishing target to mean anything');
-  return bits.join(' &middot; ');
-}
-
 // ── Manage tab: this season's offers ──────────────────────────────────────────
 
 function loadOffers(champId) {
@@ -120,7 +66,9 @@ function renderOffers(champId, data) {
 
   var previews = data.previews || {};
   var rows = (data.offers || []).map(function (o) {
-    var afford = !o.buy_in || data.balance >= o.buy_in;
+    // Both from the server (`OffersView.notes`): the explanation, and whether the balance covers it.
+    var note = (data.notes || {})[o.team] || { why: '', affordable: true };
+    var afford = note.affordable;
     var terms = fmtCredits(o.salary) + ' &middot; ' + fmtTarget(o.objective);
     return '<tr class="contract-row contract-row-' + esc(offerClass(o)) + '">' +
       '<td class="contract-team">' +
@@ -141,15 +89,14 @@ function renderOffers(champId, data) {
       // A second row rather than more columns: the explanation is a sentence, and a sentence in
       // a column makes every other column narrow.
       '<tr class="contract-why-row"><td colspan="6" class="contract-why">' +
-        offerWhy(o, data) +
-        (afford ? '' : ' &middot; <b>more than the career is worth</b>') +
+        esc(note.why) +
       '</td></tr>';
   }).join('');
 
   panel.innerHTML = '<div class="contract-box">' +
     '<div class="contract-header">' +
       '<span class="contract-title">Seats on offer</span>' +
-      '<span class="contract-note">' + contractSummary(data) + '</span>' +
+      '<span class="contract-note">' + esc(data.summary || '') + '</span>' +
     '</div>' +
     (rows
       ? '<table class="contract-table"><tbody>' + rows + '</tbody></table>'
@@ -179,27 +126,15 @@ function seatPicker(choices) {
     '</select>';
 }
 
-function contractSummary(data) {
-  var bits = ['Rating ' + Math.round(data.reputation) + '/100',
-              'Balance ' + fmtCredits(data.balance)];
-  var st = data.standing || {};
-  if (st.incumbent) {
-    // A seat is only held inside the series it was held in, so say when it was another one —
-    // otherwise the missing renewal looks like a bug rather than a rule.
-    var elsewhere = st.class !== data.class;
-    bits.push('Last seat: ' + st.incumbent +
-      (elsewhere ? ' (' + st.class + ' — different series, no renewal)'
-        : st.delivered === true ? ' (target met)'
-        : st.delivered === false ? ' (target missed)' : ''));
-  }
-  return esc(bits.join(' · '));
-}
-
 function renderSignedDeal(champId, data) {
   var panel = document.getElementById('champ-contract-panel');
   var c = data.signed;
   // Releasing is only possible while the season is unraced — the same rule that locks the team.
-  var canRelease = data.open || !data.offers;
+  // (`open` cannot say so: it is false for every signed season, raced or not.)
+  var champ = manageState.champs.find(function (ch) { return ch.id === champId; });
+  var canRelease = !!champ && (champ.rounds || []).every(function (r) {
+    return !(r.session_ids || []).length;
+  });
   panel.innerHTML = '<div class="contract-box contract-box-signed">' +
     '<div class="contract-header">' +
       liveryImg((data.previews || {})[c.team], 'contract-car') +

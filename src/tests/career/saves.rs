@@ -570,3 +570,29 @@ fn test_the_startup_sweep_clears_husks_and_leaves_everything_else() {
     assert_eq!(sweep_empty_husks(&dir), 0);
     let _ = fs::remove_dir_all(&dir);
 }
+
+// ── The folder lock ───────────────────────────────────────────────────────────
+
+#[cfg(windows)]
+#[test]
+fn test_a_saves_folder_has_one_owner_at_a_time() {
+    let dir = std::env::temp_dir().join(format!(
+        "ams2_lock_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let held = lock_folder(&dir).unwrap();
+    // The refusal names the holder — this test binary — so the user knows what to close.
+    let refused = lock_folder(&dir).err().expect("a second owner must be refused");
+    assert!(refused.contains("already in use"), "{refused}");
+    assert!(refused.contains(&std::process::id().to_string()), "{refused}");
+    // The lock file is never mistaken for a save.
+    assert!(list_saves(&dir, Path::new("")).is_empty());
+    drop(held);
+    // Released with the handle, not left behind with the file.
+    assert!(lock_folder(&dir).is_ok());
+    fs::remove_dir_all(&dir).ok();
+}

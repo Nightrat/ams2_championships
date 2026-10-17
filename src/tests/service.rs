@@ -302,3 +302,177 @@ fn test_championships_and_sessions_come_ready_to_list() {
     assert_eq!(names, ["A league", "b league"]);
     std::fs::remove_dir_all(&root).ok();
 }
+
+// ── The HTML export ───────────────────────────────────────────────────────────
+
+#[test]
+fn test_the_export_carries_standings_rounds_and_the_lap_chart() {
+    use crate::career::data_store::{LapChartEntry, RecordedSession, SessionResult};
+    let (app, root) = test_app("export", CareerMode::Multiplayer);
+    let champ = app.create_championship(season("Club <Cup> & Co")).unwrap();
+    app.add_round(&champ.id).unwrap();
+    let result = |name: &str, pos: u32| SessionResult {
+        name: name.into(),
+        car_name: "F3".into(),
+        car_class: String::new(),
+        race_position: pos,
+        laps_completed: 2,
+        fastest_lap: 90.0 + pos as f32,
+        last_lap: 0.0,
+        dnf: false,
+        is_player: false,
+    };
+    app.store.write().unwrap().sessions.push(RecordedSession {
+        id: "s1".into(),
+        recorded_at: 1_709_210_096,
+        track: "Spa".into(),
+        track_variation: "GP".into(),
+        car_name: "F3".into(),
+        car_class: String::new(),
+        session_type: crate::career::data_store::SESSION_RACE,
+        results: vec![result("Bob", 2), result("Alice", 1)],
+        // Inline: this test career's chart file does not exist, so the reader falls back to it.
+        lap_chart: vec![
+            LapChartEntry { lap: 1, driver: "Bob".into(), position: 1 },
+            LapChartEntry { lap: 1, driver: "Alice".into(), position: 2 },
+            LapChartEntry { lap: 2, driver: "Alice".into(), position: 1 },
+        ],
+    });
+    app.add_session_to_round(&champ.id, 0, "s1").unwrap();
+
+    let html = app.career_export_html();
+    assert!(html.starts_with("<!DOCTYPE html>"));
+    // Names are escaped, never pasted in as markup.
+    assert!(html.contains("Club &lt;Cup&gt; &amp; Co"), "{html}");
+    assert!(!html.contains("<Cup>"));
+    // The round names its track and winner, and the standings lead with her.
+    assert!(html.contains("R1 \u{2014} Spa &nbsp;&#127942; Alice"));
+    assert!(html.contains("<td class=\"pos\">1</td><td>Alice"));
+    // The lap chart is filled in, not an empty box: Alice leads lap 2.
+    assert!(html.contains("Lap Chart"));
+    assert!(html.contains("<td class=\"lap-p1\">1</td></tr>"), "{html}");
+    assert!(app.career_export_file_name().starts_with("ams2_career_"));
+    std::fs::remove_dir_all(&root).ok();
+}
+
+// ── The session picker and the offer sentences ────────────────────────────────
+
+#[test]
+fn test_the_picker_offers_only_sessions_no_round_holds() {
+    use crate::career::data_store::RecordedSession;
+    let (app, root) = test_app("picker", CareerMode::Multiplayer);
+    let champ = app.create_championship(season("League")).unwrap();
+    app.add_round(&champ.id).unwrap();
+    for id in ["a", "b", "c"] {
+        app.store.write().unwrap().sessions.push(RecordedSession {
+            id: id.into(),
+            recorded_at: 1,
+            track: "Spa".into(),
+            track_variation: String::new(),
+            car_name: String::new(),
+            car_class: String::new(),
+            session_type: crate::career::data_store::SESSION_RACE,
+            results: vec![],
+            lap_chart: vec![],
+        });
+    }
+    app.add_session_to_round(&champ.id, 0, "b").unwrap();
+    let picker = app.available_sessions(&champ.id).unwrap();
+    let ids: Vec<&str> = picker.sessions.iter().map(|s| s.session.id.as_str()).collect();
+    assert_eq!(ids, ["a", "c"]);
+    // Nothing to enforce without a roster and a team, so nothing is hidden.
+    assert_eq!(picker.hidden, 0);
+    assert_eq!(app.unassigned_sessions().len(), 2);
+    assert!(matches!(app.available_sessions("nope"), Err(AppError::NotFound(_))));
+    std::fs::remove_dir_all(&root).ok();
+}
+
+fn offer(kind: crate::career::contracts::OfferKind, required: f32) -> crate::career::contracts::Offer {
+    crate::career::contracts::Offer {
+        team: "Osella".into(),
+        kind,
+        renewal: false,
+        salary: 50_000,
+        objective: Some(12),
+        rank: 8,
+        buy_in: 0,
+        required,
+        expected_position: 17.6,
+    }
+}
+
+#[test]
+fn test_the_offer_sentence_names_the_rule_that_applied() {
+    use super::signing::offer_why;
+    use crate::career::contracts::{OfferKind, Standing};
+    let none = Standing::default();
+
+    let clear = offer_why(&offer(OfferKind::Paid, 40.0), 52.0, 21, &none, 0);
+    assert!(clear.why.starts_with("9th-fastest of 21 teams · its car should finish around P18"), "{}", clear.why);
+    assert!(clear.why.contains("wants 40 and you have 52 — clear of their bar"));
+    assert!(clear.affordable);
+
+    // A team asking more than the driver has, still offering: the sentence must say why.
+    let reach = offer_why(&offer(OfferKind::Paid, 57.0), 50.0, 21, &none, 0);
+    assert!(reach.why.contains("short of their bar but within reach"), "{}", reach.why);
+
+    // A back-marker charging a driver who clears its bar, and a price the career cannot pay.
+    let mut bought = offer(OfferKind::Pay, 49.0);
+    bought.buy_in = 80_000;
+    bought.objective = None;
+    let note = offer_why(&bought, 50.0, 21, &none, 10_000);
+    assert!(note.why.contains("you clear their bar of 49, but not by enough"), "{}", note.why);
+    assert!(note.why.contains("too far back for a finishing target"));
+    assert!(note.why.ends_with("more than the career is worth"));
+    assert!(!note.affordable);
+
+    let mut renewal = offer(OfferKind::Paid, 90.0);
+    renewal.renewal = true;
+    let delivered = Standing { delivered: Some(true), ..Standing::default() };
+    let note = offer_why(&renewal, 50.0, 21, &delivered, 0);
+    assert!(note.why.contains("your own team: they re-sign you whatever the rating says, and pay more"));
+}
+
+#[test]
+fn test_the_offers_summary_says_when_the_last_seat_was_another_series() {
+    use super::signing::offers_summary;
+    use crate::career::contracts::Standing;
+    let held = Standing {
+        incumbent: Some("Brabham".into()),
+        class: "F-Classic_Gen1".into(),
+        delivered: Some(true),
+        tenure: 1,
+    };
+    assert_eq!(
+        offers_summary(51.6, 1_500_000, &held, "F-Classic_Gen1"),
+        "Rating 52/100 · Balance 1,500,000 · Last seat: Brabham (target met)"
+    );
+    assert_eq!(
+        offers_summary(51.6, 0, &held, "F-Retro_Gen1"),
+        "Rating 52/100 · Balance 0 · Last seat: Brabham (F-Classic_Gen1 — different series, no renewal)"
+    );
+}
+
+#[test]
+fn test_a_config_saved_unchanged_through_the_gui_patch_comes_back_the_same() {
+    let (app, root) = test_app("config_patch", CareerMode::Unset);
+    let mut cfg = app.config_view().cfg;
+    cfg.starting_rating = 42.0;
+    cfg.custom_ai_dir = Some("   ".into()); // A blank box is "not set", not a folder named spaces.
+    let saved = app
+        .patch_config(ConfigPatch::from_config(&cfg, Default::default()))
+        .unwrap()
+        .config;
+    assert_eq!(saved.starting_rating, 42.0);
+    assert_eq!(saved.custom_ai_dir, None);
+    // Saved again untouched, nothing moves — the patch says exactly what the config held.
+    let again = app
+        .patch_config(ConfigPatch::from_config(&saved, Default::default()))
+        .unwrap()
+        .config;
+    assert_eq!(
+        serde_json::to_value(&saved).unwrap(),
+        serde_json::to_value(&again).unwrap()
+    );
+    std::fs::remove_dir_all(&root).ok();
+}

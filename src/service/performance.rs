@@ -259,14 +259,18 @@ impl App {
     /// but it arrives from outside and is re-checked rather than trusted: see
     /// [`crate::roster::liveries::preview_file`].
     pub fn livery_preview_png(&self, requested: &str) -> AppResult<Vec<u8>> {
+        let bytes = self.livery_preview_dds(requested)?;
+        crate::roster::livery_image::dds_thumbnail_png(&bytes, crate::roster::livery_image::THUMB_WIDTH)
+            .map_err(AppError::Unsupported)
+    }
+
+    /// The `.dds` behind a preview path — re-checked, since the path arrives from outside.
+    fn livery_preview_dds(&self, requested: &str) -> AppResult<Vec<u8>> {
         let file = cfg_custom_ai_dir(&self.config_path)
             .and_then(|dir| crate::roster::liveries::overrides_dir(&dir))
             .and_then(|overrides| crate::roster::liveries::preview_file(&overrides, requested))
             .ok_or_else(|| AppError::NotFound("no such livery preview".into()))?;
-        let bytes =
-            std::fs::read(&file).map_err(|_| AppError::NotFound("no such livery preview".into()))?;
-        crate::roster::livery_image::dds_thumbnail_png(&bytes, crate::roster::livery_image::THUMB_WIDTH)
-            .map_err(AppError::Unsupported)
+        std::fs::read(&file).map_err(|_| AppError::NotFound("no such livery preview".into()))
     }
 
     /// Every named driver entry per class with its AI attributes.

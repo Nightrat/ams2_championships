@@ -73,42 +73,10 @@ function rideExtremes(arr) {
 }
 
 // ── Ride height over the run ──────────────────────────────────────────────────
-// The instantaneous reading says what the car is doing now; the lowest value it
-// ever reached is what says how much floor there was left, which is the number a
-// setup is chosen against. So the extremes are accumulated per corner across the
-// run — front and rear ride height are separate setup values, so an overall
-// minimum alone would not say which end to lower.
-//
-// `min`/`max` hold 0 for "nothing recorded", the same unset convention the rest
-// of the panel uses.
+// The lowest each corner has run at, kept by the server across the run and sent
+// with every frame as `ride_seen` ({min, max} per corner, 0 = not read yet;
+// null until anything has been). See `RideRecord` in service/live_frame.rs.
 var rideSeen = null;
-// The session the readings belong to. A new track is a new run, and carrying a
-// figure across one would quietly answer a question about Monza with a lap of
-// Bathurst.
-var rideSeenKey = null;
-
-function resetRideSeen() {
-  rideSeen = null;
-  rideSeenKey = null;
-}
-
-// Fold one on-track sample into the run's extremes. Called from the point where
-// the last on-track reading is kept — deliberately before the panel's
-// visibility check, because these accumulate while the driver is driving rather
-// than while the tab happens to be open.
-function recordRideHeight(d, tel) {
-  var key = (d.track_location || '') + '|' + (d.track_variation || '');
-  if (key !== rideSeenKey) {
-    rideSeen = { min: [0, 0, 0, 0], max: [0, 0, 0, 0] };
-    rideSeenKey = key;
-  }
-  for (var i = 0; i < 4; i++) {
-    var v = tel.ride_height[i];
-    if (!(v > 0)) continue;
-    if (!(rideSeen.min[i] > 0) || v < rideSeen.min[i]) rideSeen.min[i] = v;
-    if (v > rideSeen.max[i]) rideSeen.max[i] = v;
-  }
-}
 
 // One label/value pair for a corner reading, with the corner name as a dimmed
 // qualifier on the value rather than a pair of its own.
@@ -181,37 +149,20 @@ function updateSetupPanel(d) {
   var panel = document.getElementById('setup-panel');
   if (!panel) return;
 
+  rideSeen = d.ride_seen || null;
   var tel = d.player_telemetry;
   if (!d.connected || !tel) {
     panel.innerHTML = '<div class="setup-no-data">Connect to AMS2 to see telemetry.</div>';
     dmgLastOnTrack = null;
     dmgFrozenLabel = null;
-    // The run ended with the connection, and the next one is a different car on
-    // a different setup.
-    resetRideSeen();
     return;
   }
 
-  // Freeze whenever the player is not out on track. Two signals, because
-  // neither alone catches every way off it:
-  //   pit_mode (mPitMode)  — 0 is the only value that means "out on track". This
-  //     is what catches ESC -> "Return to pits", which teleports the car into
-  //     the garage without it ever driving down a pit lane.
-  //   in_pits (mCurrentSector < 0) — the participant-level view, kept because it
-  //     flips as soon as the car crosses the pit entry.
-  // A viewed driver that cannot be found at all is the garage too.
-  var viewed = null;
-  for (var pi = 0; pi < d.participants.length; pi++) {
-    if (d.participants[pi].is_player) { viewed = d.participants[pi]; break; }
-  }
-  var onTrack = !!viewed && !viewed.in_pits && (d.pit_mode || 0) === 0;
+  // Freeze whenever the player is not out on track. `on_track` is the server's
+  // test (pit_mode and in_pits together — see `on_track` in live_frame.rs).
+  var onTrack = !!d.on_track;
   var frozenWhy = onTrack ? null : (PIT_MODES[d.pit_mode || 0] || 'In pits');
-  if (onTrack) {
-    dmgLastOnTrack = tel;
-    // Before the visibility check below on purpose: the extremes are a record
-    // of the run, and a lap driven with the Live tab closed is still a lap.
-    recordRideHeight(d, tel);
-  }
+  if (onTrack) dmgLastOnTrack = tel;
 
   // Nothing has been read on track yet, so there is no reading to hold.
   var shown = onTrack ? tel : dmgLastOnTrack;
@@ -335,14 +286,16 @@ function buildTyrePanel(tel) {
       obsolete + '</div>';
 }
 
-// Reset the run's ride-height record. Delegated from document because the panel
-// is rebuilt on every poll while the car is on track, so a listener bound to the
-// button would be thrown away with it. Clearing dmgFrozenLabel forces the next
-// poll to repaint: the button is most useful in the box between runs, and that
-// is exactly when the panel is held and would otherwise not redraw.
+// Reset the run's ride-height record (kept server-side). Delegated from document
+// because the panel is rebuilt on every poll while the car is on track, so a
+// listener bound to the button would be thrown away with it. Clearing
+// dmgFrozenLabel forces the next poll to repaint: the button is most useful in
+// the box between runs, and that is exactly when the panel is held and would
+// otherwise not redraw. It is cleared once the reset has landed, so the repaint
+// cannot pick up a frame still carrying the old record.
 document.addEventListener('click', function (e) {
   var btn = e.target.closest && e.target.closest('[data-ride-reset]');
   if (!btn) return;
-  resetRideSeen();
-  dmgFrozenLabel = null;
+  fetch('/api/live/ride-height/reset', { method: 'POST' })
+    .then(function () { dmgFrozenLabel = null; });
 });

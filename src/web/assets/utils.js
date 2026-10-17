@@ -1,13 +1,3 @@
-// ── Championship sort: Active first, then Progress, then Final; alpha within group ──
-var CHAMP_STATUS_ORDER = { Active: 0, Progress: 1, Final: 2 };
-function sortChamps(champs) {
-  return champs.slice().sort(function (a, b) {
-    var ao = CHAMP_STATUS_ORDER[a.status] ?? 3;
-    var bo = CHAMP_STATUS_ORDER[b.status] ?? 3;
-    return ao !== bo ? ao - bo : a.name.localeCompare(b.name);
-  });
-}
-
 // ── Shared constants ──────────────────────────────────────────────────────────
 var SESSION_TYPE_LABELS = { 1: 'P', 3: 'Q', 5: 'R' };
 var SESSION_TYPE_NAMES  = { 1: 'Practice', 3: 'Qualify', 5: 'Race' };
@@ -98,12 +88,6 @@ function fmtLapTime(t) {
   var ss = s.toFixed(3);
   if (parseFloat(ss) < 10) ss = '0' + ss;
   return m > 0 ? m + ':' + ss : ss;
-}
-
-function sessionWinner(session) {
-  if (!session.results || !session.results.length) return '\u2014';
-  var w = session.results.find(function (r) { return r.race_position === 1; });
-  return w ? w.name : '\u2014';
 }
 
 // ── Sortable tables ───────────────────────────────────────────────────────────

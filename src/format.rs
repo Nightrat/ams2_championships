@@ -1,7 +1,7 @@
-//! How values are written for people to read — dates, lap times, money, track names. Shared by
-//! every front end that renders in Rust (the native GUI, the HTML export) so they all write a lap
-//! time or a date the same way. The browser has its own copies in `utils.js` (`fmtLapTime`,
-//! `fmtDate`, `fmtCredits`, `fmtTrack`); these match them.
+//! How values are written for people to read — dates, lap times, money, track names — wherever
+//! they are rendered in Rust (the HTML export), so a lap time or a date reads the same as on the
+//! page. The browser has its own copies in `utils.js` (`fmtLapTime`, `fmtDate`, `fmtCredits`,
+//! `fmtTrack`); these match them.
 //!
 //! Presentation only: nothing here decides anything.
 

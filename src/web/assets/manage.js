@@ -7,7 +7,7 @@ function loadManage() {
     fetch('/api/sessions').then(function (r) { return r.json(); }),
     fetch('/api/custom-ai-files').then(function (r) { return r.json(); }).catch(function () { return []; })
   ]).then(function (results) {
-    manageState.champs = sortChamps(results[0] || []);
+    manageState.champs = results[0] || []; // already in display order
     manageState.sessions = results[1] || [];
     manageState.customAiFiles = results[2] || [];
     var active = manageState.champs.find(function (c) { return c.status === 'Active'; });
@@ -194,7 +194,7 @@ function renderChampDetail(id) {
               '<span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
               (s.car_name ? '<span class="session-car">' + esc(s.car_name) + '</span>' : '') +
               '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
-              '<span class="session-winner">\u{1f3c6} ' + esc(sessionWinner(s)) + '</span>' +
+              '<span class="session-winner">\u{1f3c6} ' + esc(s.winner || '—') + '</span>' +
             '</div>' +
             '<button class="manage-btn manage-btn-danger session-remove-btn"' +
               ' data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '" data-sid="' + esc(s.id) + '">Remove</button>' +
@@ -407,32 +407,18 @@ function loadPlayerTeamOptions(champId) {
 }
 
 function renderAvailableSessions(champId) {
-  // Eligibility is server-side; it only blocks anything when the championship has both a
-  // Custom AI file and a selected team. Failing open keeps the picker usable if it errors.
-  fetch('/api/championships/' + champId + '/session-eligibility')
+  // The server decides which sessions are offered — unassigned, and not ones adding would refuse
+  // — and counts the ones it left out (`App::available_sessions`).
+  fetch('/api/championships/' + champId + '/available-sessions')
     .then(function (r) { return r.json(); })
     .catch(function () { return null; })
-    .then(function (elig) { renderAvailableSessionsWith(champId, elig || {}); });
+    .then(function (data) { renderAvailableSessionsWith(champId, data || {}); });
 }
 
-function renderAvailableSessionsWith(champId, elig) {
-  var assignedIds = [];
-  manageState.champs.forEach(function (c) {
-    (c.rounds || []).forEach(function (round) {
-      (round.session_ids || []).forEach(function (sid) { assignedIds.push(sid); });
-    });
-  });
+function renderAvailableSessionsWith(champId, data) {
   var ridx = manageState.currentRidx || 0;
-  var available = manageState.sessions.filter(function (s) { return !assignedIds.includes(s.id); });
-  var blocked = elig.blocked || {};
-  var hidden = 0;
-  if (elig.enforced) {
-    available = available.filter(function (s) {
-      if (!blocked[s.id]) return true;
-      hidden++;
-      return false;
-    });
-  }
+  var available = data.sessions || [];
+  var hidden = data.hidden || 0;
   var hiddenNote = hidden
     ? '<div class="manage-empty">' + hidden + ' session' + (hidden === 1 ? '' : 's') +
       ' hidden — they contradict your team for this championship.</div>'
@@ -452,7 +438,7 @@ function renderAvailableSessionsWith(champId, elig) {
         '<span class="session-date">' + fmtDate(s.recorded_at) + '</span>' +
         (s.car_name ? '<span class="session-car">' + esc(s.car_name) + '</span>' : '') +
         '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
-        '<span class="session-winner">\u{1f3c6} ' + esc(sessionWinner(s)) + '</span>' +
+        '<span class="session-winner">\u{1f3c6} ' + esc(s.winner || '—') + '</span>' +
       '</div>' +
       '<button class="manage-btn manage-btn-primary session-add-btn"' +
         ' data-cid="' + esc(champId) + '" data-ridx="' + ridx + '" data-sid="' + esc(s.id) + '">+ Add to Round ' + (ridx + 1) + '</button>' +
@@ -637,8 +623,11 @@ function renderGridCheck(data) {
           ' cars on track — one per livery the roster can field — so every result is judged ' +
           'on the grid it was run against.</div>' +
       '</div>'
-    : '<div class="grid-box grid-box-ok">Every recorded session raced the full ' +
-        data.seats + '-car roster.</div>';
+    // Nothing raced yet: "every session was fine" would be true of no sessions at all.
+    : (data.sessions || []).length
+      ? '<div class="grid-box grid-box-ok">Every recorded session raced the full ' +
+          data.seats + '-car roster.</div>'
+      : '';
 }
 
 document.querySelectorAll('.tab-btn').forEach(function (btn) {

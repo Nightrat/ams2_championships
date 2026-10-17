@@ -1,5 +1,6 @@
 //! Bringing the app up: config, the saves folder, the active career, and the threads that watch
-//! the game. Shared by every executable, so the HTTP server and the native GUI start identically.
+//! the game. Kept out of the server's `main` so everything that is not serving HTTP lives in the
+//! library, where a test can reach it.
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
@@ -21,7 +22,7 @@ pub struct Startup {
 
 /// Starts the app from the executable's folder, where `config.json` lives.
 ///
-/// Refuses when another AMS2 Career program already owns the saves folder — see
+/// Refuses when another running server already owns the saves folder — see
 /// [`saves::lock_folder`]. The lock is taken before anything is written there: the load-time
 /// upgrades in [`seal_career`] write the career, and two processes doing that at once is exactly
 /// what the lock is for.

@@ -1,9 +1,9 @@
 //! The career as one self-contained HTML file — every championship with its standings and
 //! rounds, the driver statistics and the track records — for keeping or sharing outside the app.
 //!
-//! Built here rather than in a front end so the browser's "Download HTML" and the native GUI's
-//! export write the same document. The styling is inline and light, because the file is opened
-//! on its own, long after the app that made it may have gone.
+//! Built here rather than in the browser, which used to assemble it: there the lap charts were
+//! fetched lazily, so they came out empty. The styling is inline and light, because the file is
+//! opened on its own, long after the app that made it may have gone.
 
 use std::fmt::Write as _;
 

@@ -240,8 +240,8 @@ fn test_economy_defaults_match_the_module() {
     let path = tmp_path();
     fs::write(&path, "{}").unwrap();
     let cfg = load_or_create(&path);
-    assert_eq!(cfg.offer_params(), crate::contracts::OfferParams::default());
-    assert_eq!(cfg.prize_params(), crate::contracts::PrizeParams::default());
+    assert_eq!(cfg.offer_params(), crate::career::contracts::OfferParams::default());
+    assert_eq!(cfg.prize_params(), crate::career::contracts::PrizeParams::default());
     // Contracts are decided by the career mode now, not by config — nothing to assert here.
     let _ = fs::remove_file(&path);
 }
@@ -315,7 +315,7 @@ fn test_objective_slack_is_not_config_driven_yet() {
     let p = load_or_create(&path).offer_params();
     assert_eq!(
         p.objective_slack,
-        crate::contracts::OfferParams::default().objective_slack
+        crate::career::contracts::OfferParams::default().objective_slack
     );
     let _ = fs::remove_file(&path);
 }
@@ -512,8 +512,8 @@ fn test_class_years_are_clamped_and_unnamed_entries_dropped() {
     let path = tmp_path();
     fs::write(&path, r#"{"class_years":{"FE-G1":90,"Mod_B":65535,"  ":1990}}"#).unwrap();
     let years = load_or_create(&path).class_years();
-    assert_eq!(years.get("FE-G1"), Some(&crate::season_years::YEAR_MIN));
-    assert_eq!(years.get("Mod_B"), Some(&crate::season_years::YEAR_MAX));
+    assert_eq!(years.get("FE-G1"), Some(&crate::roster::season_years::YEAR_MIN));
+    assert_eq!(years.get("Mod_B"), Some(&crate::roster::season_years::YEAR_MAX));
     assert!(!years.contains_key("  "), "a nameless class is not a class");
     let _ = fs::remove_file(&path);
 }
@@ -526,7 +526,7 @@ fn test_normalize_class_years_stores_what_will_actually_be_used() {
     fs::write(&path, r#"{"class_years":{"FE-G1":3000,"F-Retro_Gen1":1974}}"#).unwrap();
     let mut cfg = load_or_create(&path);
     cfg.normalize_class_years();
-    assert_eq!(cfg.class_years.get("FE-G1"), Some(&crate::season_years::YEAR_MAX));
+    assert_eq!(cfg.class_years.get("FE-G1"), Some(&crate::roster::season_years::YEAR_MAX));
     assert!(!cfg.class_years.contains_key("F-Retro_Gen1"));
     let _ = fs::remove_file(&path);
 }

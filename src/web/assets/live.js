@@ -201,11 +201,8 @@ function processLiveData(d) {
       }
 
       statusEl.className = 'live-status live-connected';
-      if (recordBtn) {
-        var hasSession = d.participants && d.participants.length > 0 &&
-          (d.session_state === 1 || d.session_state === 3 || d.session_state === 5);
-        recordBtn.disabled = !hasSession;
-      }
+      // The server's own test, the one the record route refuses with — see `recordable`.
+      if (recordBtn) recordBtn.disabled = !d.can_record;
       statusTxt.textContent = 'Connected';
       sessType.textContent = SESSION_NAMES[d.session_state] || ('Session ' + d.session_state);
       // race_state is only meaningful for race sessions
@@ -247,21 +244,11 @@ function processLiveData(d) {
         return '+' + p.interval_gap_secs.toFixed(3);
       }
 
-      // ── Gap to fastest lap ────────────────────────────────────────────────
-      var bestLap = 0;
-      d.participants.forEach(function (p) {
-        if (p.fastest_lap_time > 0 && (bestLap === 0 || p.fastest_lap_time < bestLap)) {
-          bestLap = p.fastest_lap_time;
-        }
-      });
-
-      // Best sector times across all participants (for purple highlight)
-      var bestS1 = 0, bestS2 = 0, bestS3 = 0;
-      d.participants.forEach(function (p) {
-        if (p.best_s1 > 0 && (bestS1 === 0 || p.best_s1 < bestS1)) bestS1 = p.best_s1;
-        if (p.best_s2 > 0 && (bestS2 === 0 || p.best_s2 < bestS2)) bestS2 = p.best_s2;
-        if (p.best_s3 > 0 && (bestS3 === 0 || p.best_s3 < bestS3)) bestS3 = p.best_s3;
-      });
+      // ── Gap to fastest lap, and the purple sectors ────────────────────────
+      // The session's bests come with the frame (`session_best`, 0 = nobody has one yet).
+      var best = d.session_best || {};
+      var bestLap = best.lap || 0;
+      var bestS1 = best.s1 || 0, bestS2 = best.s2 || 0, bestS3 = best.s3 || 0;
 
       function fmtGap(p) {
         if (bestLap <= 0 || p.fastest_lap_time <= 0) return '<span class="no-time">\u2014</span>';
@@ -369,7 +356,7 @@ var spotterFocusNames = [];
     fetch('/api/spotter', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name })
+      body: JSON.stringify({ player: name })
     });
   });
 }());

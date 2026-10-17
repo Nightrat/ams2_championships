@@ -102,6 +102,14 @@ pub struct SessionEligibility {
     pub blocked: HashMap<String, String>,
 }
 
+/// What the session picker offers for one championship — see [`App::available_sessions`].
+#[derive(Serialize, Debug)]
+pub struct AvailableSessions {
+    pub sessions: Vec<SessionListing>,
+    /// Unassigned sessions left out because adding them would be refused.
+    pub hidden: usize,
+}
+
 /// A recorded session as the session lists show it.
 #[derive(Serialize, Debug, Clone)]
 pub struct SessionListing {
@@ -122,6 +130,40 @@ impl App {
                 session: s.clone(),
             })
             .collect()
+    }
+
+    /// Sessions no round of any championship holds — what "Delete unassigned sessions" removes.
+    pub fn unassigned_sessions(&self) -> Vec<SessionListing> {
+        let assigned: HashSet<String> = self
+            .data()
+            .championships
+            .iter()
+            .flat_map(|c| c.rounds.iter())
+            .flat_map(|r| r.session_ids.iter().cloned())
+            .collect();
+        self.sessions()
+            .into_iter()
+            .filter(|s| !assigned.contains(&s.session.id))
+            .collect()
+    }
+
+    /// The sessions the picker offers for a round of this championship: every unassigned one,
+    /// minus those [`Self::session_eligibility`] would refuse — the same verdict adding gives, so
+    /// the picker never offers a session the add would turn down. `hidden` says how many were
+    /// left out, so the picker can say so rather than look short.
+    pub fn available_sessions(&self, id: &str) -> AppResult<AvailableSessions> {
+        let eligibility = self.session_eligibility(id)?;
+        let mut hidden = 0;
+        let sessions = self
+            .unassigned_sessions()
+            .into_iter()
+            .filter(|s| {
+                let blocked = eligibility.enforced && eligibility.blocked.contains_key(&s.session.id);
+                hidden += usize::from(blocked);
+                !blocked
+            })
+            .collect();
+        Ok(AvailableSessions { sessions, hidden })
     }
 
     /// Every championship, in the order they are listed — see [`crate::career::data_store::display_order`].

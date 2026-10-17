@@ -58,6 +58,111 @@ pub struct OffersView {
     /// is not part of the terms, it is what signing asks for alongside them.
     pub seats: HashMap<String, Vec<SeatChoice>>,
     pub offers: Vec<Offer>,
+    /// One line above the offers: rating, balance, and the seat held going in — including when
+    /// it was in another series, which is why it carries no renewal.
+    pub summary: String,
+    /// Per offering team: why the offer reads as it does, and whether the career can pay what it
+    /// asks. Keyed by team beside the offers, like `previews` and `seats`.
+    pub notes: HashMap<String, OfferNote>,
+}
+
+/// The explanation under one offer.
+#[derive(Serialize, Debug)]
+pub struct OfferNote {
+    /// The car's place on pace, where it should finish, the team's bar against the driver's
+    /// rating, and which rule set the money — *which* rule applied, not what the rule is.
+    pub why: String,
+    /// Whether the balance covers the sponsorship asked. Signing checks it again regardless.
+    pub affordable: bool,
+}
+
+/// Why an offer reads the way it does, in plain words.
+///
+/// Assembled only from the offer and what the driver brings, never by recomputing a rate or a
+/// threshold — those are `contracts`' own. The wording is load-bearing in places: a team asking 57
+/// that offers a seat to a 50 looks like a bug unless the sentence says "within reach", and a
+/// back-marker charging a driver who clears its bar needs to say why.
+pub(super) fn offer_why(
+    o: &Offer,
+    reputation: f32,
+    teams: usize,
+    standing: &Standing,
+    balance: i64,
+) -> OfferNote {
+    let mut bits: Vec<String> = Vec::new();
+    // `rank` is a position among *teams*, not cars — which is why a 9th-place team expects to
+    // finish somewhere around P18 on a grid running two cars each.
+    if teams > 0 {
+        bits.push(format!("{}-fastest of {teams} teams", crate::format::ordinal(o.rank as u32 + 1)));
+    }
+    bits.push(format!("its car should finish around P{}", o.expected_position.round()));
+
+    let asks = o.required.round() as i64;
+    let you = reputation.round() as i64;
+    let paid_by_driver = o.kind == contracts::OfferKind::Pay;
+    bits.push(if paid_by_driver && you >= asks {
+        format!(
+            "you clear their bar of {asks}, but not by enough for a team this far back to pay \
+             you — they want sponsorship{}",
+            if o.buy_in == 0 { ", and will take whatever the career has" } else { "" }
+        )
+    } else if paid_by_driver {
+        format!(
+            "wants a rating of {asks} and you have {you} — they will take sponsorship instead, \
+             which only teams this far back do"
+        )
+    } else if o.renewal {
+        format!(
+            "your own team: they re-sign you whatever the rating says{}",
+            if standing.delivered == Some(true) {
+                ", and pay more for the seasons you have served"
+            } else {
+                ""
+            }
+        )
+    } else if you > asks {
+        format!("wants {asks} and you have {you} — clear of their bar, so they pay over their rate")
+    } else if you < asks {
+        format!(
+            "wants {asks} and you have {you} — short of their bar but within reach, so they will \
+             take you at their rate"
+        )
+    } else {
+        format!("exactly on their bar of {asks}, so they pay their rate and no more")
+    });
+    if o.objective.is_none() {
+        bits.push("too far back for a finishing target to mean anything".into());
+    }
+    let affordable = o.buy_in == 0 || balance >= o.buy_in;
+    if !affordable {
+        bits.push("more than the career is worth".into());
+    }
+    OfferNote {
+        why: bits.join(" · "),
+        affordable,
+    }
+}
+
+/// The line above the offers. A seat is only held inside the series it was held in, so it says
+/// when the last one was another series — otherwise the missing renewal looks like a bug.
+pub(super) fn offers_summary(reputation: f32, balance: i64, standing: &Standing, class: &str) -> String {
+    let mut bits = vec![
+        format!("Rating {}/100", reputation.round()),
+        format!("Balance {}", crate::format::credits(balance)),
+    ];
+    if let Some(incumbent) = &standing.incumbent {
+        let why = if standing.class != class {
+            format!(" ({} — different series, no renewal)", standing.class)
+        } else {
+            match standing.delivered {
+                Some(true) => " (target met)".into(),
+                Some(false) => " (target missed)".into(),
+                None => String::new(),
+            }
+        };
+        bits.push(format!("Last seat: {incumbent}{why}"));
+    }
+    bits.join(" · ")
 }
 
 /// What taking an offer takes: the team, and optionally which of its cars.
@@ -136,7 +241,16 @@ impl App {
                         (o.team.clone(), choices)
                     })
                     .collect();
+                let notes = offers
+                    .iter()
+                    .map(|o| {
+                        let note = offer_why(o, rep.value, eligibility.len(), &standing, ledger.balance);
+                        (o.team.clone(), note)
+                    })
+                    .collect();
                 OffersView {
+                    summary: offers_summary(rep.value, ledger.balance, &standing, &class),
+                    notes,
                     enabled: data.mode.uses_contracts(),
                     rated: true,
                     open,
@@ -152,6 +266,8 @@ impl App {
                 }
             }
             None => OffersView {
+                summary: offers_summary(0.0, ledger.balance, &standing, &class),
+                notes: Default::default(),
                 enabled: data.mode.uses_contracts(),
                 rated: false,
                 open,
