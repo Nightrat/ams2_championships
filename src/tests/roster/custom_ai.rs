@@ -596,42 +596,33 @@ const CHOICE_ROSTER: &str = r#"<custom_ai_drivers>
     <driver livery_name="1986 AGS #15 - P. Streiff"><name>Philippe Streiff</name><race_skill>0.90</race_skill></driver>
 </custom_ai_drivers>"#;
 
-fn choice_seats(team: &str, rating: f32) -> Vec<String> {
-    seat_choices(&parse_seats_str(CHOICE_ROSTER), team, rating)
+fn choice_seats(team: &str) -> Vec<String> {
+    seat_choices(&parse_seats_str(CHOICE_ROSTER), team)
         .into_iter()
         .map(|c| c.seat)
         .collect()
 }
 
 #[test]
-fn test_seat_choices_offers_only_drivers_rated_no_higher_than_the_player() {
-    // #8's weaker alternate is 60, #7 is 72: a 65 may only take #8.
-    assert_eq!(choice_seats("Brabham", 65.0), vec!["Brabham #8"]);
-    assert_eq!(choice_seats("brabham", 80.0), vec!["Brabham #7", "Brabham #8"]);
-    // Exactly equal counts: you may replace someone as good as you.
-    assert_eq!(choice_seats("Brabham", 72.0), vec!["Brabham #7", "Brabham #8"]);
+fn test_seat_choices_offers_every_car_of_the_team() {
+    // Whoever drives it, and however good they are: any car of the team may be taken.
+    assert_eq!(choice_seats("brabham"), vec!["Brabham #7", "Brabham #8"]);
+    assert_eq!(choice_seats("Coloni"), vec!["Coloni #31", "Coloni #32"]);
+    assert_eq!(choice_seats("AGS"), vec!["AGS #14", "AGS #15"]);
+    assert!(choice_seats("Nobody").is_empty());
 }
 
 #[test]
-fn test_seat_choices_falls_back_to_the_weakest_car_only() {
-    // Nobody at or below 50: only the weakest car, never the stronger one.
-    let c = seat_choices(&parse_seats_str(CHOICE_ROSTER), "Brabham", 50.0);
-    assert_eq!(c.len(), 1);
-    assert_eq!(c[0].seat, "Brabham #8");
-    assert_eq!(c[0].replaces, "Derek Warwick / Elio De Angelis");
-    assert!((c[0].rating.unwrap() - 60.0).abs() < 1e-3);
-    // Tied for weakest: both are the weakest.
-    assert_eq!(choice_seats("Coloni", 50.0), vec!["Coloni #31", "Coloni #32"]);
-}
-
-#[test]
-fn test_seat_choices_never_offers_a_stand_in_and_does_not_block_on_a_missing_skill() {
+fn test_seat_choices_names_the_regular_driver_and_the_weaker_alternate() {
+    let c = seat_choices(&parse_seats_str(CHOICE_ROSTER), "Brabham");
+    assert_eq!(c[1].seat, "Brabham #8");
+    assert_eq!(c[1].replaces, "Derek Warwick / Elio De Angelis");
+    assert!((c[1].rating.unwrap() - 60.0).abs() < 1e-3);
     // The Monza stand-in is rated 10 but is nobody's car to take: #7 stays Patrese's 72.
-    let c = seat_choices(&parse_seats_str(CHOICE_ROSTER), "Brabham", 80.0);
     assert!(c.iter().all(|c| !c.replaces.contains("Stand In")), "{c:?}");
-    // Capelli declares no skill, so he cannot be judged and is not held against the player.
-    assert_eq!(choice_seats("AGS", 50.0), vec!["AGS #14"]);
-    assert!(choice_seats("Nobody", 50.0).is_empty());
+    assert!((c[0].rating.unwrap() - 72.0).abs() < 1e-3);
+    // Capelli declares no skill: still offered, with no figure to show.
+    assert_eq!(seat_choices(&parse_seats_str(CHOICE_ROSTER), "AGS")[0].rating, None);
 }
 
 #[test]

@@ -111,14 +111,12 @@ function renderOffers(champId, data) {
   });
 }
 
-// The cars a team would put the player in. The server has already cut the list down to drivers
-// rated no higher than the player (or the team's weakest, when that is nobody), so this only
-// lists them; the choice is checked again on signing.
+// The cars a team would put the player in — every car it runs. The server builds the list and
+// checks the choice again on signing.
 function seatPicker(choices) {
   if (!choices || !choices.length) return '';
   return '<select class="manage-select contract-seat-select" title="The driver you replace. ' +
-      'You may only take the car of a driver rated no higher than you — or, if there is none, ' +
-      'the team’s weakest. It is fixed for the season once signed.">' +
+      'Any of the team’s cars may be taken. It is fixed for the season once signed.">' +
     choices.map(function (c) {
       return '<option value="' + esc(c.seat) + '">' + esc(c.seat) + ' — replace ' +
         esc(c.replaces) + (c.rating == null ? '' : ' (' + Math.round(c.rating) + ')') + '</option>';

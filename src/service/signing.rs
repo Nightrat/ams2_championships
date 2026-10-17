@@ -237,7 +237,7 @@ impl App {
                 let seats = offers
                     .iter()
                     .map(|o| {
-                        let choices = crate::roster::custom_ai::seat_choices(&roster, &o.team, rep.value);
+                        let choices = crate::roster::custom_ai::seat_choices(&roster, &o.team);
                         (o.team.clone(), choices)
                     })
                     .collect();
@@ -378,13 +378,11 @@ impl App {
 
         // ── Which car ────────────────────────────────────────────────────────
         // Chosen now and stored with the season, so every session is checked against one car
-        // from the first. Only a driver rated no higher than the player may be replaced — or,
-        // when that is nobody, the team's weakest. Re-derived here rather than trusted from the
-        // caller, like the terms.
+        // from the first. Any of the team's cars may be taken; the list is re-derived here rather
+        // than trusted from the caller, so a car the team does not run is refused.
         let choices = crate::roster::custom_ai::seat_choices(
             &champ_roster_seats(&self.config_path, &career, &current),
             &offer.team,
-            reputation.value,
         );
         let seat = match req.seat.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(wanted) => match choices.iter().find(|c| c.seat.eq_ignore_ascii_case(wanted)) {
@@ -395,9 +393,7 @@ impl App {
                         .map(|c| format!("{} (in place of {})", c.seat, c.replaces))
                         .collect();
                     return Err(conflict(format!(
-                        "You cannot take {wanted}: with a rating of {:.0} you may only replace a \
-                         {} driver rated no higher than you, or the weakest. Open: {}.",
-                        reputation.value,
+                        "You cannot take {wanted}: it is not one of {}'s cars. Open: {}.",
                         offer.team,
                         if open.is_empty() { "none".into() } else { open.join(", ") }
                     )));

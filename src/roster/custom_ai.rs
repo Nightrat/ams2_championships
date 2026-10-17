@@ -1877,17 +1877,12 @@ pub struct SeatChoice {
     pub rating: Option<f32>,
 }
 
-/// The cars of `team` a driver rated `player_rating` may take: those whose driver is rated no
-/// higher than the player — you replace someone you are at least as good as.
-///
-/// When that leaves none, the team's **weakest** car is offered instead (every car tied for
-/// weakest, if several are): a team that signed the player has a seat for them, and it is the
-/// one its worst driver was sitting in. A driver the file gives no skill cannot be judged, and is
-/// not held against the player — the same rule [`crate::career::driver_rating::is_allowed`] follows.
+/// The cars of `team` the player may take: every car it runs. The rating decides *whether* a
+/// team offers a contract; once it does, the player picks which of its drivers makes way.
 ///
 /// Per-track stand-ins are never offered: nobody is signed to replace a one-weekend substitute.
 /// Cars come back in file order.
-pub fn seat_choices(entries: &[SeatEntry], team: &str, player_rating: f32) -> Vec<SeatChoice> {
+pub fn seat_choices(entries: &[SeatEntry], team: &str) -> Vec<SeatChoice> {
     let team = team.trim();
     let mut cars: Vec<SeatChoice> = Vec::new();
     for e in entries.iter().filter(|e| !e.stand_in && e.team.eq_ignore_ascii_case(team)) {
@@ -1906,18 +1901,7 @@ pub fn seat_choices(entries: &[SeatEntry], team: &str, player_rating: f32) -> Ve
             }),
         }
     }
-    // A hair of slack: 0.55 × 100 is not exactly 55 in f32, and a rating of 55 must clear it.
-    let fits = |c: &SeatChoice| c.rating.is_none_or(|r| r <= player_rating + 1e-3);
-    if cars.iter().any(fits) {
-        return cars.into_iter().filter(fits).collect();
-    }
-    let weakest = cars
-        .iter()
-        .filter_map(|c| c.rating)
-        .fold(f32::INFINITY, f32::min);
-    cars.into_iter()
-        .filter(|c| c.rating.is_some_and(|r| r <= weakest + 1e-3))
-        .collect()
+    cars
 }
 
 /// What a season's recorded sessions say about which car of its declared team the player drove.

@@ -2697,24 +2697,26 @@ fn test_route_sign_records_the_deal_and_takes_the_seat() {
     std::fs::remove_dir_all(&root).ok();
 }
 
-// Osella on OFFER_ROSTER: #21 Ghinzani is 55, #22 Berg is 54. A starting rating of 50 clears
-// neither, so only the weaker car — Berg's — may be taken.
+// Osella on OFFER_ROSTER: #21 Ghinzani is 55, #22 Berg is 54. A starting rating of 50 is below
+// both drivers, and either car may still be taken: a team that offers, offers every seat.
 
 #[test]
 fn test_route_offers_list_the_cars_each_team_would_give() {
     let (root, config) = offer_fixture(true, r#","starting_rating":50"#);
     let v = body_json(&offers_resp(rated_champ("c1"), &config));
     let osella = v["seats"][OPEN_SEAT].as_array().expect("seats for the offering team");
-    assert_eq!(osella.len(), 1, "{v}");
-    assert_eq!(osella[0]["seat"], "Osella #22");
-    assert_eq!(osella[0]["replaces"], "Allan Berg");
+    assert_eq!(osella.len(), 2, "{v}");
+    assert_eq!(osella[0]["seat"], "Osella #21");
+    assert_eq!(osella[0]["replaces"], "Piercarlo Ghinzani");
+    assert_eq!(osella[1]["seat"], "Osella #22");
+    assert_eq!(osella[1]["replaces"], "Allan Berg");
     std::fs::remove_dir_all(&root).ok();
 }
 
 #[test]
 fn test_route_sign_stores_the_chosen_car_with_the_season() {
-    let (root, config) = offer_fixture(true, r#","starting_rating":60"#);
-    // At 60 both Osellas are open, so the choice is the player's.
+    let (root, config) = offer_fixture(true, r#","starting_rating":50"#);
+    // Ghinzani outrates the player, and his car is still the player's to take.
     let (resp, store) = sign_call(
         rated_champ("c1"),
         &config,
@@ -2733,13 +2735,13 @@ fn test_route_sign_stores_the_chosen_car_with_the_season() {
 }
 
 #[test]
-fn test_route_sign_refuses_a_car_whose_driver_outrates_the_player() {
+fn test_route_sign_refuses_a_car_the_team_does_not_run() {
     let (root, config) = offer_fixture(true, r#","starting_rating":50"#);
     let (resp, store) = sign_call(
         rated_champ("c1"),
         &config,
         "POST",
-        r#"{"team":"Osella","seat":"Osella #21"}"#,
+        r#"{"team":"Osella","seat":"Osella #99"}"#,
     );
     assert!(status_line(&resp).contains("409"), "{resp}");
     assert!(resp.contains("Osella #22 (in place of Allan Berg)"), "it names what is open: {resp}");
@@ -2755,7 +2757,7 @@ fn test_route_sign_without_a_car_takes_the_first_one_open() {
     assert!(status_line(&resp).contains("200"), "{resp}");
     assert_eq!(
         store.read().unwrap().championships[0].player_seat.as_ref().map(|s| s.seat.as_str()),
-        Some("Osella #22")
+        Some("Osella #21")
     );
     std::fs::remove_dir_all(&root).ok();
 }

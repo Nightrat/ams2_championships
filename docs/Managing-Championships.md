@@ -92,6 +92,8 @@ Only you know when a season is over — you may stop a calendar short or run pas
 
 Below the season's settings, a singleplayer career shows the seats the grid is offering you for that season, with the terms and the reason for them. Sign from there; the team you sign with becomes the season's **My Team**.
 
+Each offer also has a dropdown of the team's cars, naming the driver you would replace in each. **Any of them may be taken** — your rating decides whether a team offers at all, not which of its drivers makes way. (Per-track stand-ins are not listed: nobody is signed to replace a one-weekend substitute.) The car you pick is fixed for the season, and every session is then checked against that car rather than the team.
+
 Offers are re-derived every time you look, from your rating and the state of the career — they are never stored, so improving and looking again is the intended way to use them. A contract, once signed, is history and never changes.
 
 **Tear up** undoes a mis-click: it deletes the contract and clears the seat that came with it, and is only possible before the season has a recorded session.

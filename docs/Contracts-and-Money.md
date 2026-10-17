@@ -20,6 +20,7 @@ Each row shows:
 | **Badge** | *Renewal* or *Pay driver*. Most rows are an ordinary paid deal and carry no badge |
 | **Terms** | Salary for the season, and the finishing position they expect |
 | **Price** | Sponsorship you must bring, for a seat you are buying into |
+| **Car** | Which of the team's cars you take, and whose seat it is. Every car the team runs is offered, whoever drives it; the choice is fixed for the season once signed |
 
 Teams the roster names but AMS2 has no livery for never reach a grid at all, so they are not among the seats on offer — the Car Performance tab marks them **no livery**. The teams that make no offer are otherwise simply the ones missing from the list. Under the heading you will find your rating, your balance, and the seat you held last season.
 
