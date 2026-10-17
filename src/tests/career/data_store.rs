@@ -1768,3 +1768,50 @@ fn test_career_view_says_nothing_without_a_roster() {
         .grid_note
         .is_none());
 }
+
+// ── track_stats_all, winner, display order ────────────────────────────────────
+
+#[test]
+fn test_track_stats_all_merges_every_car_into_one_row_per_track() {
+    // Alice is quickest in the F3 sessions, Bob in the GT3 ones; the merged row ranks drivers by
+    // their best in *any* car, counts every session, and keeps the latest visit.
+    let sessions = vec![
+        make_track_session_car("a", 5, "Spa", "GP", 100, "F3", vec![("Alice", 1, 140.0, "F3"), ("Cy", 2, 145.0, "F3")]),
+        make_track_session_car("b", 3, "Spa", "GP", 300, "GT3", vec![("Bob", 1, 138.0, "GT3"), ("Alice", 2, 150.0, "GT3")]),
+        make_track_session_car("c", 5, "Monza", "GP", 200, "F3", vec![("Alice", 1, 100.0, "F3")]),
+    ];
+    let resp = compute_career(&[], &sessions);
+    assert_eq!(resp.track_stats.len(), 3, "one row per track and player car");
+    assert_eq!(resp.track_stats_all.len(), 2, "one row per track");
+    let spa = resp.track_stats_all.iter().find(|t| t.track == "Spa").unwrap();
+    assert_eq!(spa.car, "");
+    assert_eq!((spa.races, spa.qualifyings, spa.last_visited), (1, 1, 300));
+    assert_eq!((spa.best_lap, spa.best_lap_driver.as_str(), spa.best_lap_car.as_str()), (138.0, "Bob", "GT3"));
+    // Alice's slower GT3 lap does not give her a second slot.
+    assert_eq!((spa.second_lap, spa.second_lap_driver.as_str()), (140.0, "Alice"));
+    assert_eq!((spa.third_lap, spa.third_lap_driver.as_str()), (145.0, "Cy"));
+    // Most recently visited first, like the per-car list.
+    assert_eq!(resp.track_stats_all[0].track, "Spa");
+}
+
+#[test]
+fn test_winner_is_whoever_was_classified_first() {
+    let s = make_track_session("w", 5, "Spa", "GP", 1, vec![("Bob", 2, 0.0, ""), ("Alice", 1, 0.0, "")]);
+    assert_eq!(s.winner(), Some("Alice"));
+    let empty = make_track_session("e", 5, "Spa", "GP", 1, vec![]);
+    assert_eq!(empty.winner(), None);
+}
+
+#[test]
+fn test_display_order_is_status_then_name_ignoring_case() {
+    use crate::career::data_store::display_order;
+    let mut list = [
+        (ChampionshipStatus::Final, "alpha"),
+        (ChampionshipStatus::Progress, "Zeta"),
+        (ChampionshipStatus::Progress, "beta"),
+        (ChampionshipStatus::Active, "Omega"),
+    ];
+    list.sort_by(|a, b| display_order((&a.0, a.1), (&b.0, b.1)));
+    let names: Vec<&str> = list.iter().map(|x| x.1).collect();
+    assert_eq!(names, ["Omega", "beta", "Zeta", "alpha"]);
+}

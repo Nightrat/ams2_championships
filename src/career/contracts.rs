@@ -1,6 +1,6 @@
 //! Seat offers and the contracts they become.
 //!
-//! The driver rating in [`crate::driver_rating`] answers "may this driver have this seat".
+//! The driver rating in [`crate::career::driver_rating`] answers "may this driver have this seat".
 //! This module answers the two questions that follow: *on what terms*, and *what was agreed*.
 //!
 //! Almost nothing here is persisted, for the same reason the rating persists nothing — an offer
@@ -16,8 +16,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::data_store::{Championship, ChampionshipStatus, RecordedSession};
-use crate::driver_rating::{TeamEligibility, Tier};
+use crate::career::data_store::{Championship, ChampionshipStatus, RecordedSession};
+use crate::career::driver_rating::{TeamEligibility, Tier};
 
 /// Per-season pay for the quickest car on the grid, in credits.
 ///
@@ -245,7 +245,7 @@ pub fn for_championship<'a>(contracts: &'a [Contract], champ_id: &str) -> Option
     contracts.iter().find(|c| c.champ_id == champ_id)
 }
 
-/// The tunable half of offer generation, mirroring [`crate::driver_rating::RatingParams`].
+/// The tunable half of offer generation, mirroring [`crate::career::driver_rating::RatingParams`].
 ///
 /// [`Default`] is the shipped economy; a config may replace it wholesale without this module
 /// knowing where the numbers came from.
@@ -450,7 +450,7 @@ pub fn offers_for(
 
 /// Every seat the driver could take this season, with the terms attached.
 ///
-/// `eligibility` comes straight from [`crate::driver_rating::team_eligibility_with`] and is
+/// `eligibility` comes straight from [`crate::career::driver_rating::team_eligibility_with`] and is
 /// already ordered fastest car first, which is the rank each offer reports.
 ///
 /// A team the rating cannot reach makes no offer, with one exception: the back of the grid,
@@ -577,7 +577,7 @@ pub fn offers_for_with(
 ///
 /// So when nothing at all is obtainable, the cheapest seat for sale drops its price to exactly
 /// what the career has. The seat still costs everything, which is the point — a way in, not a
-/// gift. This replaced a rule in [`crate::driver_rating`] that handed the least demanding team
+/// gift. This replaced a rule in [`crate::career::driver_rating`] that handed the least demanding team
 /// over free; that one could not do better because it did not know what the driver could pay.
 fn open_a_way_in(
     mut offers: Vec<Offer>,
@@ -746,7 +746,7 @@ pub struct Finances {
 
 /// The driver the recorder flagged as the player, across every session it wrote.
 ///
-/// This is [`crate::driver_rating::infer_player_name`]'s first and strongest branch, repeated
+/// This is [`crate::career::driver_rating::infer_player_name`]'s first and strongest branch, repeated
 /// here rather than reached for because the rating's version needs a roster to fall back on and
 /// finances must work for a class that has no Custom AI file.
 fn flagged_player(sessions: &[RecordedSession]) -> Option<&str> {
@@ -761,7 +761,7 @@ fn flagged_player(sessions: &[RecordedSession]) -> Option<&str> {
 ///
 /// A round groups practice, qualifying and the race, so counting rounds alone would pay a wage
 /// for a weekend that was only practised. Session type 5 is the race — the same test
-/// [`crate::data_store::standings`] scores on, so a round that pays is a round that counted.
+/// [`crate::career::data_store::standings`] scores on, so a round that pays is a round that counted.
 fn races_run(champ: &Championship, sessions: &[RecordedSession]) -> u32 {
     champ
         .rounds
@@ -770,7 +770,7 @@ fn races_run(champ: &Championship, sessions: &[RecordedSession]) -> u32 {
             r.session_ids.iter().any(|id| {
                 sessions
                     .iter()
-                    .any(|s| s.id == *id && s.session_type == crate::data_store::SESSION_RACE)
+                    .any(|s| s.id == *id && s.session_type == crate::career::data_store::SESSION_RACE)
             })
         })
         .count() as u32
@@ -843,7 +843,7 @@ pub fn finances(
             continue;
         };
         let complete = champ.status == ChampionshipStatus::Final;
-        let table = crate::data_store::standings(champ, sessions);
+        let table = crate::career::data_store::standings(champ, sessions);
         let position = player.and_then(|name| {
             table
                 .iter()
@@ -857,7 +857,7 @@ pub fn finances(
             class: champ
                 .custom_ai_file
                 .as_deref()
-                .map(crate::custom_ai::class_of_file)
+                .map(crate::roster::custom_ai::class_of_file)
                 .unwrap_or_default()
                 .to_string(),
             salary: salary_earned(c, champ, sessions),
@@ -960,7 +960,7 @@ pub fn settle(
     }
     // The same derivation `finances` runs, taken once and kept. A driver who cannot be
     // identified in the standings wins nothing, which is what the derivation said too.
-    let table = crate::data_store::standings(champ, sessions);
+    let table = crate::career::data_store::standings(champ, sessions);
     let position = player.and_then(|name| {
         table
             .iter()
@@ -1021,5 +1021,5 @@ pub fn seal_finished(
 }
 
 #[cfg(test)]
-#[path = "tests/contracts.rs"]
+#[path = "../tests/career/contracts.rs"]
 mod tests;

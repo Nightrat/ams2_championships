@@ -1,5 +1,5 @@
 use super::*;
-use crate::data_store::{RecordedSession, SessionResult};
+use crate::career::data_store::{RecordedSession, SessionResult};
 use std::fs;
 
 fn tmp_dir(tag: &str) -> PathBuf {
@@ -46,8 +46,8 @@ fn session(id: &str, chart: Vec<LapChartEntry>) -> RecordedSession {
 
 /// A folder save, which is the only kind that can keep charts beside itself.
 fn folder_save(dir: &Path, name: &str) -> PathBuf {
-    let career = crate::saves::save_path(dir, name);
-    crate::saves::prepare_save_dir(&career).unwrap();
+    let career = crate::career::saves::save_path(dir, name);
+    crate::career::saves::prepare_save_dir(&career).unwrap();
     fs::write(&career, r#"{"sessions":[],"championships":[]}"#).unwrap();
     career
 }
@@ -117,7 +117,7 @@ fn test_a_legacy_flat_save_keeps_its_charts_inline() {
     // A flat save is a bare file with no folder to put anything beside, and those saves are
     // never migrated. Moving the chart nowhere and leaving it where it is must not lose it.
     let dir = tmp_dir("flat");
-    let career = crate::saves::legacy_save_path(&dir, "old");
+    let career = crate::career::saves::legacy_save_path(&dir, "old");
     fs::write(&career, r#"{"sessions":[],"championships":[]}"#).unwrap();
 
     assert!(laps_dir(&career).is_none());

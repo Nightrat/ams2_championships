@@ -17,8 +17,8 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::custom_ai::{name_key, GridEntry, PlayerSeat, SeatEntry};
-use crate::data_store::{Championship, RecordedSession, SessionResult};
+use crate::roster::custom_ai::{name_key, GridEntry, PlayerSeat, SeatEntry};
+use crate::career::data_store::{Championship, RecordedSession, SessionResult};
 
 /// Marker AMS2 appends to lobby-fill AI names. It appears only in multiplayer — single-player
 /// grids built from a Custom AI Driver file carry the roster's real names — which makes it a
@@ -376,7 +376,7 @@ fn session_team(
             is_player: r.is_player,
         })
         .collect();
-    match crate::custom_ai::infer_player_seat(seats, &grid) {
+    match crate::roster::custom_ai::infer_player_seat(seats, &grid) {
         PlayerSeat::Derived(seat) => Some(seat.team),
         PlayerSeat::Candidates(v) => {
             if let Some(d) = declared {
@@ -452,7 +452,7 @@ pub struct RatingContext {
     pub seats: Vec<SeatEntry>,
     pub expected: HashMap<String, f32>,
     /// The sessions this roster is restricted to, for a season that keeps its own copy of the
-    /// roster (see [`crate::season_rosters`]). `None` covers every session in the class.
+    /// roster (see [`crate::career::signed_rosters`]). `None` covers every session in the class.
     pub only: Option<HashSet<String>>,
 }
 
@@ -950,7 +950,7 @@ pub fn recorded_players(sessions: &[RecordedSession], seats: &[SeatEntry]) -> Ve
 /// Every seat on the grid may come back `Locked`, and for an unproven driver most rosters do
 /// exactly that. This function judges a rating against a grid and nothing else; what to do about
 /// a driver who has earned nothing is a question about money, and it is answered in
-/// [`crate::contracts::offers_for_with`].
+/// [`crate::career::contracts::offers_for_with`].
 pub fn team_eligibility(
     reputation: f32,
     expected: &HashMap<String, f32>,
@@ -1012,5 +1012,5 @@ pub fn is_allowed(eligibility: &[TeamEligibility], team: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "tests/driver_rating.rs"]
+#[path = "../tests/career/driver_rating.rs"]
 mod tests;

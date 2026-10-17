@@ -1,6 +1,6 @@
 use super::*;
-use crate::ams2_shared_memory::{LiveSessionData, ParticipantData, PlayerTelemetry};
-use crate::data_store::{CareerData, SharedStore};
+use crate::game::shared_memory::{LiveSessionData, ParticipantData, PlayerTelemetry};
+use crate::career::data_store::{CareerData, SharedStore};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 

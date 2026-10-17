@@ -2,7 +2,7 @@
 //!
 //! A livery mod ships each car's preview beside its body textures — a wide render of the car on
 //! a transparent background, declared as `<PREVIEWIMAGE PATH="...">` in the manifest
-//! [`crate::liveries`] already reads. It is a `.dds`: a block-compressed texture no browser will
+//! [`crate::roster::liveries`] already reads. It is a `.dds`: a block-compressed texture no browser will
 //! display, and an image crate to decode it would pull in more dependencies than the rest of this
 //! program has together. So it is decoded here and re-encoded as a PNG thumbnail.
 //!
@@ -595,5 +595,5 @@ fn deflate_fixed(data: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
-#[path = "tests/livery_image.rs"]
+#[path = "../tests/roster/livery_image.rs"]
 mod tests;

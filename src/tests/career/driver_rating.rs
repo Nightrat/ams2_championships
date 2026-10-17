@@ -1,6 +1,6 @@
 use super::*;
-use crate::custom_ai::parse_seats_str;
-use crate::data_store::{RecordedSession, SessionResult};
+use crate::roster::custom_ai::parse_seats_str;
+use crate::career::data_store::{RecordedSession, SessionResult};
 
 const ROSTER: &str = r#"<custom_ai_drivers>
     <driver livery_name="1986 Williams #5 - N. Mansell"><name>Nigel Mansell</name><race_skill>0.98</race_skill></driver>
@@ -277,7 +277,7 @@ fn class_b_session(id: &str, at: u64, player_pos: u32) -> RecordedSession {
 
 #[test]
 fn test_assigned_sessions_keeps_only_what_a_championship_claims() {
-    use crate::data_store::{Championship, ChampionshipStatus, Round};
+    use crate::career::data_store::{Championship, ChampionshipStatus, Round};
     let sessions: Vec<RecordedSession> = (0..4)
         .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
         .collect();
@@ -312,7 +312,7 @@ fn test_assigned_sessions_keeps_only_what_a_championship_claims() {
 
 #[test]
 fn test_rating_ignores_unassigned_sessions() {
-    use crate::data_store::{Championship, ChampionshipStatus, Round};
+    use crate::career::data_store::{Championship, ChampionshipStatus, Round};
     let ctxs = contexts();
     let winning: Vec<RecordedSession> = (0..6)
         .map(|i| sp_session(&i.to_string(), 100 + i, 5, 1, 15))
@@ -430,7 +430,7 @@ fn test_a_season_context_scores_only_its_own_sessions_and_wins_over_the_class() 
 // The expected values below are a snapshot of current behaviour, not a specification. Changing
 // the rating maths is *supposed* to move them — update them deliberately when it does.
 
-fn reference_career() -> crate::data_store::CareerData {
+fn reference_career() -> crate::career::data_store::CareerData {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/src/tests/fixtures/career_reference.json"
@@ -443,7 +443,7 @@ fn reference_contexts() -> Vec<RatingContext> {
         env!("CARGO_MANIFEST_DIR"),
         "/docs/custom_ai_files_with_perf_scalars"
     ));
-    crate::custom_ai::class_performance(dir)
+    crate::roster::custom_ai::class_performance(dir)
         .into_iter()
         .map(|perf| {
             let path = dir.join(format!("{}.xml", perf.class));
@@ -452,7 +452,7 @@ fn reference_contexts() -> Vec<RatingContext> {
                 .iter()
                 .map(|c| (c.team.clone(), c.pace_delta_pct))
                 .collect();
-            RatingContext::new(&perf.class, crate::custom_ai::parse_seats(&path), &pace)
+            RatingContext::new(&perf.class, crate::roster::custom_ai::parse_seats(&path), &pace)
         })
         .collect()
 }
@@ -556,7 +556,7 @@ fn test_reference_career_second_human_is_online_only() {
 fn test_eligibility_locks_top_teams_and_opens_the_back() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
-    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+    let skills = crate::roster::custom_ai::parse_team_skills_str(ROSTER);
     let low = team_eligibility(40.0, &exp, &skills);
     let williams = low.iter().find(|e| e.team == "Williams").unwrap();
     let osella = low.iter().find(|e| e.team == "Osella").unwrap();
@@ -584,7 +584,7 @@ fn test_eligibility_locks_top_teams_and_opens_the_back() {
 fn test_is_allowed_permits_unknown_teams() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
-    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+    let skills = crate::roster::custom_ai::parse_team_skills_str(ROSTER);
     // A rating that clears Osella's bar, so there is a permitted team to contrast against.
     let e = team_eligibility(70.0, &exp, &skills);
     assert!(!is_allowed(&e, "Williams"));
@@ -598,7 +598,7 @@ fn test_is_allowed_permits_unknown_teams() {
 
 #[test]
 fn test_expected_positions_shrink_when_phantom_seats_are_removed() {
-    use crate::custom_ai::without_phantom_seats;
+    use crate::roster::custom_ai::without_phantom_seats;
 
     let seats = parse_seats_str(ROSTER);
     let pace = pace();
@@ -635,7 +635,7 @@ fn test_expected_positions_shrink_when_phantom_seats_are_removed() {
 
 #[test]
 fn test_expected_positions_unchanged_when_liveries_cannot_be_verified() {
-    use crate::custom_ai::without_phantom_seats;
+    use crate::roster::custom_ai::without_phantom_seats;
 
     let seats = parse_seats_str(ROSTER);
     let before = expected_positions(&pace(), &seats);
@@ -789,7 +789,7 @@ fn test_starting_rating_washes_out_as_races_accumulate() {
 fn test_strictness_shifts_every_requirement_by_the_same_amount() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
-    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+    let skills = crate::roster::custom_ai::parse_team_skills_str(ROSTER);
 
     let base = team_requirements(&exp, &skills);
     let easier = team_requirements_with(&params(|p| p.strictness = -15.0), &exp, &skills);
@@ -807,7 +807,7 @@ fn test_strictness_shifts_every_requirement_by_the_same_amount() {
 fn test_strictness_opens_seats_the_default_locks() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
-    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+    let skills = crate::roster::custom_ai::parse_team_skills_str(ROSTER);
 
     // Brabham's bar is Warwick's 0.78, so 73, out of reach at 60.
     assert_eq!(
@@ -834,7 +834,7 @@ fn test_strictness_opens_seats_the_default_locks() {
 fn test_grid_gate_alone_ignores_incumbent_skill() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
-    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+    let skills = crate::roster::custom_ai::parse_team_skills_str(ROSTER);
 
     let grid: HashMap<String, f32> =
         team_requirements_with(&params(|p| p.gates = Gates::Grid), &exp, &skills)
@@ -849,7 +849,7 @@ fn test_grid_gate_alone_ignores_incumbent_skill() {
 fn test_incumbent_gate_alone_ignores_car_pace() {
     let seats = parse_seats_str(ROSTER);
     let exp = expected_positions(&pace(), &seats);
-    let skills = crate::custom_ai::parse_team_skills_str(ROSTER);
+    let skills = crate::roster::custom_ai::parse_team_skills_str(ROSTER);
 
     let inc: HashMap<String, f32> =
         team_requirements_with(&params(|p| p.gates = Gates::Incumbent), &exp, &skills)
@@ -868,7 +868,7 @@ fn test_incumbent_gate_leaves_a_skill_less_roster_wide_open() {
 </custom_ai_drivers>"#;
     let seats = parse_seats_str(NO_SKILLS);
     let exp = expected_positions(&pace(), &seats);
-    let skills = crate::custom_ai::parse_team_skills_str(NO_SKILLS);
+    let skills = crate::roster::custom_ai::parse_team_skills_str(NO_SKILLS);
     assert!(skills.is_empty(), "fixture must declare no race_skill");
 
     // Documented consequence: with no bar left to clear, every seat is free. The Config hint

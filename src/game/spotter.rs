@@ -1,4 +1,4 @@
-use crate::ams2_shared_memory::{read_live_session, LiveSessionData};
+use crate::game::shared_memory::{read_live_session, LiveSessionData};
 
 #[derive(PartialEq, Clone, Copy)]
 enum GapCategory {

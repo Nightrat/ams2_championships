@@ -685,7 +685,7 @@ pub struct DriverAttributes {
     pub driver: String,
     pub team: String,
     /// The raw `livery_name` this entry binds to — the string AMS2 matches against its own
-    /// liveries, and the key [`crate::liveries`] checks for existence.
+    /// liveries, and the key [`crate::roster::liveries`] checks for existence.
     pub livery: String,
     /// The `tracks="..."` attribute, when this entry only applies at certain circuits.
     pub tracks: Option<String>,
@@ -695,7 +695,7 @@ pub struct DriverAttributes {
     /// Composite 0–100 strength from those attributes — see [`rate_driver`].
     pub rating: Option<f32>,
     /// `Some(true)` when no installed livery matches `livery`, so AMS2 will never spawn this
-    /// driver. `None` means it could not be checked — see [`crate::liveries::phantom_liveries`].
+    /// driver. `None` means it could not be checked — see [`crate::roster::liveries::phantom_liveries`].
     pub phantom: Option<bool>,
 }
 
@@ -774,10 +774,10 @@ pub fn parse_driver_attributes(path: &Path) -> Vec<DriverAttributes> {
 /// Fills in each entry's `phantom` flag against the liveries actually installed.
 ///
 /// Every entry keeps `None` when the check cannot be made for this roster, so "unknown" is never
-/// rendered as "fine" or as "broken" — see [`crate::liveries::phantom_liveries`].
+/// rendered as "fine" or as "broken" — see [`crate::roster::liveries::phantom_liveries`].
 pub fn mark_phantom_entries(entries: &mut [DriverAttributes], installed: Option<&HashSet<String>>) {
     let roster: Vec<String> = entries.iter().map(|e| e.livery.clone()).collect();
-    let Some(phantoms) = crate::liveries::phantom_liveries(installed, &roster) else {
+    let Some(phantoms) = crate::roster::liveries::phantom_liveries(installed, &roster) else {
         return;
     };
     for e in entries.iter_mut() {
@@ -1117,7 +1117,7 @@ pub fn class_performance(dir: &Path) -> Vec<ClassPerformance> {
 }
 
 /// [`class_performance`], judging each class's season by the user's answer where there is one
-/// (`config.class_years`, via [`crate::season_years::season_year_with`]).
+/// (`config.class_years`, via [`crate::roster::season_years::season_year_with`]).
 ///
 /// The years are taken as a parameter rather than read here because this module knows nothing
 /// about config — and because a modded class's year is a fact about the install, which only the
@@ -1153,7 +1153,7 @@ pub fn class_performance_with(
 }
 
 /// One class's ranked performance table, read from `path` — the game's file, or a season's own
-/// copy of it (see [`crate::season_rosters`]), which is why the class is named separately rather
+/// copy of it (see [`crate::career::signed_rosters`]), which is why the class is named separately rather
 /// than taken from the file's stem.
 pub fn class_performance_of(
     class: &str,
@@ -1183,7 +1183,7 @@ pub fn class_performance_of(
     });
     ClassPerformance {
         class: class.to_string(),
-        year: crate::season_years::season_year_with(class, years),
+        year: crate::roster::season_years::season_year_with(class, years),
         cars: rows,
     }
 }
@@ -1381,7 +1381,7 @@ pub fn without_phantom_seats(
     installed: Option<&HashSet<String>>,
 ) -> Vec<SeatEntry> {
     let roster: Vec<String> = entries.iter().map(|e| e.livery.clone()).collect();
-    match crate::liveries::phantom_liveries(installed, &roster) {
+    match crate::roster::liveries::phantom_liveries(installed, &roster) {
         Some(phantoms) => entries
             .into_iter()
             .filter(|e| !phantoms.contains(&e.livery))
@@ -1653,7 +1653,7 @@ impl GridFit {
 /// the grid shows nothing wrong, or cannot tell.
 ///
 /// AMS2 fields one car per livery and binds a roster entry to a livery by name, silently skipping
-/// an entry that names none. For a livery mod [`crate::liveries::phantom_liveries`] catches that
+/// an entry that names none. For a livery mod [`crate::roster::liveries::phantom_liveries`] catches that
 /// from the manifests, but the game's own liveries — and a car mod's — are sealed in its paks, so
 /// there the grid is the only witness. Given opponents enough for every car of the roster, every
 /// car but the player's must be on track; any other that is missing never spawns.
@@ -1883,7 +1883,7 @@ pub struct SeatChoice {
 /// When that leaves none, the team's **weakest** car is offered instead (every car tied for
 /// weakest, if several are): a team that signed the player has a seat for them, and it is the
 /// one its worst driver was sitting in. A driver the file gives no skill cannot be judged, and is
-/// not held against the player — the same rule [`crate::driver_rating::is_allowed`] follows.
+/// not held against the player — the same rule [`crate::career::driver_rating::is_allowed`] follows.
 ///
 /// Per-track stand-ins are never offered: nobody is signed to replace a one-weekend substitute.
 /// Cars come back in file order.
@@ -2061,5 +2061,5 @@ pub fn check_locked_seat(
 }
 
 #[cfg(test)]
-#[path = "tests/custom_ai.rs"]
+#[path = "../tests/roster/custom_ai.rs"]
 mod tests;

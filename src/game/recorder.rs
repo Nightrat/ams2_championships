@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::ams2_shared_memory::{read_live_session, LiveSessionData};
-use crate::data_store::{
+use crate::game::shared_memory::{read_live_session, LiveSessionData};
+use crate::career::data_store::{
     persist, LapChartEntry, RecordedSession, SavePath, SessionResult, SharedStore,
 };
 
@@ -52,7 +52,7 @@ pub(crate) fn is_replay(game_state: u32) -> bool {
 }
 
 #[cfg(test)]
-#[path = "tests/session_recorder.rs"]
+#[path = "../tests/game/recorder.rs"]
 mod tests;
 
 /// `player_name`, when given, names the participant known to be the human player from an
@@ -135,7 +135,7 @@ pub(crate) fn capture(
 
     // The chart goes beside the career rather than into it — it is the bulk of a session and
     // nothing but its own view reads it. A save that cannot take one keeps it inline.
-    crate::lap_charts::externalize(path, std::slice::from_mut(&mut recorded));
+    crate::career::lap_charts::externalize(path, std::slice::from_mut(&mut recorded));
 
     {
         let mut data = store.write().unwrap();
@@ -153,6 +153,16 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
         return Err("No active career — create one first".into());
     }
     let session = read_live_session();
+    recordable(&session)?;
+    capture(store, path, &session, vec![], None);
+    Ok(())
+}
+
+/// Whether the live session is one [`capture_current`] would record, and why not when it is not.
+///
+/// Its own function so the live tab's Record button is enabled on exactly this test: a button
+/// judged by a looser one is a button that offers a click the route then refuses.
+pub fn recordable(session: &LiveSessionData) -> Result<(), String> {
     if !session.connected {
         return Err("AMS2 is not connected".into());
     }
@@ -170,7 +180,6 @@ pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String
     ) {
         return Err("No active session".into());
     }
-    capture(store, path, &session, vec![], None);
     Ok(())
 }
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::data_store::ChampionshipStatus;
+use crate::career::data_store::ChampionshipStatus;
 
 fn tmp_dir(tag: &str) -> PathBuf {
     let ns = std::time::SystemTime::now()
@@ -85,7 +85,7 @@ fn test_restore_puts_the_season_roster_back_and_keeps_the_baseline() {
     );
     assert_eq!(matches_game(&career, &ai, &c), Some(true));
     // The overwritten file had no baseline yet, so it got one before being replaced.
-    assert!(crate::custom_ai::has_baseline(&ai.join("F-Test.xml")));
+    assert!(crate::roster::custom_ai::has_baseline(&ai.join("F-Test.xml")));
     let _ = fs::remove_dir_all(root);
 }
 

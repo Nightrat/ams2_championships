@@ -12,21 +12,21 @@
 //! career on each change, which on a saves folder inside Google Drive means re-uploading it.
 //!
 //! **Legacy flat saves keep their charts inline.** A flat save is a bare `<name>.json` with no
-//! folder to put anything beside, and those saves are never migrated — see [`crate::saves`]. So
+//! folder to put anything beside, and those saves are never migrated — see [`crate::career::saves`]. So
 //! [`externalize`] simply does nothing for them and the charts stay where they are, which is
 //! also why every reader here falls back to the copy held in the session.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::data_store::{LapChartEntry, RecordedSession};
+use crate::career::data_store::{LapChartEntry, RecordedSession};
 
 /// Folder holding one career's lap charts, inside that career's own folder.
 const LAPS_DIR: &str = "laps";
 
 /// Where this career's lap charts live, or `None` for a legacy flat save.
 pub fn laps_dir(career_file: &Path) -> Option<PathBuf> {
-    crate::saves::career_dir(career_file).map(|dir| dir.join(LAPS_DIR))
+    crate::career::saves::career_dir(career_file).map(|dir| dir.join(LAPS_DIR))
 }
 
 /// The file one session's chart is stored in.
@@ -35,7 +35,7 @@ pub fn laps_dir(career_file: &Path) -> Option<PathBuf> {
 /// as unix timestamps, but a hand-edited career can hold anything, and this value is joined onto
 /// a path — so it goes through the same gate every user-supplied save name does.
 pub fn chart_path(career_file: &Path, session_id: &str) -> Option<PathBuf> {
-    let name = crate::saves::sanitize_name(session_id)?;
+    let name = crate::career::saves::sanitize_name(session_id)?;
     laps_dir(career_file).map(|dir| dir.join(format!("{name}.json")))
 }
 
@@ -108,5 +108,5 @@ pub fn externalize(career_file: &Path, sessions: &mut [RecordedSession]) -> usiz
 }
 
 #[cfg(test)]
-#[path = "tests/lap_charts.rs"]
+#[path = "../tests/career/lap_charts.rs"]
 mod tests;

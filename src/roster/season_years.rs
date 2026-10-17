@@ -61,5 +61,5 @@ pub fn season_year_with(class: &str, overrides: &BTreeMap<String, u16>) -> Optio
 }
 
 #[cfg(test)]
-#[path = "tests/season_years.rs"]
+#[path = "../tests/roster/season_years.rs"]
 mod tests;

@@ -1,5 +1,5 @@
 use super::*;
-use crate::driver_rating::{TeamEligibility, Tier};
+use crate::career::driver_rating::{TeamEligibility, Tier};
 
 fn elig(team: &str, tier: Tier, required: f32, expected_position: f32) -> TeamEligibility {
     TeamEligibility {
@@ -494,7 +494,7 @@ fn test_for_championship_finds_the_right_contract() {
 #[test]
 fn test_a_save_written_before_contracts_still_loads() {
     let json = r#"{"sessions":[],"championships":[]}"#;
-    let data: crate::data_store::CareerData = serde_json::from_str(json).unwrap();
+    let data: crate::career::data_store::CareerData = serde_json::from_str(json).unwrap();
     assert!(data.contracts.is_empty());
 }
 
@@ -541,7 +541,7 @@ fn test_a_contract_written_when_deals_ran_for_years_still_loads() {
 // career and the real shipped rosters rather than only hand-built grids. Expected values are a
 // snapshot of current behaviour — changing the economy is *supposed* to move them.
 
-fn reference_career() -> crate::data_store::CareerData {
+fn reference_career() -> crate::career::data_store::CareerData {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/src/tests/fixtures/career_reference.json"
@@ -556,12 +556,12 @@ const AI_DIR: &str = concat!(
 
 /// The reference driver's rating, and the F-Classic_Gen1 grid it opens.
 fn reference_eligibility() -> (f32, Vec<TeamEligibility>) {
-    use crate::driver_rating::{
+    use crate::career::driver_rating::{
         assigned_sessions, compute_reputation_global, team_eligibility, RatingContext,
     };
 
     let dir = std::path::Path::new(AI_DIR);
-    let contexts: Vec<RatingContext> = crate::custom_ai::class_performance(dir)
+    let contexts: Vec<RatingContext> = crate::roster::custom_ai::class_performance(dir)
         .into_iter()
         .map(|perf| {
             let path = dir.join(format!("{}.xml", perf.class));
@@ -570,7 +570,7 @@ fn reference_eligibility() -> (f32, Vec<TeamEligibility>) {
                 .iter()
                 .map(|c| (c.team.clone(), c.pace_delta_pct))
                 .collect();
-            RatingContext::new(&perf.class, crate::custom_ai::parse_seats(&path), &pace)
+            RatingContext::new(&perf.class, crate::roster::custom_ai::parse_seats(&path), &pace)
         })
         .collect();
 
@@ -583,7 +583,7 @@ fn reference_eligibility() -> (f32, Vec<TeamEligibility>) {
         .find(|c| c.class == "F-Classic_Gen1")
         .expect("fixture class");
     let path = dir.join("F-Classic_Gen1.xml");
-    let skills = crate::custom_ai::parse_team_skills(&path);
+    let skills = crate::roster::custom_ai::parse_team_skills(&path);
     (rep, team_eligibility(rep, &own.expected, &skills))
 }
 
@@ -702,7 +702,7 @@ fn test_reference_career_offers_are_stable() {
 
 // ── Finances ─────────────────────────────────────────────────────────────────
 
-use crate::data_store::{Round, SessionResult};
+use crate::career::data_store::{Round, SessionResult};
 
 fn prize_params() -> PrizeParams {
     PrizeParams::default()
@@ -1566,7 +1566,7 @@ fn test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most() {
     // then 102,000) each put only their cheapest seat in reach. That is a choice of *economy* —
     // a balance near 115,000 would buy a second seat everywhere — so the threshold records where
     // the tuning stands rather than pretending eight of eight still holds.
-    use crate::driver_rating::{expected_positions, team_eligibility_with};
+    use crate::career::driver_rating::{expected_positions, team_eligibility_with};
 
     // Measured against the shipped config as a whole, not `OfferParams::default()`: the promise
     // is about what a *new* install gives a driver who has raced nothing, and the balance means
@@ -1588,19 +1588,19 @@ fn test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most() {
     let mut checked = 0;
     let mut grids_with_a_choice = 0;
 
-    for perf in crate::custom_ai::class_performance(dir) {
+    for perf in crate::roster::custom_ai::class_performance(dir) {
         let path = dir.join(format!("{}.xml", perf.class));
         let pace: std::collections::HashMap<String, f32> = perf
             .cars
             .iter()
             .map(|c| (c.team.clone(), c.pace_delta_pct))
             .collect();
-        let seats = crate::custom_ai::parse_seats(&path);
+        let seats = crate::roster::custom_ai::parse_seats(&path);
         let elig = team_eligibility_with(
             &tuning,
             rating,
             &expected_positions(&pace, &seats),
-            &crate::custom_ai::parse_team_skills(&path),
+            &crate::roster::custom_ai::parse_team_skills(&path),
         );
 
         // Offers generated *at* the balance, so the last-resort discount only fires if the
@@ -1653,7 +1653,7 @@ fn test_the_starting_balance_buys_a_choice_not_the_grid() {
     // The other half of the promise. A balance that reached every seat for sale would make the
     // rating irrelevant in the first season, so on at least one shipped roster it must fall
     // short of the dearest seats.
-    use crate::driver_rating::{expected_positions, team_eligibility_with};
+    use crate::career::driver_rating::{expected_positions, team_eligibility_with};
 
     // Measured against the shipped config as a whole, not `OfferParams::default()`: the promise
     // is about what a *new* install gives a driver who has raced nothing, and the balance means
@@ -1668,7 +1668,7 @@ fn test_the_starting_balance_buys_a_choice_not_the_grid() {
     let dir = std::path::Path::new(AI_DIR);
     let mut grids_with_seats_out_of_reach = 0;
 
-    for perf in crate::custom_ai::class_performance(dir) {
+    for perf in crate::roster::custom_ai::class_performance(dir) {
         let path = dir.join(format!("{}.xml", perf.class));
         let pace: std::collections::HashMap<String, f32> = perf
             .cars
@@ -1678,8 +1678,8 @@ fn test_the_starting_balance_buys_a_choice_not_the_grid() {
         let elig = team_eligibility_with(
             &tuning,
             rating,
-            &expected_positions(&pace, &crate::custom_ai::parse_seats(&path)),
-            &crate::custom_ai::parse_team_skills(&path),
+            &expected_positions(&pace, &crate::roster::custom_ai::parse_seats(&path)),
+            &crate::roster::custom_ai::parse_team_skills(&path),
         );
         let offers = offers_for_with(
             "c",

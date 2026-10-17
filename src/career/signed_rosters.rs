@@ -13,20 +13,20 @@
 //! [`restore`], copying the season's roster back to where AMS2 reads it.
 //!
 //! **Legacy flat saves get no copy.** A flat `<name>.json` has no folder to keep one in, and those
-//! saves are never migrated (see [`crate::saves`]), so they go on reading the game's file exactly
+//! saves are never migrated (see [`crate::career::saves`]), so they go on reading the game's file exactly
 //! as before — the same rule lap charts follow.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::data_store::Championship;
+use crate::career::data_store::Championship;
 
 /// Folder holding one career's season rosters, inside that career's own folder.
 const ROSTERS_DIR: &str = "rosters";
 
 /// Where this career keeps its season rosters, or `None` for a legacy flat save.
 pub fn rosters_dir(career_file: &Path) -> Option<PathBuf> {
-    crate::saves::career_dir(career_file).map(|dir| dir.join(ROSTERS_DIR))
+    crate::career::saves::career_dir(career_file).map(|dir| dir.join(ROSTERS_DIR))
 }
 
 /// The file one season's roster is kept in, whether or not it exists yet.
@@ -34,7 +34,7 @@ pub fn rosters_dir(career_file: &Path) -> Option<PathBuf> {
 /// `None` for a flat save, and for a championship id that cannot be a filename — ids are written
 /// as unix timestamps, but a hand-edited career can hold anything and this is joined onto a path.
 pub fn copy_path(career_file: &Path, champ_id: &str) -> Option<PathBuf> {
-    let name = crate::saves::sanitize_name(champ_id)?;
+    let name = crate::career::saves::sanitize_name(champ_id)?;
     rosters_dir(career_file).map(|dir| dir.join(format!("{name}.xml")))
 }
 
@@ -95,7 +95,7 @@ pub fn matches_game(career_file: &Path, ai_dir: &Path, champ: &Championship) -> 
 /// on. The game reads a roster when a session loads, so the session has to be restarted after.
 ///
 /// The game's file gets its baseline first, like every other write the app makes to a roster
-/// (see [`crate::custom_ai::ensure_baseline`]) — Reset to baseline must still reach the roster as
+/// (see [`crate::roster::custom_ai::ensure_baseline`]) — Reset to baseline must still reach the roster as
 /// it was before the app ever touched it.
 pub fn restore(career_file: &Path, ai_dir: &Path, champ: &Championship) -> Result<(), String> {
     let file = champ
@@ -106,7 +106,7 @@ pub fn restore(career_file: &Path, ai_dir: &Path, champ: &Championship) -> Resul
         .ok_or_else(|| "this season has no stored roster".to_string())?;
     let target = ai_dir.join(file);
     if target.is_file() {
-        crate::custom_ai::ensure_baseline(&target)?;
+        crate::roster::custom_ai::ensure_baseline(&target)?;
     }
     fs::copy(&copy, &target)
         .map(|_| ())
@@ -114,5 +114,5 @@ pub fn restore(career_file: &Path, ai_dir: &Path, champ: &Championship) -> Resul
 }
 
 #[cfg(test)]
-#[path = "tests/season_rosters.rs"]
+#[path = "../tests/career/signed_rosters.rs"]
 mod tests;

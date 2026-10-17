@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::data_store::{try_load_data, CareerData, CareerMode};
+use crate::career::data_store::{try_load_data, CareerData, CareerMode};
 
 /// The career file inside a save folder. Fixed, so a save is renamed by renaming one directory
 /// rather than a directory and the file inside it.
@@ -451,5 +451,5 @@ pub fn resolve_active(dir: &Path, name: Option<&str>) -> Option<PathBuf> {
 }
 
 #[cfg(test)]
-#[path = "tests/saves.rs"]
+#[path = "../tests/career/saves.rs"]
 mod tests;

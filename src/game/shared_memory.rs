@@ -155,7 +155,7 @@ pub struct LiveSessionData {
     pub pit_mode: u32,
 }
 
-fn disconnected() -> LiveSessionData {
+pub(crate) fn disconnected() -> LiveSessionData {
     LiveSessionData {
         connected: false,
         game_state: 0,

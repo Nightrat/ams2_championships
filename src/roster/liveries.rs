@@ -4,7 +4,7 @@
 //! a livery the game already owns, matched on the `livery_name` attribute. A `livery_name` that
 //! matches nothing is silently ignored — no error, no warning, the driver simply never spawns.
 //! The 1978 roster shipped with 24 entries against 22 real liveries, so two drivers could never
-//! appear and two seats looked permanently empty to the seat accounting in [`crate::custom_ai`].
+//! appear and two seats looked permanently empty to the seat accounting in [`crate::roster::custom_ai`].
 //!
 //! The game's own livery data is sealed in Oodle-compressed `*_livery.bff` paks, so it cannot be
 //! read directly. What *can* be read is the livery-override manifest a livery mod installs at
@@ -14,7 +14,7 @@
 //! That makes this a *partial* index: it covers modded car models and nothing else. A class with
 //! no livery mod yields no names at all, and absence there proves nothing — hence the
 //! can't-verify handling in [`phantom_liveries`], mirroring what
-//! [`crate::custom_ai::known_class_names`] does when the class registry is unreadable.
+//! [`crate::roster::custom_ai::known_class_names`] does when the class registry is unreadable.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 /// `<install>/Vehicles/Textures/CustomLiveries/Overrides`, derived from the configured
 /// `CustomAIDrivers` folder by walking up to the install root — the same two-level climb
-/// [`crate::custom_ai::known_class_names`] uses. `None` if that derivation fails.
+/// [`crate::roster::custom_ai::known_class_names`] uses. `None` if that derivation fails.
 pub fn overrides_dir(custom_ai_dir: &Path) -> Option<PathBuf> {
     let install_root = custom_ai_dir.parent()?.parent()?;
     Some(
@@ -55,14 +55,14 @@ pub struct ManifestEntry {
 /// comes first: the entry's own closing tag, or the next entry's opening one. A self-closing
 /// `<LIVERY_OVERRIDE ... />` has no children at all and so never has a preview.
 pub fn parse_manifest_entries(xml: &str) -> Vec<ManifestEntry> {
-    let xml = crate::custom_ai::strip_comments(xml);
+    let xml = crate::roster::custom_ai::strip_comments(xml);
     let mut out = Vec::new();
     let mut rest = xml.as_str();
     while let Some(idx) = rest.find("<LIVERY_OVERRIDE") {
         rest = &rest[idx..];
         let Some(end) = rest.find('>') else { break };
         let open = &rest[..=end];
-        let name = crate::custom_ai::attr_value(open, "NAME").map(|n| n.trim().to_string());
+        let name = crate::roster::custom_ai::attr_value(open, "NAME").map(|n| n.trim().to_string());
         rest = &rest[end + 1..];
         if let Some(name) = name {
             let body_end = [rest.find("</LIVERY_OVERRIDE"), rest.find("<LIVERY_OVERRIDE")]
@@ -83,7 +83,7 @@ pub fn parse_manifest_entries(xml: &str) -> Vec<ManifestEntry> {
 fn find_preview(body: &str) -> Option<String> {
     let at = body.find("<PREVIEWIMAGE")?;
     let end = body[at..].find('>')? + at;
-    let path = crate::custom_ai::attr_value(&body[at..=end], "PATH")?
+    let path = crate::roster::custom_ai::attr_value(&body[at..=end], "PATH")?
         .trim()
         .to_string();
     (!path.is_empty()).then_some(path)
@@ -247,5 +247,5 @@ pub fn phantom_liveries(
 }
 
 #[cfg(test)]
-#[path = "tests/liveries.rs"]
+#[path = "../tests/roster/liveries.rs"]
 mod tests;

@@ -1,8 +1,6 @@
 use std::io::Write;
 use std::net::TcpStream;
 
-use crate::ams2_shared_memory::read_live_session;
-
 pub fn sha1(data: &[u8]) -> [u8; 20] {
     let mut h: [u32; 5] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
     let mut msg = data.to_vec();
@@ -106,7 +104,17 @@ pub fn ws_send_text(stream: &mut TcpStream, payload: &[u8]) -> std::io::Result<(
     stream.write_all(&frame)
 }
 
-pub fn handle_websocket(mut stream: TcpStream, headers: &str, poll_ms: u64) {
+/// Upgrades the connection and streams one text frame per `poll_ms`, each one whatever
+/// `next_frame` produces, until the client goes away or `next_frame` has nothing to send.
+///
+/// The frame is the caller's so this stays transport: what the live tab is sent each poll is
+/// decided by `service::App::live_frame`, not here.
+pub fn handle_websocket(
+    mut stream: TcpStream,
+    headers: &str,
+    poll_ms: u64,
+    mut next_frame: impl FnMut() -> Option<Vec<u8>>,
+) {
     let key = headers
         .lines()
         .find(|l| l.to_ascii_lowercase().starts_with("sec-websocket-key:"))
@@ -125,15 +133,9 @@ pub fn handle_websocket(mut stream: TcpStream, headers: &str, poll_ms: u64) {
         return;
     }
 
-    loop {
-        let data = read_live_session();
-        match serde_json::to_vec(&data) {
-            Ok(json) => {
-                if ws_send_text(&mut stream, &json).is_err() {
-                    break;
-                }
-            }
-            Err(_) => break,
+    while let Some(json) = next_frame() {
+        if ws_send_text(&mut stream, &json).is_err() {
+            break;
         }
         std::thread::sleep(std::time::Duration::from_millis(poll_ms));
     }

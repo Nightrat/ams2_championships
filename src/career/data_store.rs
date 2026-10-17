@@ -47,7 +47,7 @@ pub struct RecordedSession {
     pub session_type: u32,
     pub results: Vec<SessionResult>,
     /// Empty in every folder save: the chart lives in `laps/<id>.json` beside the career, and
-    /// is read only when someone opens that session's chart. See [`crate::lap_charts`] for why.
+    /// is read only when someone opens that session's chart. See [`crate::career::lap_charts`] for why.
     /// Still filled for a legacy flat save, which has nowhere else to put it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lap_chart: Vec<LapChartEntry>,
@@ -82,6 +82,31 @@ pub enum ChampionshipStatus {
     Progress,
     /// All rounds completed — winner determined.
     Final,
+}
+
+impl ChampionshipStatus {
+    /// Where a season of this status is listed: the one being raced first, then the unfinished,
+    /// then the finished.
+    fn display_rank(&self) -> u8 {
+        match self {
+            ChampionshipStatus::Active => 0,
+            ChampionshipStatus::Progress => 1,
+            ChampionshipStatus::Final => 2,
+        }
+    }
+}
+
+/// The order seasons are listed in everywhere they are listed — status ([`ChampionshipStatus::
+/// display_rank`]), then name, ignoring case. Takes the two fields rather than a type so the
+/// stored [`Championship`] and the derived [`ChampionshipView`] sort the same way.
+pub fn display_order(
+    a: (&ChampionshipStatus, &str),
+    b: (&ChampionshipStatus, &str),
+) -> std::cmp::Ordering {
+    a.0.display_rank()
+        .cmp(&b.0.display_rank())
+        .then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase()))
+        .then_with(|| a.1.cmp(b.1))
 }
 
 /// User-created championship grouping a set of rounds.
@@ -130,7 +155,7 @@ pub struct Championship {
     /// grows as rounds are raced, so after round one there is no way to tell whether a season
     /// is an eighth or a fifteenth of the way through. That is the only reason a salary could
     /// not be paid out across a season rather than in one lump at the end, so declaring it up
-    /// front is what makes per-race pay possible — see [`crate::contracts::salary_earned`].
+    /// front is what makes per-race pay possible — see [`crate::career::contracts::salary_earned`].
     ///
     /// `None` on every season created before this existed, and on any season in a career that
     /// does not use contracts. Those pay exactly as they did: the whole salary, at `Final`.
@@ -185,7 +210,7 @@ impl CareerMode {
     }
 
     /// Whether a session must *prove* it was driven in the season's car, rather than merely not
-    /// contradict it — see [`crate::custom_ai::SeatProof`].
+    /// contradict it — see [`crate::roster::custom_ai::SeatProof`].
     ///
     /// Singleplayer only: a contract was signed for that one car and is paid for it. An unset
     /// career keeps the lenient check it always had, which never required a full grid.
@@ -260,9 +285,9 @@ pub struct CareerData {
     /// save written before contracts existed, and from every save where the player never signed
     /// anything, which is why it defaults rather than being required.
     ///
-    /// This is the *only* persisted part of the contracts feature — see [`crate::contracts`].
+    /// This is the *only* persisted part of the contracts feature — see [`crate::career::contracts`].
     #[serde(default)]
-    pub contracts: Vec<crate::contracts::Contract>,
+    pub contracts: Vec<crate::career::contracts::Contract>,
     /// The rating tuning this career runs on.
     ///
     /// Copied from `config.rating_params()` when the career is created and then **kept**, for the
@@ -277,7 +302,7 @@ pub struct CareerData {
     /// is loaded, so a career in use has its own copy. `POST /api/career/rating/adopt` is the one
     /// way to replace it afterwards.
     #[serde(default)]
-    pub rating_params: Option<crate::driver_rating::RatingParams>,
+    pub rating_params: Option<crate::career::driver_rating::RatingParams>,
 }
 
 pub type SharedStore = Arc<RwLock<CareerData>>;
@@ -393,6 +418,8 @@ pub struct SessionView {
     /// the roster and half not, and the half that counts is the point.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grid_note: Option<String>,
+    /// Whoever was classified P1 — see [`RecordedSession::winner`].
+    pub winner: Option<String>,
 }
 
 /// Round with sessions already resolved from IDs.
@@ -456,7 +483,10 @@ pub struct TrackStat {
 pub struct CareerResponse {
     pub championships: Vec<ChampionshipView>,
     pub driver_stats: Vec<DriverStat>,
+    /// Grouped by (track, variation, player car) — what the Tracks tab's car filter picks from.
     pub track_stats: Vec<TrackStat>,
+    /// The same records across every car (`car` empty) — the Tracks tab's "All cars" view.
+    pub track_stats_all: Vec<TrackStat>,
 }
 
 fn resolve_sessions<'a>(
@@ -662,18 +692,18 @@ fn constructors(
 /// Seats a championship's roster can field, or an empty list when there is nothing to check
 /// against — no folder configured, no file assigned, or a file that will not parse.
 ///
-/// The roster is the season's own copy when it keeps one (see [`crate::season_rosters`]); the
+/// The roster is the season's own copy when it keeps one (see [`crate::career::signed_rosters`]); the
 /// liveries it is checked against are still the install's, since those are what AMS2 can spawn.
 fn roster_seats_of(
     champ: &Championship,
     ai_dir: Option<&Path>,
     career_file: &Path,
-) -> Vec<crate::custom_ai::SeatEntry> {
-    let Some(file) = crate::season_rosters::roster_file(career_file, ai_dir, champ) else {
+) -> Vec<crate::roster::custom_ai::SeatEntry> {
+    let Some(file) = crate::career::signed_rosters::roster_file(career_file, ai_dir, champ) else {
         return Vec::new();
     };
-    let installed = ai_dir.and_then(crate::liveries::installed_livery_names);
-    crate::custom_ai::without_phantom_seats(crate::custom_ai::parse_seats(&file), installed.as_ref())
+    let installed = ai_dir.and_then(crate::roster::liveries::installed_livery_names);
+    crate::roster::custom_ai::without_phantom_seats(crate::roster::custom_ai::parse_seats(&file), installed.as_ref())
 }
 
 /// The grid warning for one recorded session, if it has one.
@@ -681,24 +711,32 @@ fn roster_seats_of(
 /// Practice is left alone: nothing derives anything from it, so a short practice grid is a
 /// choice rather than a mistake and flagging it would be noise on the one session type where it
 /// does not matter.
-fn grid_note_for(s: &RecordedSession, seats: &[crate::custom_ai::SeatEntry]) -> Option<String> {
+fn grid_note_for(s: &RecordedSession, seats: &[crate::roster::custom_ai::SeatEntry]) -> Option<String> {
     if seats.is_empty() || s.session_type == SESSION_PRACTICE {
         return None;
     }
-    crate::custom_ai::GridFit::measure(seats, &s.grid()).note()
+    crate::roster::custom_ai::GridFit::measure(seats, &s.grid()).note()
 }
 
 impl RecordedSession {
     /// The grid as seat inference reads it.
-    pub fn grid(&self) -> Vec<crate::custom_ai::GridEntry<'_>> {
+    pub fn grid(&self) -> Vec<crate::roster::custom_ai::GridEntry<'_>> {
         self.results
             .iter()
-            .map(|r| crate::custom_ai::GridEntry {
+            .map(|r| crate::roster::custom_ai::GridEntry {
                 name: &r.name,
                 car_name: &r.car_name,
                 is_player: r.is_player,
             })
             .collect()
+    }
+
+    /// Whoever was classified P1, if anyone was.
+    pub fn winner(&self) -> Option<&str> {
+        self.results
+            .iter()
+            .find(|r| r.race_position == 1)
+            .map(|r| r.name.as_str())
     }
 }
 
@@ -709,11 +747,11 @@ impl RecordedSession {
 pub fn settle_player_seat(
     champ: &Championship,
     sessions: &[RecordedSession],
-    seats: &[crate::custom_ai::SeatEntry],
+    seats: &[crate::roster::custom_ai::SeatEntry],
     adding: Option<&RecordedSession>,
-) -> crate::custom_ai::SeatEvidence {
+) -> crate::roster::custom_ai::SeatEvidence {
     let Some(team) = champ.player_team.as_deref().filter(|t| !t.trim().is_empty()) else {
-        return crate::custom_ai::SeatEvidence::Unknown;
+        return crate::roster::custom_ai::SeatEvidence::Unknown;
     };
     let assigned: Vec<&RecordedSession> = champ
         .rounds
@@ -722,8 +760,8 @@ pub fn settle_player_seat(
         .filter_map(|id| sessions.iter().find(|s| &s.id == id))
         .chain(adding)
         .collect();
-    let grids: Vec<Vec<crate::custom_ai::GridEntry>> = assigned.iter().map(|s| s.grid()).collect();
-    crate::custom_ai::settle_seat(seats, grids.iter().map(|g| g.as_slice()), team)
+    let grids: Vec<Vec<crate::roster::custom_ai::GridEntry>> = assigned.iter().map(|s| s.grid()).collect();
+    crate::roster::custom_ai::settle_seat(seats, grids.iter().map(|g| g.as_slice()), team)
 }
 
 /// The lock a season should carry, re-derived from its assigned sessions: `None` until they
@@ -732,11 +770,11 @@ pub fn settle_player_seat(
 pub fn derive_seat_lock(
     champ: &Championship,
     sessions: &[RecordedSession],
-    seats: &[crate::custom_ai::SeatEntry],
+    seats: &[crate::roster::custom_ai::SeatEntry],
 ) -> Option<SeatLock> {
     match settle_player_seat(champ, sessions, seats, None) {
-        crate::custom_ai::SeatEvidence::Settled(s) => Some(SeatLock {
-            replaces: crate::custom_ai::replaced_driver(seats, &s.seat),
+        crate::roster::custom_ai::SeatEvidence::Settled(s) => Some(SeatLock {
+            replaces: crate::roster::custom_ai::replaced_driver(seats, &s.seat),
             seat: s.seat,
         }),
         _ => None,
@@ -748,8 +786,8 @@ fn resolve_team_map(
     ai_dir: Option<&Path>,
     career_file: &Path,
 ) -> HashMap<String, String> {
-    crate::season_rosters::roster_file(career_file, ai_dir, champ)
-        .map(|file| crate::custom_ai::parse_driver_teams(&file))
+    crate::career::signed_rosters::roster_file(career_file, ai_dir, champ)
+        .map(|file| crate::roster::custom_ai::parse_driver_teams(&file))
         .unwrap_or_default()
 }
 
@@ -792,7 +830,7 @@ pub fn compute_career(champs: &[Championship], sessions: &[RecordedSession]) -> 
 /// Like [`compute_career`], but resolves each championship's assigned Custom AI Driver file
 /// (relative to `ai_dir`) to substitute team/livery names for driver car labels. A season that
 /// keeps its own roster beside `career_file` is read from that copy instead — see
-/// [`crate::season_rosters`].
+/// [`crate::career::signed_rosters`].
 pub fn compute_career_full(
     champs: &[Championship],
     sessions: &[RecordedSession],
@@ -920,6 +958,7 @@ pub fn compute_career_full(
                     session_type: s.session_type,
                     results: result_views,
                     grid_note: grid_note_for(s, &seats),
+                    winner: s.winner().map(str::to_string),
                 });
             }
             rounds.push(RoundView {
@@ -969,7 +1008,35 @@ pub fn compute_career_full(
             .then(b.races.cmp(&a.races))
     });
 
-    // ── Track stats — grouped by (track, variation, player car) ──────────────
+    // ── Track stats ──────────────────────────────────────────────────────────
+    // Twice: once per player car, which is what the Tracks tab's car filter picks from, and once
+    // across every car, which is its "All cars" view. Both come from here so the merge is not a
+    // second copy of this logic in the browser.
+    let track_stats = track_stats_by(sessions, |s| {
+        if !s.car_name.is_empty() {
+            s.car_name.clone()
+        } else {
+            s.car_class.clone()
+        }
+    });
+    let track_stats_all = track_stats_by(sessions, |_| String::new());
+
+    CareerResponse {
+        championships,
+        driver_stats,
+        track_stats,
+        track_stats_all,
+    }
+}
+
+/// Track records grouped by (track, variation, `car_of(session)`), most recently visited first.
+///
+/// A driver's best lap in a group is the fastest they set in any of its sessions, and the three
+/// lap columns are the three fastest *drivers*, so one driver cannot hold two of them.
+fn track_stats_by(
+    sessions: &[RecordedSession],
+    car_of: impl Fn(&RecordedSession) -> String,
+) -> Vec<TrackStat> {
     #[derive(Default)]
     struct TrackAccum {
         races: u32,
@@ -980,12 +1047,7 @@ pub fn compute_career_full(
     }
     let mut track_accum: HashMap<(String, String, String), TrackAccum> = HashMap::new();
     for s in sessions {
-        let car = if !s.car_name.is_empty() {
-            s.car_name.clone()
-        } else {
-            s.car_class.clone()
-        };
-        let key = (s.track.clone(), s.track_variation.clone(), car);
+        let key = (s.track.clone(), s.track_variation.clone(), car_of(s));
         let a = track_accum.entry(key).or_default();
         if s.session_type == 5 {
             a.races += 1;
@@ -1055,12 +1117,7 @@ pub fn compute_career_full(
         })
         .collect();
     track_stats.sort_by(|a, b| b.last_visited.cmp(&a.last_visited));
-
-    CareerResponse {
-        championships,
-        driver_stats,
-        track_stats,
-    }
+    track_stats
 }
 
 /// Whether `path` may be written over.
@@ -1115,5 +1172,5 @@ pub fn persist(store: &SharedStore, path: &PathBuf) -> Result<(), String> {
 }
 
 #[cfg(test)]
-#[path = "tests/data_store.rs"]
+#[path = "../tests/career/data_store.rs"]
 mod tests;
