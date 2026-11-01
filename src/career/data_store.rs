@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 /// One driver's position on a specific completed lap.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -303,6 +304,17 @@ pub struct CareerData {
     /// way to replace it afterwards.
     #[serde(default)]
     pub rating_params: Option<crate::career::driver_rating::RatingParams>,
+
+    /// Why the last attempt to save this career failed, or `None` while its file holds what
+    /// memory does. Set and cleared by [`persist`] alone, and never written to the file: it
+    /// describes this copy *against* the file, so a career just read from disk is saved by
+    /// definition — which is also why switching careers clears it without being told to.
+    ///
+    /// It exists for the recorder, which saves with nobody waiting on an answer. A session it
+    /// could not write is still here in memory, and the live frame carries this so the Live tab
+    /// can say so while saving it is still possible.
+    #[serde(skip)]
+    pub save_error: Option<String>,
 }
 
 pub type SharedStore = Arc<RwLock<CareerData>>;
@@ -1120,7 +1132,45 @@ fn track_stats_by(
     track_stats
 }
 
-/// Whether `path` may be written over.
+/// The save lock. It has two jobs, and they are one lock because each needs the other.
+///
+/// **It puts saves in order.** The recorder thread and every request thread save the same career,
+/// and the store's own lock cannot order them: a save only *reads* the store, and any number of
+/// readers may hold it together. Two saves side by side would write the same temporary file, and
+/// the one to finish last could be the one that read the career first — putting an older career
+/// back over a newer one. Inside this lock each save reads the career and writes it before the
+/// next begins, so the last write is always of the latest career.
+///
+/// **It fixes which career is active.** Switching careers and renaming the active one happen
+/// under it, and a save reads the active path only once it holds it — so the file a save writes
+/// always belongs to the career the store holds. A save that read the path *before* taking the
+/// lock could wait out a switch and then write the career it found into the file it had read:
+/// the incoming career over the outgoing one. The recorder holds it for a whole capture for the
+/// same reason, so the session, its lap chart and the save all land in one career.
+///
+/// One process owns a saves folder (`saves::lock_folder`), so one lock in that process covers
+/// every writer there is. Taken through [`saving`]; the order is this lock, then the store's,
+/// then the active path's — never this one while holding the store.
+static SAVING: Mutex<()> = Mutex::new(());
+
+/// The save lock, held — see [`SAVING`]. While it lives, nothing saves and no other career can
+/// become active, so the active path read under it is the career the store holds until it is
+/// dropped. Hold it for one operation, and never take it while holding the store's lock.
+pub struct Saving {
+    _lock: MutexGuard<'static, ()>,
+}
+
+/// Takes the save lock, waiting for any save, switch or capture in progress to finish.
+pub fn saving() -> Saving {
+    // The lock guards no data, only order, so one poisoned by a panic has nothing half-done
+    // behind it and is simply taken.
+    Saving {
+        _lock: SAVING.lock().unwrap_or_else(|e| e.into_inner()),
+    }
+}
+
+/// What `path` holds now — `None` when there is no file yet, which is how every career begins —
+/// or why it must not be written over.
 ///
 /// A file that exists but will not parse was never loaded, so whatever is in memory did not come
 /// from it — writing would destroy a career nobody has read. Checked here, at the point of
@@ -1128,47 +1178,169 @@ fn track_stats_by(
 /// somebody forgot to set, and it also catches a file that was damaged *after* startup.
 ///
 /// Only the shape is checked, not the content — `IgnoredAny` walks the JSON without building a
-/// `CareerData`, so guarding every write costs a parse and no allocation.
-fn safe_to_overwrite(path: &Path) -> Result<(), String> {
+/// `CareerData`. The text itself comes back because [`persist`] needs it twice more: to see
+/// whether anything changed, and as the backup.
+fn current_save(path: &Path) -> Result<Option<String>, String> {
     if !path.exists() {
-        return Ok(());
+        return Ok(None);
     }
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
     serde_json::from_str::<serde::de::IgnoredAny>(content.strip_prefix(BOM).unwrap_or(&content))
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(Some(content))
+}
+
+/// Where a folder save keeps its career as it was before the last change: `career.json.bak`,
+/// beside it. `None` for a legacy flat save, which has no folder to keep one in — the same
+/// reason it keeps its lap charts inline.
+pub fn backup_path(career_file: &Path) -> Option<PathBuf> {
+    crate::career::saves::career_dir(career_file)
+        .map(|dir| dir.join(crate::career::saves::BACKUP_FILE))
 }
 
 /// Writes the career to `path`, unless that would overwrite a save that could not be read.
 ///
-/// Returns the reason it declined, so a route can report it rather than appearing to succeed.
-/// The console warning is unconditional: a background recorder has nowhere else to say it, and
-/// silently not saving is exactly the failure this guard exists to make loud.
-pub fn persist(store: &SharedStore, path: &PathBuf) -> Result<(), String> {
+/// Returns the reason it declined, so a route can report it rather than appearing to succeed, and
+/// records the outcome on the career as [`CareerData::save_error`] — set on failure, cleared on
+/// success — because the recorder saves with nobody to return a reason to. The console warning
+/// is unconditional for the same reason: silently not saving is exactly the failure this guard
+/// exists to make loud.
+///
+/// On the way to the disk:
+/// - **The file is replaced in one step** ([`replace_file`]), so a crash, a full disk or a sync
+///   client reading mid-write finds the old career or the new one, never part of each.
+/// - **A folder save keeps the version it replaces** at [`backup_path`]. A career broken by a
+///   hand edit, a sync conflict or a change made by mistake is then one rename away from the
+///   version before. A backup is only ever taken of a file that parsed.
+/// - **Nothing is written when nothing changed.** That is what keeps the backup meaning "before
+///   the last change": rewriting an unchanged career — switching away from it flushes it, for
+///   one — would otherwise replace the backup with a copy of the file it is meant to differ from.
+///
+/// `path` is the caller's word for where the career lives, which is only safe where nothing can
+/// switch careers — startup, and tests. Anything that saves *the active career* while the app is
+/// running reads its path under the lock and calls [`Saving::persist`] (see [`SAVING`]).
+pub fn persist(store: &SharedStore, path: &Path) -> Result<(), String> {
+    saving().persist(store, path)
+}
+
+impl Saving {
+    /// [`persist`], for a caller already holding the lock.
+    ///
+    /// The career is read under the store's lock and written after it is released: the recorder
+    /// needs the write lock to file a session, and a slow disk is no reason to make it wait.
+    pub fn persist(&self, store: &SharedStore, path: &Path) -> Result<(), String> {
+        let content = serialize(&store.read().unwrap());
+        let result = content.and_then(|content| write_career(path, &content));
+        report(&result);
+        if let Ok(mut data) = store.write() {
+            data.save_error = result.as_ref().err().cloned();
+        }
+        result
+    }
+
+    /// [`Self::persist`] from a career the caller already holds for writing.
+    ///
+    /// For switching careers and renaming the active one: they write the career out and then
+    /// repoint the store, and nothing may change it in between — a change landing after the flush
+    /// and before the swap would be in neither file. Whoever holds `data` is the only one who
+    /// could make one.
+    pub fn persist_from(&self, data: &mut CareerData, path: &Path) -> Result<(), String> {
+        let result = serialize(data).and_then(|content| write_career(path, &content));
+        report(&result);
+        data.save_error = result.as_ref().err().cloned();
+        result
+    }
+}
+
+fn serialize(data: &CareerData) -> Result<String, String> {
+    serde_json::to_string_pretty(data).map_err(|e| format!("failed to save career data: {e}"))
+}
+
+/// The console line for a failed save — unconditional, because the recorder has nobody else
+/// to tell.
+fn report(result: &Result<(), String>) {
+    if let Err(msg) = result {
+        eprintln!("ERROR: {msg}");
+    }
+}
+
+/// The write itself, for a caller holding the lock: the guard, the unchanged check, the backup
+/// and the one-step replace.
+fn write_career(path: &Path, content: &str) -> Result<(), String> {
     // No active career — the saves folder was empty at startup and none has been created yet.
     // There is nowhere for this to go, and writing it to a path of "" would be worse than
     // saying so.
     if path.as_os_str().is_empty() {
-        let msg = "no active career — create one before saving".to_string();
-        eprintln!("ERROR: {msg}");
-        return Err(msg);
+        return Err("no active career — create one before saving".to_string());
     }
-    if let Err(e) = safe_to_overwrite(path) {
-        let msg = format!(
+    let current = current_save(path).map_err(|e| {
+        format!(
             "refusing to overwrite {}: it exists but could not be read ({e}). \
              Fix or move the file — nothing in it has been changed.",
             path.display()
-        );
-        eprintln!("ERROR: {msg}");
-        return Err(msg);
+        )
+    })?;
+    if current.as_deref() == Some(content) {
+        return Ok(());
     }
-    let data = store.read().unwrap();
-    let content = serde_json::to_string_pretty(&*data).unwrap_or_default();
-    fs::write(path, content).map_err(|e| {
-        let msg = format!("failed to save career data: {e}");
-        eprintln!("ERROR: {msg}");
-        msg
-    })
+    if let (Some(previous), Some(backup)) = (&current, backup_path(path)) {
+        // A backup that cannot be refreshed is no reason to lose the save it was meant to
+        // protect, so it is reported and the career is written anyway.
+        if let Err(e) = replace_file(&backup, previous.as_bytes()) {
+            eprintln!("Could not refresh the backup {}: {e}", backup.display());
+        }
+    }
+    replace_file(path, content.as_bytes()).map_err(|e| format!("failed to save career data: {e}"))
+}
+
+/// How many times a finished temporary file is renamed over the career before giving up and
+/// writing in place. The pauses between them add up to an eighth of a second.
+const REPLACE_ATTEMPTS: u32 = 4;
+
+/// Writes `bytes` to `path` so that whoever reads it — another thread, a sync client, the next
+/// start after a crash — finds the old file or the new one, never part of each.
+///
+/// The bytes go to a sibling `<name>.tmp`, are flushed to disk, and that file is renamed over
+/// `path`, which replaces it in one step. Flushing first is what makes this hold across a power
+/// cut: a rename can reach the disk before the contents it points at do.
+///
+/// Windows refuses the rename while something holds `path` open without allowing it to be
+/// replaced — a virus scanner, or a sync client reading it. That is usually over in moments, so
+/// it is retried briefly, and if it is not, the file is written in place, as every save was
+/// before this. Losing the one-step replace is better than losing the save, and for a folder save
+/// the backup [`persist`] has just taken covers the gap. Only the rename falls back: a temporary
+/// file that could not be *written* — a full disk — returns the error with `path` untouched,
+/// which is the whole point; writing in place then could leave it half-written.
+fn replace_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".tmp");
+    let tmp = path.with_file_name(name);
+    let written = fs::File::create(&tmp).and_then(|mut file| {
+        file.write_all(bytes)?;
+        file.sync_all()
+    });
+    if let Err(e) = written {
+        let _ = fs::remove_file(&tmp);
+        return Err(e);
+    }
+    let mut last = match fs::rename(&tmp, path) {
+        Ok(()) => return Ok(()),
+        Err(e) => e,
+    };
+    for attempt in 1..REPLACE_ATTEMPTS {
+        std::thread::sleep(std::time::Duration::from_millis(20 * attempt as u64));
+        match fs::rename(&tmp, path) {
+            Ok(()) => return Ok(()),
+            Err(e) => last = e,
+        }
+    }
+    let _ = fs::remove_file(&tmp);
+    eprintln!(
+        "Could not replace {} in one step ({last}) — something is holding it open. \
+         Writing it in place instead.",
+        path.display()
+    );
+    fs::write(path, bytes)
 }
 
 #[cfg(test)]

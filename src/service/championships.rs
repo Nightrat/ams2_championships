@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     bad, cfg_custom_ai_dir, champ_roster_file, champ_roster_seats, conflict, double_option,
-    not_found, now_secs, App, AppResult,
+    internal, not_found, now_secs, App, AppResult,
 };
 use crate::roster::custom_ai::{self, GridEntry, GridFit, SeatEntry};
 use crate::career::data_store::{
@@ -554,9 +554,13 @@ impl App {
         if data.championships.len() == before {
             return Err(not_found("not found"));
         }
-        drop(data);
+        // Read while the career is held: switching changes the store and the path together under
+        // the store's lock, so this is the folder of the career just changed. The save reads the
+        // path again under its own lock; if a switch came between, it flushed this change into
+        // this folder's file already.
         let career = self.active_path();
-        self.persist_to(&career)?;
+        drop(data);
+        self.persist()?;
         // A season's roster belongs to the season; with nothing left to point at it, it is a
         // stray file.
         crate::career::signed_rosters::remove(&career, id);
@@ -578,8 +582,10 @@ impl App {
 
     /// Removes a round, and re-derives the season's car from the sessions left.
     pub fn remove_round(&self, id: &str, ridx: usize) -> AppResult<Championship> {
-        let career = self.active_path();
         let mut data = self.store.write().unwrap();
+        // Read while the career is held, so the roster the car is re-derived from is this
+        // career's — see `App::delete_championship`.
+        let career = self.active_path();
         let d = &mut *data;
         let Some(champ) = d.championships.iter_mut().find(|c| c.id == id) else {
             return Err(not_found("not found"));
@@ -605,8 +611,9 @@ impl App {
     /// car is stored on the season (`player_seat`) and every later session must be in it — the
     /// team name alone would accept the team-mate's car too.
     pub fn add_session_to_round(&self, id: &str, ridx: usize, sid: &str) -> AppResult<Championship> {
-        let career = self.active_path();
         let mut data = self.store.write().unwrap();
+        // Read while the career is held, so the seat is judged on this career's roster.
+        let career = self.active_path();
         let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
             return Err(not_found("not found"));
         };
@@ -649,8 +656,9 @@ impl App {
         ridx: usize,
         sid: &str,
     ) -> AppResult<Championship> {
-        let career = self.active_path();
         let mut data = self.store.write().unwrap();
+        // Read while the career is held, as in `remove_round`.
+        let career = self.active_path();
         let d = &mut *data;
         let Some(champ) = d.championships.iter_mut().find(|c| c.id == id) else {
             return Err(not_found("not found"));
@@ -667,9 +675,23 @@ impl App {
     }
 
     /// Captures the live session by hand, outside the recorder's automatic triggers.
+    ///
+    /// Two different failures, kept apart. Nothing worth recording is a refusal (`Conflict`) —
+    /// the same test the Record button is enabled on. A session taken but not saved is
+    /// `Internal`: it is in memory, and the career's `save_error` keeps saying so until a save
+    /// succeeds. Answering "Saved." for that one would be the silent failure `persist` exists to
+    /// prevent.
+    ///
+    /// The active career is handed over as the shared handle, not read here: `capture` reads it
+    /// under the save lock, so a switch cannot slip between choosing the career and saving it.
     pub fn record_current_session(&self) -> AppResult<()> {
-        crate::game::recorder::capture_current(&self.store, &self.active_path())
-            .map_err(super::AppError::Conflict)
+        if self.active_path().as_os_str().is_empty() {
+            return Err(conflict("No active career — create one first"));
+        }
+        let session = crate::game::shared_memory::read_live_session();
+        crate::game::recorder::recordable(&session).map_err(conflict)?;
+        crate::game::recorder::capture(&self.store, &self.data_path, &session, vec![], None)
+            .map_err(|e| internal(format!("The session was recorded but not saved: {e}")))
     }
 
     /// Distinct team names from the championship's roster, for the "player team" picker.

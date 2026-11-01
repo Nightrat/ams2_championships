@@ -1,7 +1,7 @@
 use super::*;
 use crate::game::shared_memory::{LiveSessionData, ParticipantData, PlayerTelemetry};
 use crate::career::data_store::{CareerData, SharedStore};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -179,6 +179,11 @@ fn make_store() -> (SharedStore, PathBuf) {
     (store, path)
 }
 
+/// The shared active-career handle `capture` reads its path from, pointing at `path`.
+fn active(path: &Path) -> SavePath {
+    Arc::new(RwLock::new(path.to_path_buf()))
+}
+
 // ── capture() ─────────────────────────────────────────────────────────────────
 
 #[test]
@@ -191,7 +196,7 @@ fn test_capture_stores_session_with_correct_fields() {
             make_participant("Bob", 2, 10, 91.0, "McLaren"),
         ],
     );
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     let data = store.read().unwrap();
     assert_eq!(data.sessions.len(), 1);
     let s = &data.sessions[0];
@@ -217,7 +222,7 @@ fn test_capture_dnf_driver_with_fewer_laps() {
             make_participant("Bob", 2, 8, 91.0, ""),
         ],
     );
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     let data = store.read().unwrap();
     let results = &data.sessions[0].results;
     assert!(!results[0].dnf, "Alice finished");
@@ -235,7 +240,7 @@ fn test_capture_all_same_laps_no_dnf() {
             make_participant("Bob", 2, 5, 91.0, ""),
         ],
     );
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     let data = store.read().unwrap();
     for r in &data.sessions[0].results {
         assert!(!r.dnf, "{} should not be DNF", r.name);
@@ -248,7 +253,7 @@ fn test_capture_zero_laps_nobody_is_dnf() {
     // max_laps == 0 → guard prevents DNF marking
     let (store, path) = make_store();
     let session = make_session(5, vec![make_participant("Alice", 1, 0, 0.0, "")]);
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     let data = store.read().unwrap();
     assert!(!data.sessions[0].results[0].dnf);
     let _ = std::fs::remove_file(&path);
@@ -258,7 +263,7 @@ fn test_capture_zero_laps_nobody_is_dnf() {
 fn test_capture_maps_session_type_practice() {
     let (store, path) = make_store();
     let session = make_session(1, vec![make_participant("Alice", 1, 3, 90.0, "")]);
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     assert_eq!(store.read().unwrap().sessions[0].session_type, 1);
     let _ = std::fs::remove_file(&path);
 }
@@ -267,7 +272,7 @@ fn test_capture_maps_session_type_practice() {
 fn test_capture_maps_session_type_qualify() {
     let (store, path) = make_store();
     let session = make_session(3, vec![make_participant("Alice", 1, 3, 90.0, "")]);
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     assert_eq!(store.read().unwrap().sessions[0].session_type, 3);
     let _ = std::fs::remove_file(&path);
 }
@@ -281,7 +286,7 @@ fn test_capture_is_player_from_telemetry_flag() {
         5,
         vec![alice, make_participant("Bob", 2, 10, 91.0, "McLaren")],
     );
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     let data = store.read().unwrap();
     assert!(data.sessions[0].results[0].is_player, "Alice");
     assert!(!data.sessions[0].results[1].is_player, "Bob");
@@ -301,7 +306,7 @@ fn test_capture_is_player_falls_back_to_player_name_override() {
             make_participant("Bob", 2, 10, 91.0, "McLaren"),
         ],
     );
-    capture(&store, &path, &session, vec![], Some("Bob"));
+    capture(&store, &active(&path), &session, vec![], Some("Bob")).unwrap();
     let data = store.read().unwrap();
     assert!(!data.sessions[0].results[0].is_player, "Alice");
     assert!(data.sessions[0].results[1].is_player, "Bob");
@@ -312,12 +317,95 @@ fn test_capture_is_player_falls_back_to_player_name_override() {
 fn test_capture_persists_to_file() {
     let (store, path) = make_store();
     let session = make_session(5, vec![make_participant("Alice", 1, 10, 90.0, "")]);
-    capture(&store, &path, &session, vec![], None);
+    capture(&store, &active(&path), &session, vec![], None).unwrap();
     assert!(path.exists(), "capture should persist data to disk");
     let content = std::fs::read_to_string(&path).unwrap();
     let v: serde_json::Value = serde_json::from_str(&content).unwrap();
     assert_eq!(v["sessions"].as_array().unwrap().len(), 1);
     let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_session_that_cannot_be_saved_is_kept_and_the_career_says_why() {
+    // The recorder has nobody to answer, so the reason has to land somewhere the Live tab can
+    // read it — and the session must still be there to save once the file is fixed.
+    let (store, path) = make_store();
+    let damaged = "{ not a career";
+    std::fs::write(&path, damaged).unwrap();
+    let session = make_session(5, vec![make_participant("Alice", 1, 10, 90.0, "")]);
+
+    let err = capture(&store, &active(&path), &session, vec![], None)
+        .expect_err("a save over an unreadable file must be refused");
+    assert!(err.contains("refusing to overwrite"), "{err}");
+    let data = store.read().unwrap();
+    assert_eq!(data.sessions.len(), 1, "the session stays in memory");
+    assert_eq!(data.save_error.as_deref(), Some(err.as_str()));
+    drop(data);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), damaged, "the file is untouched");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_session_taken_with_no_active_career_is_an_error_and_not_kept() {
+    let (store, _) = make_store();
+    let session = make_session(5, vec![make_participant("Alice", 1, 10, 90.0, "")]);
+    let err = capture(&store, &active(&PathBuf::new()), &session, vec![], None)
+        .expect_err("there is no career to record into");
+    assert!(err.contains("NOT recorded"), "{err}");
+    assert!(store.read().unwrap().sessions.is_empty());
+}
+
+#[test]
+fn test_a_capture_reads_the_active_career_only_once_it_holds_the_save_lock() {
+    // The race this closes: the recorder read the active path, waited for the save lock while
+    // the user switched careers, then wrote the career it found — the new one — into the path it
+    // had read, the old career's file. The path is now read under the lock, so a switch made
+    // while the capture waits sends the session, its chart and the save to the career switched to.
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ams2_rec_switch_{ns}"));
+    let a = root.join("a").join("career.json");
+    let b = root.join("b").join("career.json");
+    for (file, season) in [(&a, "A"), (&b, "B")] {
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        let json = format!(
+            r#"{{"sessions":[],"championships":[{{"id":"{season}","name":"{season}","points_system":[25],"rounds":[]}}]}}"#
+        );
+        std::fs::write(file, json).unwrap();
+    }
+    let a_before = std::fs::read_to_string(&a).unwrap();
+    let load = |file: &Path| crate::career::data_store::try_load_data(file).unwrap();
+    let store: SharedStore = Arc::new(RwLock::new(load(&a)));
+    let active = active(&a);
+
+    let held = crate::career::data_store::saving();
+    let capturing = {
+        let (store, active) = (store.clone(), active.clone());
+        std::thread::spawn(move || {
+            let session = make_session(5, vec![make_participant("Alice", 1, 3, 90.0, "")]);
+            let chart = vec![LapChartEntry { lap: 1, driver: "Alice".into(), position: 1 }];
+            capture(&store, &active, &session, chart, None)
+        })
+    };
+    // Long enough for the capture to be waiting on the lock — it cannot get past it either way.
+    std::thread::sleep(Duration::from_millis(100));
+    // A switch to B, made the way `App::switch_to` makes one: under the lock, the store's
+    // contents and the path together.
+    *store.write().unwrap() = load(&b);
+    *active.write().unwrap() = b.clone();
+    drop(held);
+    capturing.join().unwrap().expect("the session is saved");
+
+    assert_eq!(std::fs::read_to_string(&a).unwrap(), a_before, "A's file is untouched");
+    assert!(!a.parent().unwrap().join("laps").exists(), "and nothing was written beside it");
+    let saved = load(&b);
+    assert_eq!(saved.championships[0].name, "B");
+    assert_eq!(saved.sessions.len(), 1, "the session went to the career switched to");
+    let chart = b.parent().unwrap().join("laps").join(format!("{}.json", saved.sessions[0].id));
+    assert!(chart.exists(), "with its lap chart beside it");
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 // ── should_capture() ──────────────────────────────────────────────────────────

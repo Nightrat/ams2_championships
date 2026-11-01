@@ -1425,6 +1425,239 @@ fn test_persist_accepts_a_save_that_only_had_a_byte_order_mark() {
     let _ = fs::remove_file(&path);
 }
 
+// ── How a save reaches the disk ───────────────────────────────────────────────
+
+/// A folder save in a saves folder of its own: `<temp>/ams2_save_test_<tag>_<ns>/c/career.json`.
+/// Returns the career file and the folder to remove afterwards.
+fn folder_save(tag: &str) -> (PathBuf, PathBuf) {
+    let ns = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ams2_save_test_{tag}_{ns}"));
+    let career = root.join("c").join(crate::career::saves::CAREER_FILE);
+    fs::create_dir_all(career.parent().unwrap()).unwrap();
+    (career, root)
+}
+
+/// Every file name in `dir`, sorted.
+fn files_in(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn test_a_first_save_leaves_the_career_and_nothing_else() {
+    // No backup of a file that was not there, and no temporary file left lying about.
+    let (career, root) = folder_save("first");
+    let store = load_store(&career);
+    store.write().unwrap().sessions.push(sample_session());
+    persist(&store, &career).unwrap();
+    assert_eq!(files_in(career.parent().unwrap()), vec!["career.json"]);
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_a_folder_save_keeps_the_version_before_the_last_change() {
+    let (career, root) = folder_save("backup");
+    let backup = backup_path(&career).expect("a folder save has somewhere to keep one");
+    let store = load_store(&career);
+
+    store.write().unwrap().championships.push(sample_championship());
+    persist(&store, &career).unwrap();
+    let first = fs::read_to_string(&career).unwrap();
+
+    store.write().unwrap().sessions.push(sample_session());
+    persist(&store, &career).unwrap();
+    let second = fs::read_to_string(&career).unwrap();
+    assert_ne!(second, first);
+    assert_eq!(fs::read_to_string(&backup).unwrap(), first);
+
+    store.write().unwrap().championships.clear();
+    persist(&store, &career).unwrap();
+    assert_eq!(
+        fs::read_to_string(&backup).unwrap(),
+        second,
+        "the backup moves on with each change"
+    );
+    assert_eq!(
+        files_in(career.parent().unwrap()),
+        vec!["career.json", "career.json.bak"]
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_saving_an_unchanged_career_leaves_its_backup_alone() {
+    // Switching away from a career flushes it whether or not anything changed. Rewriting it then
+    // would make the backup a copy of the file, and the version before the last change would be
+    // gone.
+    let (career, root) = folder_save("unchanged");
+    let backup = backup_path(&career).unwrap();
+    let store = load_store(&career);
+    store.write().unwrap().championships.push(sample_championship());
+    persist(&store, &career).unwrap();
+    let before_change = fs::read_to_string(&career).unwrap();
+    store.write().unwrap().sessions.push(sample_session());
+    persist(&store, &career).unwrap();
+
+    persist(&store, &career).expect("an unchanged career saves without complaint");
+    assert_eq!(fs::read_to_string(&backup).unwrap(), before_change);
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_a_damaged_career_never_becomes_its_backup() {
+    // The backup is what a damaged career is restored *from*, so the damage must never reach it.
+    let (career, root) = folder_save("damaged");
+    let backup = backup_path(&career).unwrap();
+    let store = load_store(&career);
+    store.write().unwrap().championships.push(sample_championship());
+    persist(&store, &career).unwrap();
+    store.write().unwrap().sessions.push(sample_session());
+    persist(&store, &career).unwrap();
+    let good = fs::read_to_string(&backup).unwrap();
+
+    fs::write(&career, "{ hand-edited and broken").unwrap();
+    store.write().unwrap().sessions.clear();
+    persist(&store, &career).expect_err("an unreadable career is never written over");
+    assert_eq!(fs::read_to_string(&backup).unwrap(), good);
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_a_flat_save_keeps_no_backup() {
+    // A legacy `<name>.json` has no folder of its own. A backup beside it would be a stray file
+    // in the saves folder, left behind by every rename and delete of the save.
+    let (_, root) = folder_save("flat");
+    let flat = root.join("old.json");
+    assert_eq!(backup_path(&flat), None);
+    let store = load_store(&flat);
+    store.write().unwrap().championships.push(sample_championship());
+    persist(&store, &flat).unwrap();
+    store.write().unwrap().sessions.push(sample_session());
+    persist(&store, &flat).unwrap();
+    assert_eq!(files_in(&root), vec!["c", "old.json"]);
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_saves_from_many_threads_at_once_end_with_every_change() {
+    // The recorder and the request threads all save the same career. Each save reads the career
+    // and writes it inside one lock, so whichever is written last holds every change before it.
+    let (career, root) = folder_save("threads");
+    let store = load_store(&career);
+    let threads: Vec<_> = (0..4)
+        .map(|t| {
+            let store = store.clone();
+            let career = career.clone();
+            std::thread::spawn(move || {
+                for i in 0..5 {
+                    let mut session = sample_session();
+                    session.id = format!("{t}-{i}");
+                    store.write().unwrap().sessions.push(session);
+                    persist(&store, &career).expect("every save must succeed");
+                }
+            })
+        })
+        .collect();
+    for t in threads {
+        t.join().unwrap();
+    }
+    let saved = try_load_data(&career).expect("the file must hold one whole career");
+    assert_eq!(saved.sessions.len(), 20);
+    assert_eq!(
+        files_in(career.parent().unwrap()),
+        vec!["career.json", "career.json.bak"]
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[cfg(windows)]
+#[test]
+fn test_a_career_held_open_against_replacing_is_still_saved() {
+    // A virus scanner or a sync client reading the file can refuse the one-step replace for as
+    // long as it holds it. The save must still happen — in place, as every save did before.
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_SHARE_READ: u32 = 0x1;
+    const FILE_SHARE_WRITE: u32 = 0x2;
+
+    let (career, root) = folder_save("held");
+    let store = load_store(&career);
+    store.write().unwrap().championships.push(sample_championship());
+    persist(&store, &career).unwrap();
+
+    // Others may read and write it, but not delete or replace it.
+    let holder = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .open(&career)
+        .unwrap();
+    store.write().unwrap().sessions.push(sample_session());
+    persist(&store, &career).expect("a held career is written in place rather than not at all");
+    drop(holder);
+
+    assert_eq!(try_load_data(&career).unwrap().sessions.len(), 1);
+    assert_eq!(
+        files_in(career.parent().unwrap()),
+        vec!["career.json", "career.json.bak"],
+        "the temporary file is cleared away"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_a_failed_save_is_remembered_on_the_career_until_one_succeeds() {
+    let path = load_tmp("remembered");
+    fs::write(&path, "{ damaged").unwrap();
+    let store = load_store(&path);
+    store.write().unwrap().sessions.push(sample_session());
+    let err = persist(&store, &path).expect_err("the damaged file is protected");
+    assert_eq!(store.read().unwrap().save_error.as_deref(), Some(err.as_str()));
+
+    // The damaged file is moved aside, and the next save writes what memory still holds.
+    fs::remove_file(&path).unwrap();
+    persist(&store, &path).expect("nothing is in the way any more");
+    assert_eq!(store.read().unwrap().save_error, None);
+    assert_eq!(try_load_data(&path).unwrap().sessions.len(), 1);
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_a_save_waits_while_the_save_lock_is_held() {
+    // What switching careers relies on: while it holds the lock, nothing else writes a career.
+    let path = load_tmp("held_lock");
+    let store = load_store(&path);
+    let held = saving();
+    let writer = {
+        let (store, path) = (store.clone(), path.clone());
+        std::thread::spawn(move || persist(&store, &path))
+    };
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    assert!(!path.exists(), "nothing may be written while the lock is held");
+    drop(held);
+    writer.join().unwrap().expect("the save goes ahead once the lock is free");
+    assert!(path.exists());
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn test_the_reason_a_save_failed_is_never_written_into_the_career() {
+    // It describes the copy in memory against the file, which a file cannot say about itself.
+    let path = load_tmp("noflag");
+    let store = load_store(&path);
+    store.write().unwrap().save_error = Some("an earlier failure".into());
+    persist(&store, &path).unwrap();
+    assert!(!fs::read_to_string(&path).unwrap().contains("save_error"));
+    assert!(try_load_data(&path).unwrap().save_error.is_none());
+    let _ = fs::remove_file(&path);
+}
+
 #[test]
 fn test_driver_standings_name_the_team_falling_back_to_the_car() {
     let champ = make_champ(vec![25, 18, 15], &["s1"]);

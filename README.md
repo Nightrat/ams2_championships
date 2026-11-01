@@ -180,6 +180,7 @@ Each career is a **folder** inside the saves folder (`championships/` next to th
 championships/
   ams2_career/
     career.json            <- the career: sessions, championships, contracts
+    career.json.bak        <- the career as it was before its last change
     laps/
       1728394855.json      <- one lap chart per race session
   gt3_2025/
@@ -200,7 +201,9 @@ Lap charts live beside the career in `laps/` rather than inside it. They are the
 
 At most one championship carries the `Active` status: it marks the season currently being raced, and `PATCH /api/championships/:id` demotes any previous holder to `Progress`. The live timing grid reads its team names from that championship, so the flag is load-bearing rather than cosmetic.
 
-A career written before folders existed — a flat `<name>.json` directly in the saves folder — is still read, and is never migrated. Its lap charts stay inside the file.
+Every save replaces `career.json` in one step — the new career is written to a temporary file, flushed to disk and renamed over the old one — so a crash or a sync client reading mid-write never finds half a career. The version it replaces is kept as `career.json.bak`, unless nothing changed. Restoring it is a rename, done with the server closed.
+
+A career written before folders existed — a flat `<name>.json` directly in the saves folder — is still read, and is never migrated. Its lap charts stay inside the file, and it keeps no backup.
 
 Track layout data is stored as JSON files in `championships/track_layouts/`, one per track, named by a slug of the track name. They are built automatically from car positions during live sessions and shared by every career.
 
@@ -216,6 +219,7 @@ Track layout data is stored as JSON files in `championships/track_layouts/`, one
 | `GET` | `/api/career/finances` | Balance, season ledger, and the season being raced |
 | `PATCH` | `/api/career/mode` | Set the career mode — allowed once, only from unset |
 | `POST` | `/api/career/rating/adopt` | Move the current career onto the rating tuning in config |
+| `POST` | `/api/career/save` | Write the active career to disk now — the Live tab's **Save now**, after a save failed |
 | `GET` | `/api/championships` | List all championships |
 | `POST` | `/api/championships` | Create a championship; a singleplayer one requires a Custom AI file and a planned round count |
 | `PATCH` | `/api/championships/:id` | Update name, status, points system, planned rounds, Custom AI file or player team. Setting status to `Active` demotes any other Active championship to `Progress` |
@@ -253,8 +257,10 @@ Track layout data is stored as JSON files in `championships/track_layouts/`, one
 | `GET` | `/api/track-layout/:track` | Load saved track radar points for a track |
 | `POST` | `/api/track-layout/:track` | Save track radar points for a track |
 | `GET` | `/api/live-teams` | Driver → team names for the live grid, from the active championship's Custom AI Drivers file, plus that championship's player team and the grid check |
-| `GET` | `/live` | Current AMS2 session state snapshot (JSON) |
+| `GET` | `/live` | Current AMS2 session state snapshot (JSON). The one route a page on another site may read |
 | `WS` | `/ws` | WebSocket endpoint — pushes live session JSON at the configured poll interval |
+
+A request that a browser marks as sent by a page on another site — its `Origin` header names a different address from the one the server was reached at — is refused with `403`, the WebSocket included. Otherwise any website open in the same browser could change your career. `GET /live` is the exception, so overlays and other tools can still read the live snapshot. Requests with no `Origin` at all, such as `curl` or a script, are not affected.
 
 ## Development
 
@@ -272,7 +278,7 @@ Press **Ctrl+Shift+B** to pick a build task (build / test / clippy / fmt). **car
 cargo test
 ```
 
-Around 780 tests live in `src/tests/`, which mirrors the source folders. Each file is wired into its module with `#[path = "…"]` so it can reach `pub(crate)` items:
+Around 810 tests live in `src/tests/`, which mirrors the source folders. Each file is wired into its module with `#[path = "…"]` so it can reach `pub(crate)` items:
 
 - `career/data_store.rs` — JSON persistence round-trips, standings and the countback tiebreak, constructor scoring, `compute_career` aggregation, track stats
 - `career/saves.rs`, `career/lap_charts.rs`, `career/signed_rosters.rs` — both save layouts and rename/duplicate/delete; externalised lap charts; a signed season's roster copy

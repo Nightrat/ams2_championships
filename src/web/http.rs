@@ -51,14 +51,27 @@ pub fn send_with_cache(
     cache_control: &str,
     body: &[u8],
 ) {
+    write_response(stream, status, content_type, cache_control, "", body);
+}
+
+/// The one place a response is put together. `extra_headers` is either empty or whole
+/// `Name: value\r\n` lines.
+///
+/// No `Access-Control-Allow-Origin` by default: the app's own page is served from here, so it
+/// needs no permission to read what it asks for, and granting it to every site let any page the
+/// user had open read the career too. [`json_ok_any_origin`] is the exception.
+fn write_response(
+    stream: &mut TcpStream,
+    status: &str,
+    content_type: &str,
+    cache_control: &str,
+    extra_headers: &str,
+    body: &[u8],
+) {
     let header = format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\
-         Cache-Control: {}\r\nAccess-Control-Allow-Origin: *\r\n\
-         Connection: close\r\n\r\n",
-        status,
-        content_type,
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\
+         Cache-Control: {cache_control}\r\n{extra_headers}Connection: close\r\n\r\n",
         body.len(),
-        cache_control
     );
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(body);
@@ -80,6 +93,50 @@ pub fn send_download(stream: &mut TcpStream, content_type: &str, file_name: &str
 
 pub fn json_ok(stream: &mut TcpStream, body: &[u8]) {
     send_response(stream, "200 OK", "application/json", body);
+}
+
+/// [`json_ok`] that a page on any site may read — for the raw `/live` snapshot only, which the
+/// README offers to overlays and other tools and which changes nothing when read.
+pub fn json_ok_any_origin(stream: &mut TcpStream, body: &[u8]) {
+    write_response(
+        stream,
+        "200 OK",
+        "application/json",
+        "no-store",
+        "Access-Control-Allow-Origin: *\r\n",
+        body,
+    );
+}
+
+/// The value of the request header called `name`, matched in any case, trimmed; `None` when the
+/// request did not send one. `headers` is [`Request::headers`], request line included.
+pub fn header<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
+    headers.lines().skip(1).find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        key.trim().eq_ignore_ascii_case(name).then(|| value.trim())
+    })
+}
+
+/// Whether a browser says this request was sent by a page on another site.
+///
+/// Any page the user has open can aim a form or a script at this server, and a POST whose body
+/// is plain text goes out without the browser asking anyone first — so a page elsewhere could
+/// sign contracts, switch careers or reset rosters here. `Origin` is written by the browser, not
+/// by the page, and is sent with every request a page makes to another site and with every
+/// same-site request that is not a GET. It is compared with `Host`, the address the browser was
+/// given for this server — `127.0.0.1`, `localhost` or a LAN address alike — so the app works
+/// from whichever of them it was opened at.
+///
+/// No `Origin` at all is not a page: curl, scripts and the tests send none, and are let through.
+/// `Origin: null` — a sandboxed frame, a file opened from disk — is not this app's page either.
+pub fn from_another_site(headers: &str) -> bool {
+    let Some(origin) = header(headers, "origin") else {
+        return false;
+    };
+    match header(headers, "host") {
+        Some(host) => !origin.eq_ignore_ascii_case(&format!("http://{host}")),
+        None => true,
+    }
 }
 
 /// Answers `{"error": msg}`. The message is escaped as a JSON string, so a Windows path (all

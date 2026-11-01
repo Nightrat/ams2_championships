@@ -66,7 +66,7 @@ fn default_floor_prize() -> i64 {
 /// That works, but it is the last resort doing the work.
 ///
 /// The figure it replaced was 5,000,000, measured against that old economy: across the eight
-/// rosters in `docs/custom_ai_files_with_perf_scalars` the second-cheapest pay-driver seat for a
+/// rosters then in `custom_ai_files_with_perf_scalars` the second-cheapest pay-driver seat for a
 /// driver on the starting rating reached 4,949,999, and it covered the dearest of those.
 /// `test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most` is what re-measures
 /// the promise now, against [`Config::default`]'s economy rather than this one.

@@ -95,6 +95,14 @@ Rows in that state are tagged **no livery** in the Car and Driver Performance ta
 
 The check reads the livery manifests your **livery mods** install, which is the only list of livery names that can be read — the game's own livery data is sealed inside its pak files. That makes the check partial by nature: a class no livery mod covers reads as *liveries not verifiable* rather than being guessed at, so an unmodded class is never wrongly condemned.
 
+A livery mod often sits *beside* a car's own liveries rather than replacing them — the 1983 F-Retro Gen3 skinpack leaves the Brabham BT52's two white stock cars in place. Naming such a car in a roster by the name its livery screen shows (“Brabham BT52 #5”) did **not** work: AMS2 kept racing it as its own default AI driver. What does work is giving the car a name in the mod's manifest:
+
+1. Start AMS2 with the launch option `-showLiveryIDs` and read the car's ID on the livery screen.
+2. Add an entry for that ID to the mod's manifest (`Vehicles\Textures\CustomLiveries\Overrides\<car>\<car>.xml`), with no textures so it keeps its look: `<LIVERY_OVERRIDE LIVERY="53" NAME="RAM-Hart #9 Alliot" BASELIVERY="Default"></LIVERY_OVERRIDE>`
+3. Use that name as the roster entry's `livery_name`.
+
+The app then checks it like any other mod livery. Keep a copy of the edited manifest: reinstalling or updating the mod overwrites it.
+
 The scalars affect **your** car too, not only the AI: you occupy a seat in a livery like everyone else.
 
 Reiza documents the scalars as 0.900–1.100, where 1.000 means no change, and edits outside that range are refused. AMS2 reads the file when a session loads, so restart the session for an edit to take effect.

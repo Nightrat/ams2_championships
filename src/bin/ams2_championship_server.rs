@@ -10,7 +10,8 @@ use std::sync::Arc;
 use ams2_championship::game::shared_memory::read_live_session;
 use ams2_championship::career::data_store::CareerMode;
 use ams2_championship::web::http::{
-    json_err, json_ok, read_full_request, send_download, send_response, send_with_cache, url_decode,
+    from_another_site, json_err, json_ok, json_ok_any_origin, read_full_request, send_download,
+    send_response, send_with_cache, url_decode,
 };
 use ams2_championship::service::{
     exe_dir, startup, App, AppError, AppResult, ChampionshipPatch, ConfigPatch, DriverAttrEdit,
@@ -131,6 +132,18 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, app: &App, poll_ms: u64) {
     let method = req.method.as_str();
     let body = req.body.as_slice();
 
+    // A page on another site may not use this server — see `from_another_site`. Checked before
+    // anything else, the WebSocket included. The raw snapshot is the exception: the README offers
+    // it to overlays and other tools, and reading it changes nothing.
+    if from_another_site(&req.headers) && !(method == "GET" && path == "/live") {
+        return json_err(
+            &mut stream,
+            "403 Forbidden",
+            "refused: this request came from a page on another site. Open the app from this \
+             server's own address to use it.",
+        );
+    }
+
     // WebSocket upgrade — /ws
     if path == "/ws"
         && req.headers.lines().any(|l| {
@@ -147,10 +160,11 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, app: &App, poll_ms: u64) {
     // ── Fixed paths ──────────────────────────────────────────────────────────
     match (method, path) {
         ("GET", "/api/live-teams") => return reply(&mut stream, Ok(app.live_teams())),
-        // Real-time telemetry, kept for backwards compatibility.
+        // Real-time telemetry, kept for backwards compatibility — and for tools outside the app,
+        // which is why it alone may be read by a page on another site.
         (_, "/live") => {
             let json = serde_json::to_vec(&read_live_session()).unwrap_or_else(|_| b"{}".to_vec());
-            return json_ok(&mut stream, &json);
+            return json_ok_any_origin(&mut stream, &json);
         }
         ("POST", "/api/live/ride-height/reset") => {
             app.reset_ride_record();
@@ -177,6 +191,9 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, app: &App, poll_ms: u64) {
             return;
         }
         ("POST", "/api/career/rating/adopt") => return reply(&mut stream, app.adopt_rating()),
+        ("POST", "/api/career/save") => {
+            return reply_with(&mut stream, app.save_career(), b"{\"ok\":true}")
+        }
         ("GET", "/api/custom-ai-files") => return reply(&mut stream, Ok(app.custom_ai_files())),
 
         ("GET", "/api/car-performance") => return reply(&mut stream, Ok(app.car_performance())),

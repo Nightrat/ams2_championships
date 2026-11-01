@@ -11,6 +11,7 @@ config.json                      <- server configuration
 championships\
   ams2_career\                   <- a career: the folder name is the career name
     career.json                    its sessions, championships and contracts
+    career.json.bak                the same career as it was before its last change
     laps\
       1728394855.json              one lap chart per recorded race
   gt3_2025\                      <- another career, fully independent
@@ -101,7 +102,35 @@ scratch.
 - **`starting_balance`** and the **rating tuning** the career was created with
 
 The file is updated automatically after every recorded session and after any change made in the
-Manage tab.
+Manage tab. Each update replaces the file in one step: the new career is written to a temporary
+file first and only then takes the name `career.json`. A crash, a full disk or a sync client
+reading at the wrong moment therefore finds the old career or the new one, never half of one.
+
+## If a career cannot be saved
+
+If a save fails, a red **NOT SAVED** banner appears on the **Live Session** tab, with a red `!` on
+the tab's button so you see it from any tab. The banner gives the reason. The usual ones are a
+`career.json` that was edited by hand and no longer reads, which the app refuses to write over, or
+another program holding the file.
+
+Nothing is lost while the server keeps running: the changes, including any session just recorded,
+are held in memory. Fix what the banner names (for a damaged file, move it out of the folder),
+then press **Save now**. Closing the server before that loses them.
+
+## The automatic backup
+
+Each career folder keeps `career.json.bak`: the career as it was before its last change. Saving
+an unchanged career leaves it alone, and a damaged file is never copied into it.
+
+To go back one step, after a hand edit gone wrong, a sync conflict or a change you did not mean:
+
+1. Close the server.
+2. Rename or move the damaged `career.json`.
+3. Rename `career.json.bak` to `career.json`.
+
+Only the last change is lost. The backup sits on the same disk as the career and goes back one
+step only, so it does not replace a real backup. Saves from an older version (`<name>.json`) keep
+no backup.
 
 ## Backing up your data
 

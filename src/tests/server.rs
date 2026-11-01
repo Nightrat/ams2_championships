@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use ams2_championship::career::data_store::{
     CareerData, Championship, ChampionshipStatus, RecordedSession, Round, SessionResult,
 };
-use ams2_championship::web::http::{parse_request, track_slug, Request};
+use ams2_championship::web::http::{from_another_site, header, parse_request, track_slug, Request};
 use ams2_championship::web::websocket::{base64_encode, sha1, ws_accept_key, ws_send_text};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -82,6 +82,22 @@ fn call_full_raw(
     request_bytes: Vec<u8>,
     config: Option<std::path::PathBuf>,
 ) -> Vec<u8> {
+    let mut client = serve_one(store, data_path, saves_dir, config);
+    client.write_all(&request_bytes).unwrap();
+    let mut resp = Vec::new();
+    client.read_to_end(&mut resp).unwrap();
+    resp
+}
+
+/// Runs `handle()` for a single connection and returns the client end of it — for a test that
+/// must not read to the end, such as one where a regression would open a WebSocket that never
+/// closes.
+fn serve_one(
+    store: ams2_championship::career::data_store::SharedStore,
+    data_path: std::path::PathBuf,
+    saves_dir: std::path::PathBuf,
+    config: Option<std::path::PathBuf>,
+) -> std::net::TcpStream {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let html = Arc::new(b"<html/>".to_vec());
@@ -105,11 +121,7 @@ fn call_full_raw(
         let (conn, _) = listener.accept().unwrap();
         handle(conn, html, &app, 200);
     });
-    let mut client = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
-    client.write_all(&request_bytes).unwrap();
-    let mut resp = Vec::new();
-    client.read_to_end(&mut resp).unwrap();
-    resp
+    std::net::TcpStream::connect(format!("127.0.0.1:{port}")).unwrap()
 }
 
 fn get(
@@ -5641,4 +5653,149 @@ fn test_route_driver_performance_previews_are_empty_without_manifests() {
     assert!(cls["previews"].is_object(), "{cls}");
     assert_eq!(cls["previews"].as_object().unwrap().len(), 0, "{cls}");
     std::fs::remove_dir_all(&dir).ok();
+}
+
+// ── Pages on other sites ──────────────────────────────────────────────────────
+
+/// A request as a browser sends it from a page whose origin is `origin`, to a server it reached
+/// at `127.0.0.1:8080`.
+fn from_page(method: &str, path: &str, origin: &str) -> Vec<u8> {
+    format!(
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nOrigin: {origin}\r\n\
+         Content-Length: 0\r\n\r\n"
+    )
+    .into_bytes()
+}
+
+#[test]
+fn test_from_another_site_compares_the_origin_with_the_address_used() {
+    let at = |host: &str, origin: Option<&str>| {
+        let origin = origin.map(|o| format!("Origin: {o}\r\n")).unwrap_or_default();
+        format!("POST /api/career/save HTTP/1.1\r\nHost: {host}\r\n{origin}\r\n")
+    };
+    // No Origin is not a page — curl, scripts, the tests.
+    assert!(!from_another_site(&at("127.0.0.1:8080", None)));
+    // The app's own page, at any address it can be opened at.
+    assert!(!from_another_site(&at("127.0.0.1:8080", Some("http://127.0.0.1:8080"))));
+    assert!(!from_another_site(&at("localhost:8080", Some("http://localhost:8080"))));
+    assert!(!from_another_site(&at("192.168.1.20:8080", Some("http://192.168.1.20:8080"))));
+    assert!(!from_another_site(&at("[::1]:8080", Some("http://[::1]:8080"))));
+    assert!(!from_another_site(&at("LocalHost:8080", Some("HTTP://localhost:8080"))), "case");
+    // Everything else.
+    assert!(from_another_site(&at("127.0.0.1:8080", Some("https://evil.example"))));
+    assert!(from_another_site(&at("127.0.0.1:8080", Some("http://127.0.0.1:9090"))), "port");
+    assert!(from_another_site(&at("127.0.0.1:8080", Some("https://127.0.0.1:8080"))), "scheme");
+    assert!(from_another_site(&at("127.0.0.1:8080", Some("null"))), "a file or a sandbox");
+    assert!(from_another_site("POST / HTTP/1.1\r\nOrigin: http://127.0.0.1:8080\r\n\r\n"), "no Host");
+}
+
+#[test]
+fn test_header_is_found_in_any_case_and_not_in_the_request_line() {
+    let h = "GET /x:y HTTP/1.1\r\nHOST: a:1\r\nx-thing:  spaced  \r\n\r\n";
+    assert_eq!(header(h, "host"), Some("a:1"));
+    assert_eq!(header(h, "X-Thing"), Some("spaced"));
+    assert_eq!(header(h, "get /x"), None);
+    assert_eq!(header(h, "origin"), None);
+}
+
+#[test]
+fn test_a_page_on_another_site_cannot_change_the_career() {
+    // A POST like this one carries no body type a browser asks permission for, so before this
+    // check any page the user had open could send it.
+    let (store, path) = make_test_store();
+    let resp = call(
+        store.clone(),
+        path.clone(),
+        from_page("POST", "/api/career/rating/adopt", "https://evil.example"),
+    );
+    assert!(status_line(&resp).contains("403"), "{resp}");
+    assert!(body_json(&resp)["error"].as_str().unwrap().contains("another site"));
+    assert!(store.read().unwrap().rating_params.is_none(), "nothing may have changed");
+    assert!(!path.exists(), "nothing may have been written");
+}
+
+#[test]
+fn test_a_page_opened_from_a_file_is_another_site() {
+    let (store, path) = make_test_store();
+    let resp = call(store.clone(), path.clone(), from_page("POST", "/api/career/rating/adopt", "null"));
+    assert!(status_line(&resp).contains("403"), "{resp}");
+    assert!(store.read().unwrap().rating_params.is_none());
+}
+
+#[test]
+fn test_the_apps_own_page_still_changes_the_career() {
+    let (store, path) = make_test_store();
+    let resp = call(
+        store.clone(),
+        path.clone(),
+        from_page("POST", "/api/career/rating/adopt", "http://127.0.0.1:8080"),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(store.read().unwrap().rating_params.is_some());
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_api_answers_do_not_invite_other_sites_to_read_them() {
+    let (store, path) = make_test_store();
+    let resp = get(store, path, "/api/career");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(!resp.contains("Access-Control-Allow-Origin"), "{resp}");
+}
+
+#[test]
+fn test_the_raw_live_snapshot_stays_open_to_other_sites() {
+    // The README offers it to overlays and other tools, and reading it changes nothing.
+    let (store, path) = make_test_store();
+    let resp = call(store, path, from_page("GET", "/live", "http://overlay.example"));
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(resp.contains("Access-Control-Allow-Origin: *"), "{resp}");
+}
+
+#[test]
+fn test_a_websocket_from_another_site_is_refused() {
+    // The browser applies no cross-origin rule to a WebSocket at all, so without this a page
+    // anywhere could watch the live frame. Only the first answer is read: a regression would
+    // open the socket and stream frames forever.
+    let (store, path) = make_test_store();
+    let mut client = serve_one(store, path, std::env::temp_dir(), None);
+    client
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .unwrap();
+    client
+        .write_all(
+            b"GET /ws HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nOrigin: https://evil.example\r\n\
+              Upgrade: websocket\r\nConnection: Upgrade\r\n\
+              Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+        )
+        .unwrap();
+    let mut first = [0u8; 256];
+    let n = client.read(&mut first).unwrap();
+    let head = String::from_utf8_lossy(&first[..n]);
+    assert!(head.starts_with("HTTP/1.1 403"), "{head}");
+}
+
+// ── Saving by hand ────────────────────────────────────────────────────────────
+
+#[test]
+fn test_route_save_career_reports_why_it_cannot_and_saves_once_it_can() {
+    let (store, path) = make_test_store();
+    std::fs::write(&path, "{ damaged").unwrap();
+    store.write().unwrap().sessions.push(win_session("s1"));
+
+    let resp = post(store.clone(), path.clone(), "/api/career/save", b"");
+    assert!(status_line(&resp).contains("500"), "{resp}");
+    let err = body_json(&resp)["error"].as_str().unwrap().to_string();
+    assert!(err.contains("refusing to overwrite"), "{err}");
+    assert_eq!(store.read().unwrap().save_error.as_deref(), Some(err.as_str()));
+
+    // The damaged file is moved aside; the career in memory goes back to disk.
+    std::fs::remove_file(&path).unwrap();
+    let resp = post(store.clone(), path.clone(), "/api/career/save", b"");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert_eq!(body(&resp), r#"{"ok":true}"#);
+    assert_eq!(store.read().unwrap().save_error, None);
+    let saved = ams2_championship::career::data_store::try_load_data(&path).unwrap();
+    assert_eq!(saved.sessions.len(), 1);
+    let _ = std::fs::remove_file(&path);
 }

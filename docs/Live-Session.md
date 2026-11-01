@@ -21,6 +21,12 @@ Use this if you have auto-recording turned off for a session type (e.g. practice
 
 > **Watching a replay?** The recorder freezes while one plays, and so does this button (saving is refused with a message). A replay refills the live timing data with a race that is already over, so what is on screen is not the session — recording it would file a mid-race picture as the result. Everything picks up where it was when you leave the replay.
 
+## NOT SAVED banner
+
+A red **NOT SAVED** banner at the top of the tab means the career could not be written to disk, usually just after the recorder filed a session. A red `!` appears on the **Live Session** tab button too, so you see it from any tab. The banner shows whether or not AMS2 is connected, because a race is recorded as you leave it.
+
+The session and every other change are held in memory, so nothing is lost while the server keeps running. Fix what the banner names, then press **Save now**. The banner disappears once a save succeeds. Closing the server first loses those changes. See [Data & Backup](Data-and-Backup.md#if-a-career-cannot-be-saved).
+
 ## Grid check
 
 In a singleplayer career, a banner above the timing table says whether the grid on track is the one your season will be judged against — **including when it is**:
@@ -75,6 +81,16 @@ AMS2's shared memory has no team or livery field — every car reports only its 
 3. Your own row uses the championship's **My Team** setting, because your profile name is not in the roster file.
 
 Anything the roster does not name — and your row when **My Team** is unset — falls back to the AMS2 car model.
+
+> **A roster can rename a team.** The team is normally the start of the livery's name, so a roster for one season built on another season's skinpack inherits the wrong teams. An entry can state its own with a comment inside its `<driver>` block, which AMS2 ignores:
+>
+> ```xml
+> <driver livery_name="Theodore-Ford #34 Cecotto">
+>     <!-- team: Osella-Alfa Romeo -->
+>     <name>Piercarlo Ghinzani</name>
+> ```
+>
+> The app then uses that name everywhere: the live grid, the Car and Driver Performance tabs, team requirements, offers and seats. Two liveries given the same team become one team with two cars. One editing caveat: a team has a single set of scalars in the Car Performance tab, and saving them writes them into every entry of that team.
 
 > **Cars beyond the roster show as car models.** If you set more opponents than the roster has liveries, AMS2 fills the rest with its own AI, which the roster cannot name. Matching the opponent count to the roster keeps the whole column on real team names.
 

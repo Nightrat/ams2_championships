@@ -239,6 +239,84 @@ fn test_session_bests_ignore_unset_times() {
     assert_eq!(session_bests(&d), SessionBests::default());
 }
 
+/// A driver whose best sectors are 25 / 30 / 35, with `cur` as this lap's.
+fn timed(cur: [f32; 3]) -> crate::game::shared_memory::ParticipantData {
+    let mut p = driver("A", false, 90.0, [25.0, 30.0, 35.0], false);
+    (p.cur_s1, p.cur_s2, p.cur_s3) = (cur[0], cur[1], cur[2]);
+    p
+}
+
+fn cells_of(participants: Vec<crate::game::shared_memory::ParticipantData>) -> Vec<[SectorCell; 3]> {
+    let mut d = live([0.0; 4]);
+    d.participants = participants;
+    sector_cells(&d, &session_bests(&d))
+}
+
+fn cell(time: f32, mark: SectorMark) -> SectorCell {
+    SectorCell { time, mark }
+}
+
+#[test]
+fn test_a_sector_faster_than_the_drivers_best_is_a_partial_and_not_shown() {
+    // Monza 1984 as AMS2 reported it: S1 01.737 for a car that left the pits mid-sector. It
+    // never entered the best, so it is a fragment — showing it purple called it the session's
+    // fastest. The driver's best stands in for it.
+    let cells = cells_of(vec![timed([1.737, -1.0, -1.0])]);
+    assert_eq!(cells[0][0], cell(25.0, SectorMark::Best));
+}
+
+#[test]
+fn test_a_sector_spent_partly_in_the_garage_is_not_shown() {
+    // 9:09.152: the sector the car sat out in the garage.
+    let cells = cells_of(vec![timed([-1.0, 549.152, -1.0])]);
+    assert_eq!(cells[0][1].time, 30.0);
+}
+
+#[test]
+fn test_a_counted_sector_is_shown_and_coloured() {
+    let cells = cells_of(vec![
+        timed([25.0, 31.5, -1.0]),
+        // A second driver with faster bests, so the first one's are only personal.
+        {
+            let mut p = driver("B", false, 89.0, [24.0, 29.0, 34.0], false);
+            p.cur_s1 = 24.5;
+            p
+        },
+    ]);
+    // This lap's S1 equals the driver's own best: green. S2 is slower: plain. No S3 yet this
+    // lap: the best stands, plain because the session's is faster.
+    assert_eq!(
+        cells[0],
+        [
+            cell(25.0, SectorMark::Personal),
+            cell(31.5, SectorMark::Plain),
+            cell(35.0, SectorMark::Plain),
+        ]
+    );
+    // B's 24.5 is slower than B's own 24.0, which is the session's best.
+    assert_eq!(cells[1][0], cell(24.5, SectorMark::Plain));
+    assert_eq!(cells[1][1], cell(29.0, SectorMark::Best));
+}
+
+#[test]
+fn test_a_sector_with_no_best_behind_it_is_not_shown() {
+    // A first out-lap: a current time, but nothing the game counted yet.
+    let mut p = driver("A", false, 0.0, [-1.0, -1.0, -1.0], false);
+    p.cur_s1 = 12.0;
+    let cells = cells_of(vec![p]);
+    assert_eq!(cells[0], [SectorCell::default(); 3]);
+}
+
+#[test]
+fn test_the_frame_carries_one_row_of_sectors_per_participant() {
+    let (app, root) = test_app("sectors", CareerMode::Unset);
+    let mut d = live([0.0; 4]);
+    d.participants.push(timed([25.0, -1.0, -1.0]));
+    let frame = app.frame_of(d);
+    assert_eq!(frame.sectors.len(), frame.data.participants.len());
+    std::fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn test_ride_record_keeps_each_corners_extremes_on_track_only() {
     let (app, root) = test_app("ride", CareerMode::Unset);
@@ -474,5 +552,129 @@ fn test_a_config_saved_unchanged_through_the_gui_patch_comes_back_the_same() {
         serde_json::to_value(&saved).unwrap(),
         serde_json::to_value(&again).unwrap()
     );
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_the_live_frame_says_the_career_is_not_saved_until_a_save_succeeds() {
+    // The recorder fails with nobody asking, usually just as AMS2 disconnects, so the frame
+    // carries the reason whatever the game is doing — and saving by hand is what clears it.
+    let (app, root) = test_app("unsaved", CareerMode::Unset);
+    let career = app.active_path();
+    std::fs::write(&career, "{ damaged").unwrap();
+    app.adopt_rating().expect_err("the damaged file must not be written over");
+    let frame = app.frame_of(crate::game::shared_memory::disconnected());
+    assert!(
+        frame.save_error.as_deref().is_some_and(|e| e.contains("refusing to overwrite")),
+        "{:?}",
+        frame.save_error
+    );
+
+    app.save_career().expect_err("still damaged, still refused");
+    std::fs::remove_file(&career).unwrap();
+    app.save_career().expect("nothing is in the way any more");
+    assert_eq!(app.frame_of(crate::game::shared_memory::disconnected()).save_error, None);
+    let saved = crate::career::data_store::try_load_data(&career).unwrap();
+    assert!(saved.rating_params.is_some(), "the change made while unsaved reached the file");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+// ── A session recorded while the active career changes ────────────────────────
+
+/// A folder save at `<root>/<name>/career.json` holding one championship called `season`.
+fn career_on_disk(root: &Path, name: &str, season: &str) -> PathBuf {
+    let file = root.join(name).join("career.json");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    let json = format!(
+        r#"{{"sessions":[],"championships":[{{"id":"{season}","name":"{season}","points_system":[25],"rounds":[]}}]}}"#
+    );
+    std::fs::write(&file, json).unwrap();
+    file
+}
+
+fn season_names(data: &CareerData) -> Vec<String> {
+    data.championships.iter().map(|c| c.name.clone()).collect()
+}
+
+/// The recorder filing a session with a lap chart, on a thread of its own.
+fn capture_on_a_thread(app: &App) -> std::thread::JoinHandle<Result<(), String>> {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let chart = vec![crate::career::data_store::LapChartEntry {
+            lap: 1,
+            driver: "Me".into(),
+            position: 1,
+        }];
+        crate::game::recorder::capture(&app.store, &app.data_path, &live([0.0; 4]), chart, None)
+    })
+}
+
+#[test]
+fn test_a_session_filed_while_switching_careers_lands_whole_in_one_of_them() {
+    // Both orders are legitimate: filed into A before the switch, or into B after it. What must
+    // never happen is a mix — B written into A's file, or the session in one career with its
+    // chart beside the other. The test holds the save lock while both start, so they are
+    // waiting on it together when it is let go.
+    let (app, root) = test_app("switch_race", CareerMode::Unset);
+    let a = career_on_disk(&root, "career", "A");
+    assert_eq!(a, app.active_path());
+    *app.store.write().unwrap() = crate::career::data_store::try_load_data(&a).unwrap();
+    let b = career_on_disk(&root, "b", "B");
+
+    let held = crate::career::data_store::saving();
+    let recorder = capture_on_a_thread(&app);
+    let switch = {
+        let app = app.clone();
+        std::thread::spawn(move || app.activate_save("b").map(|_| ()))
+    };
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    drop(held);
+    recorder.join().unwrap().expect("the session is saved");
+    switch.join().unwrap().expect("the switch goes through");
+
+    let in_a = crate::career::data_store::try_load_data(&a).unwrap();
+    let in_b = crate::career::data_store::try_load_data(&b).unwrap();
+    assert_eq!(season_names(&in_a), ["A"], "A's file holds A");
+    assert_eq!(season_names(&in_b), ["B"], "B's file holds B");
+    let (holder, folder) = match (in_a.sessions.len(), in_b.sessions.len()) {
+        (1, 0) => (&in_a, a.parent().unwrap()),
+        (0, 1) => (&in_b, b.parent().unwrap()),
+        counts => panic!("the session must be in exactly one career: {counts:?}"),
+    };
+    let chart = folder.join("laps").join(format!("{}.json", holder.sessions[0].id));
+    assert!(chart.exists(), "the chart sits beside the career holding the session");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_a_session_filed_while_the_active_career_is_renamed_follows_it() {
+    // A capture that read the old path and wrote after the move would recreate the old folder —
+    // writing a lap chart creates its own — and save a second copy of the career there.
+    let (app, root) = test_app("rename_race", CareerMode::Unset);
+    let a = career_on_disk(&root, "career", "A");
+    *app.store.write().unwrap() = crate::career::data_store::try_load_data(&a).unwrap();
+
+    let held = crate::career::data_store::saving();
+    let recorder = capture_on_a_thread(&app);
+    let rename = {
+        let app = app.clone();
+        std::thread::spawn(move || app.rename_save("career", "renamed").map(|_| ()))
+    };
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    drop(held);
+    recorder.join().unwrap().expect("the session is saved");
+    rename.join().unwrap().expect("the rename goes through");
+
+    assert!(!root.join("career").exists(), "the old folder is not brought back");
+    let renamed = root.join("renamed").join("career.json");
+    assert_eq!(app.active_path(), renamed);
+    let saved = crate::career::data_store::try_load_data(&renamed).unwrap();
+    assert_eq!(season_names(&saved), ["A"]);
+    assert_eq!(saved.sessions.len(), 1, "the session followed the career");
+    let chart = root
+        .join("renamed")
+        .join("laps")
+        .join(format!("{}.json", saved.sessions[0].id));
+    assert!(chart.exists(), "and so did its chart");
     std::fs::remove_dir_all(&root).ok();
 }

@@ -14,7 +14,7 @@ fn generate_html() -> String {
 <header>
   <h1>AMS2 Career Championships</h1>
   <div class="tab-bar">
-    <button class="tab-btn tab-active" data-tab="live">&#9679; Live Session</button>
+    <button class="tab-btn tab-active" data-tab="live">&#9679; Live Session<span id="tab-live-warn" class="tab-warn tab-warn-bad" title="This career could not be saved — see the Live Session tab" hidden>!</span></button>
     <button class="tab-btn" data-tab="career">&#127942; Career</button>
     <button class="tab-btn" data-tab="manage">&#9881; Manage</button>
     <button class="tab-btn" data-tab="config">&#9965; Config<span id="tab-config-warn" class="tab-warn" title="No Custom AI Drivers folder is set" hidden>!</span></button>
@@ -58,6 +58,11 @@ fn generate_html() -> String {
         <span class="live-dot"></span>
         <span id="live-status-text">Not connected — start AMS2 and open this page via the server</span>
       </div>
+      <!-- The career in memory is ahead of its file: the last save failed. Filled from every
+           live frame, connected or not — the recorder fails just as a race ends and AMS2
+           disconnects — and first among the banners, because closing the server loses what
+           it holds. -->
+      <div id="live-save-warning" class="live-grid-warning live-seat-wrong live-save-warning" hidden></div>
       <!-- Filled by live.js from /api/live-teams. This is the one moment a grid problem can
            still be fixed — quit to the menu, set the opponent count, start again — so it sits
            above the timing table rather than in a tab the user would have to go looking in. -->

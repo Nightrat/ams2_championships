@@ -293,8 +293,10 @@ impl App {
     /// This is the team picker plus a record of what was agreed: it applies the same locks
     /// [`Self::patch_championship`] does rather than working around them.
     pub fn sign(&self, id: &str, req: &SignRequest) -> AppResult<Signed> {
-        let career = self.active_path();
         let mut data = self.store.write().unwrap();
+        // Read while the career is held: switching changes the store and the path together under
+        // the store's lock, so the roster copy below lands beside the career the deal goes into.
+        let career = self.active_path();
         let current = data
             .championships
             .iter()
@@ -437,7 +439,7 @@ impl App {
         data.contracts.push(contract.clone());
         drop(data);
 
-        if let Err(e) = self.persist_to(&career) {
+        if let Err(e) = self.persist() {
             // Nothing was signed, so nothing is fixed either.
             if copied {
                 crate::career::signed_rosters::remove(&career, id);
@@ -478,9 +480,11 @@ impl App {
             champ.player_team = None;
             champ.player_seat = None;
         }
-        drop(data);
+        // Read while the career is held, so the roster removed below is this career's — see
+        // `App::delete_championship`.
         let career = self.active_path();
-        self.persist_to(&career)?;
+        drop(data);
+        self.persist()?;
         // The roster was kept because of the deal, so it goes with it: the season reads the
         // game's file again until it is signed afresh, which takes a new copy.
         crate::career::signed_rosters::remove(&career, id);

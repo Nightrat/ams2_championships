@@ -16,6 +16,9 @@ pub struct LiveFrame {
     #[serde(flatten)]
     pub data: LiveSessionData,
     pub session_best: SessionBests,
+    /// The three sector cells of each participant, in the order of `participants` — see
+    /// [`sector_cells`].
+    pub sectors: Vec<[SectorCell; 3]>,
     /// The run's ride-height extremes; `None` until a corner has been read on track.
     pub ride_seen: Option<RideSeen>,
     /// Whether the player is out on track — see [`on_track`]. The telemetry panel holds its last
@@ -25,6 +28,11 @@ pub struct LiveFrame {
     /// state. An active career is not part of it: the click says so, which a greyed-out button
     /// could not.
     pub can_record: bool,
+    /// Why the career could not be saved, for as long as that is so — see
+    /// `CareerData::save_error`. It rides every frame rather than a route of its own because the
+    /// recorder fails with nobody asking, typically just as a race ends and AMS2 disconnects; the
+    /// Live tab shows it whether or not the game is connected.
+    pub save_error: Option<String>,
 }
 
 /// The fastest of everyone on track. `0.0` is "nobody has set one", the same unset convention
@@ -55,6 +63,72 @@ pub fn session_bests(data: &LiveSessionData) -> SessionBests {
         s2: fastest(data, |p| p.best_s2),
         s3: fastest(data, |p| p.best_s3),
     }
+}
+
+/// One sector cell of the timing table: the time to print (`0.0` prints a dash) and how to
+/// colour it.
+#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq)]
+pub struct SectorCell {
+    pub time: f32,
+    pub mark: SectorMark,
+}
+
+#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SectorMark {
+    #[default]
+    Plain,
+    /// The session's best sector (purple).
+    Best,
+    /// The driver's own best, set this lap (green).
+    Personal,
+}
+
+/// Tolerance for comparing two sector times AMS2 wrote as floats.
+const SECTOR_EPS: f32 = 0.001;
+
+/// Whether a current-lap sector time is one AMS2 actually counted.
+///
+/// AMS2 reports partial sectors in the current-lap times — a car leaving the pits mid-sector
+/// shows `01.737`, one that sat in the garage `9:09.152` — and leaves them out of the driver's
+/// best. That is the test: a counted sector enters the best the moment it is completed, so a
+/// current time faster than the driver's best (or with no best at all) is one the game threw
+/// away. The slow side cannot be read off the best, so a sector over twice the driver's best is
+/// taken to include a stop in the pits — no racing sector is that slow, and a spin that costs
+/// that much leaves nothing worth comparing either.
+fn counted_sector(cur: f32, best: f32) -> bool {
+    cur > 0.0 && best > 0.0 && cur >= best - SECTOR_EPS && cur <= best * 2.0
+}
+
+/// The cell for one sector: the current lap's time when it counts, else the driver's best.
+/// Purple when it is the session's best, green when this lap's time is the driver's own best.
+fn sector_cell(cur: f32, best: f32, session_best: f32) -> SectorCell {
+    let counted = counted_sector(cur, best);
+    let time = if counted { cur } else { best.max(0.0) };
+    let mark = if time <= 0.0 {
+        SectorMark::Plain
+    } else if session_best > 0.0 && time <= session_best + SECTOR_EPS {
+        SectorMark::Best
+    } else if counted && cur <= best + SECTOR_EPS {
+        SectorMark::Personal
+    } else {
+        SectorMark::Plain
+    };
+    SectorCell { time, mark }
+}
+
+/// Every participant's three sector cells, in the order of `data.participants`.
+pub fn sector_cells(data: &LiveSessionData, bests: &SessionBests) -> Vec<[SectorCell; 3]> {
+    data.participants
+        .iter()
+        .map(|p| {
+            [
+                sector_cell(p.cur_s1, p.best_s1, bests.s1),
+                sector_cell(p.cur_s2, p.best_s2, bests.s2),
+                sector_cell(p.cur_s3, p.best_s3, bests.s3),
+            ]
+        })
+        .collect()
 }
 
 /// The lowest and highest each corner has run at, FL / FR / RL / RR, in cm. `0.0` is "not read
@@ -147,11 +221,15 @@ impl App {
             record.fold(&data);
             record.seen()
         };
+        let save_error = self.data().save_error.clone();
+        let session_best = session_bests(&data);
         LiveFrame {
-            session_best: session_bests(&data),
+            sectors: sector_cells(&data, &session_best),
+            session_best,
             can_record: crate::game::recorder::recordable(&data).is_ok(),
             on_track: on_track(&data),
             ride_seen,
+            save_error,
             data,
         }
     }

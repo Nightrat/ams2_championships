@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<USER_OVERRIDES>
+
+
+	<LIVERY_OVERRIDE LIVERY="51" NAME="Brabham-BMW #5 Piquet" BASELIVERY="Default">
+        <PREVIEWIMAGE PATH="TAMS2SP\1983preview5.dds" />
+        <TEXTURE NAME="BODY" PATH="TAMS2SP\1983body5.dds" />
+	</LIVERY_OVERRIDE>
+	<HELMET_OVERRIDE LIVERY="51" NAME="Brabham-BMW #5 Piquet" BASEHELMET="DEFAULT">
+    	<TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\83_Piquet_Helmet.dds" />
+    	<TEXTURE NAME="VISOR_DIFF" PATH="TAMS2SP\83_Piquet_visor.dds" />
+		<TEXTURE NAME="VISOR_SPEC" PATH="TAMS2SP\83_Piquet_visor_spec.dds" />
+    </HELMET_OVERRIDE>
+	<OUTFIT_OVERRIDE LIVERY="51" BASEOUTFIT="DEFAULT">
+        <TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\Suits\brabham_torso.dds" />
+        <TEXTURE NAME="ARMS_DIFF" PATH="TAMS2SP\Suits\brabham_arms.dds" />
+        <TEXTURE NAME="GLOVES_DIFF" PATH="TAMS2SP\Suits\brabham_gloves.dds" />
+        <TEXTURE NAME="LEGS_DIFF" PATH="TAMS2SP\Suits\brabham_legs.dds" />
+        <TEXTURE NAME="SEATBELTS_DIFF" PATH="TAMS2SP\Suits\blue_safety_harness.dds" />
+    </OUTFIT_OVERRIDE>
+
+    <LIVERY_OVERRIDE LIVERY="52" NAME="Brabham-BMW #6 Patrese" BASELIVERY="Default">
+        <PREVIEWIMAGE PATH="TAMS2SP\1983preview6.dds" />
+        <TEXTURE NAME="BODY" PATH="TAMS2SP\1983body6.dds" />
+	</LIVERY_OVERRIDE>
+	<HELMET_OVERRIDE LIVERY="52" NAME="Brabham-BMW #6 Patrese" BASEHELMET="DEFAULT">
+    	<TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\83_Patrese_Helmet.dds" />
+    	<TEXTURE NAME="VISOR_DIFF" PATH="TAMS2SP\83_Patrese_visor.dds" />
+		<TEXTURE NAME="VISOR_SPEC" PATH="TAMS2SP\83_Patrese_visor_spec.dds" />
+    </HELMET_OVERRIDE>
+	<OUTFIT_OVERRIDE LIVERY="52" BASEOUTFIT="DEFAULT">
+        <TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\Suits\brabham_torso.dds" />
+        <TEXTURE NAME="ARMS_DIFF" PATH="TAMS2SP\Suits\brabham_arms.dds" />
+        <TEXTURE NAME="GLOVES_DIFF" PATH="TAMS2SP\Suits\brabham_gloves.dds" />
+        <TEXTURE NAME="LEGS_DIFF" PATH="TAMS2SP\Suits\brabham_legs.dds" />
+        <TEXTURE NAME="SEATBELTS_DIFF" PATH="TAMS2SP\Suits\blue_safety_harness.dds" />
+    </OUTFIT_OVERRIDE>
+
+	<!-- Added for the 1984 roster (ams2_career custom_ai_files_with_perf_scalars\F1_1984): the two
+	     stock white BT52s, IDs 53 and 54, renamed so a Custom AI file can bind to them. No textures
+	     of their own, so they keep the base livery's look. -->
+	<LIVERY_OVERRIDE LIVERY="53" NAME="RAM-Hart #9 Alliot" BASELIVERY="Default">
+	</LIVERY_OVERRIDE>
+	<LIVERY_OVERRIDE LIVERY="54" NAME="RAM-Hart #10 Palmer" BASELIVERY="Default">
+	</LIVERY_OVERRIDE>
+</USER_OVERRIDES>

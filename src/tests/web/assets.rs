@@ -194,6 +194,38 @@ fn test_the_missing_roster_folder_warning_is_wired_to_real_elements() {
     assert!(CSS.contains(".config-warn {"), "the notice has no styling");
 }
 
+#[test]
+fn test_the_unsaved_career_warning_is_wired_to_real_elements() {
+    let html = build_base_html();
+    for id in ["live-save-warning", "tab-live-warn"] {
+        assert!(
+            html.contains(&format!("id=\"{id}\"")),
+            "{id} is set by live.js but is not in the page"
+        );
+        assert!(
+            JS_LIVE.contains(&format!("getElementById('{id}')")),
+            "{id} is in the page but nothing ever unhides it"
+        );
+    }
+    // Hidden until a frame says otherwise.
+    assert!(html.contains(
+        r#"id="live-save-warning" class="live-grid-warning live-seat-wrong live-save-warning" hidden"#
+    ));
+    assert!(html.contains(r#"id="tab-live-warn" class="tab-warn tab-warn-bad""#));
+    // Read off every frame *before* the early return for a game that is not connected: the
+    // recorder's save fails just as a race ends and AMS2 goes away.
+    let process = JS_LIVE
+        .split("function processLiveData(d) {")
+        .nth(1)
+        .expect("live.js has processLiveData");
+    let shown = process
+        .find("renderSaveError(d.save_error)")
+        .expect("the frame's save_error is never shown");
+    let first_return = process.find("return;").expect("processLiveData returns early");
+    assert!(shown < first_return, "a failed save must show while AMS2 is disconnected too");
+    assert!(JS_LIVE.contains("'/api/career/save'"), "the banner's button saves nothing");
+}
+
 /// The stylesheet with `/* … */` removed, so a rule's selector is not preceded by the comment
 /// that introduces it.
 fn strip_css_comments(css: &str) -> String {

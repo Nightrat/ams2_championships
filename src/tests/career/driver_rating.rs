@@ -441,7 +441,7 @@ fn reference_career() -> crate::career::data_store::CareerData {
 fn reference_contexts() -> Vec<RatingContext> {
     let dir = std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/docs/custom_ai_files_with_perf_scalars"
+        "/custom_ai_files_with_perf_scalars"
     ));
     crate::roster::custom_ai::class_performance(dir)
         .into_iter()
@@ -509,7 +509,7 @@ fn test_reference_career_rating_snapshot() {
         "teammate_bonus {}",
         r.teammate_bonus
     );
-    // Snapshot value shifts whenever docs/custom_ai_files_with_perf_scalars/*.xml's scalars change
+    // Snapshot value shifts whenever custom_ai_files_with_perf_scalars/*.xml's scalars change
     // (power_scalar was rescaled so the fastest car in each class is 1.00, not up to 1.10).
     assert!((r.value - 57.16).abs() < 0.5, "rating {}", r.value);
 }

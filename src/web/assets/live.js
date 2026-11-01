@@ -173,10 +173,60 @@ function renderStatusBox(id, status, badClass) {
     '<span class="live-grid-warning-text">' + esc(status.text) + '</span>';
 }
 
+// ── A career that could not be saved ──────────────────────────────────────────
+// The recorder saves with nobody waiting on an answer, so a session it could not write would
+// otherwise be known only to the server's console, and lost when the server closes. Every frame
+// says whether the career in memory is ahead of its file; this shows it on the Live tab, with
+// the one thing to do about it, and as a red "!" on the tab's button so it is seen from any tab.
+// The reason is the server's sentence.
+//
+// Rebuilt only when the reason changes: a frame arrives several times a second, and a button
+// replaced between press and release never receives the click.
+var liveSaveErrorShown = null;
+
+function renderSaveError(reason) {
+  reason = reason || null;
+  if (reason === liveSaveErrorShown) return;
+  liveSaveErrorShown = reason;
+  var badge = document.getElementById('tab-live-warn');
+  if (badge) badge.hidden = !reason;
+  var box = document.getElementById('live-save-warning');
+  if (!box) return;
+  if (!reason) { box.hidden = true; box.textContent = ''; return; }
+  box.hidden = false;
+  box.innerHTML = '<span class="live-grid-warning-icon">&#9888;</span>' +
+    '<span class="live-grid-warning-text">NOT SAVED — the latest changes to this career, ' +
+      'including any session just recorded, are only in memory, and closing the server now ' +
+      'loses them. Fix the problem below, then save.' +
+      '<span class="live-save-reason">' + esc(reason) + '</span></span>' +
+    '<button class="manage-btn live-save-btn">Save now</button>';
+}
+
+// Delegated, like the roster banner's buttons. On success the banner goes at once rather than
+// on the next frame; on failure the next frame carries the new reason, and the alert says it now.
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest && e.target.closest('.live-save-btn');
+  if (!btn) return;
+  btn.disabled = true;
+  fetch('/api/career/save', { method: 'POST' })
+    .then(function (r) {
+      return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+    })
+    .then(function (r) {
+      if (r.ok) { renderSaveError(null); return; }
+      btn.disabled = false;
+      alert(r.body.error || 'Could not save the career.');
+    })
+    .catch(function () { btn.disabled = false; alert('Could not save the career.'); });
+});
+
 var SESSION_NAMES = ['', 'Practice', 'Test', 'Qualify', 'Formation Lap', 'Race', 'Time Attack'];
 var RACE_NAMES    = ['', 'Not Started', 'Racing', 'Finished', 'DSQ', 'Retired', 'DNF'];
 
 function processLiveData(d) {
+      // Before anything that returns early: a failed save matters most just after a race, when
+      // AMS2 has disconnected and the rest of this function has nothing to draw.
+      renderSaveError(d.save_error);
       var statusEl   = document.getElementById('live-status');
       var statusTxt  = document.getElementById('live-status-text');
       var infoEl     = document.getElementById('live-info');
@@ -244,11 +294,12 @@ function processLiveData(d) {
         return '+' + p.interval_gap_secs.toFixed(3);
       }
 
-      // ── Gap to fastest lap, and the purple sectors ────────────────────────
-      // The session's bests come with the frame (`session_best`, 0 = nobody has one yet).
+      // ── Gap to fastest lap, and the sector cells ──────────────────────────
+      // The session's best lap comes with the frame (`session_best`, 0 = nobody has one yet),
+      // and so does every sector cell (`sectors`), already chosen and coloured.
       var best = d.session_best || {};
       var bestLap = best.lap || 0;
-      var bestS1 = best.s1 || 0, bestS2 = best.s2 || 0, bestS3 = best.s3 || 0;
+      var sectors = d.sectors || [];
 
       function fmtGap(p) {
         if (bestLap <= 0 || p.fastest_lap_time <= 0) return '<span class="no-time">\u2014</span>';
@@ -257,18 +308,14 @@ function processLiveData(d) {
         return '+' + delta.toFixed(3);
       }
 
-      // Sector cell: show current-lap sector time, highlight if it matches
-      // the overall best sector (purple) or the driver's own best (green).
-      function fmtSector(cur, best, overallBest) {
-        var display = cur > 0 ? cur : best;
-        if (display <= 0) return '<span class="no-time">\u2014</span>';
-        var cls = 'live-sector';
-        if (overallBest > 0 && display <= overallBest + 0.001) cls = 'live-sector-best';
-        else if (best > 0 && cur > 0 && cur <= best + 0.001)   cls = 'live-sector-pb';
-        return '<span class="' + cls + '">' + fmtLapTime(display) + '</span>';
+      var SECTOR_CLASS = { best: 'live-sector-best', personal: 'live-sector-pb', plain: 'live-sector' };
+      function fmtSector(cell) {
+        if (!cell || cell.time <= 0) return '<span class="no-time">\u2014</span>';
+        return '<span class="' + SECTOR_CLASS[cell.mark] + '">' + fmtLapTime(cell.time) + '</span>';
       }
 
-      liveBody.innerHTML = d.participants.map(function (p) {
+      liveBody.innerHTML = d.participants.map(function (p, i) {
+        var s = sectors[i] || [];
         var pos = p.race_position > 0 ? p.race_position : '\u2014';
         var rowCls = p.is_player ? ' class="player-row"' : '';
         var nameSuffix = p.is_player ? ' <span class="player-tag">YOU</span>' : '';
@@ -278,9 +325,9 @@ function processLiveData(d) {
           '<td class="live-num">'  + p.laps_completed + '</td>' +
           '<td class="live-gap">'  + fmtInterval(p) + '</td>' +
           '<td class="live-gap">'  + fmtGap(p) + '</td>' +
-          '<td class="live-time">' + fmtSector(p.cur_s1, p.best_s1, bestS1) + '</td>' +
-          '<td class="live-time">' + fmtSector(p.cur_s2, p.best_s2, bestS2) + '</td>' +
-          '<td class="live-time">' + fmtSector(p.cur_s3, p.best_s3, bestS3) + '</td>' +
+          '<td class="live-time">' + fmtSector(s[0]) + '</td>' +
+          '<td class="live-time">' + fmtSector(s[1]) + '</td>' +
+          '<td class="live-time">' + fmtSector(s[2]) + '</td>' +
           '<td class="live-time">' + fmtLapTime(p.fastest_lap_time) + '</td>' +
           '<td class="live-time">' + fmtLapTime(p.last_lap_time) + '</td>' +
           '<td class="live-team">' + fmtTeam(p) + '</td>' +

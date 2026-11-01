@@ -25,6 +25,16 @@ impl App {
         self.saves_view(&self.active_path())
     }
 
+    /// Writes the active career to its file now — the Live tab's answer to a save that failed.
+    ///
+    /// Every change is saved as it is made, so this only does anything once one could not be:
+    /// the career in memory is then ahead of its file, and once whatever stopped the save is
+    /// fixed — a damaged file moved aside, a sync client letting go — this puts it back in step.
+    /// An unchanged career writes nothing (see `data_store::persist`).
+    pub fn save_career(&self) -> AppResult<()> {
+        self.persist()
+    }
+
     fn saves_view(&self, active: &Path) -> SavesView {
         let saves = saves::list_saves(&self.saves_dir, active);
         let active_name = saves
@@ -90,24 +100,32 @@ impl App {
             ))
         })?;
 
-        // Flush the outgoing career before repointing, then swap the store's *contents* — never
-        // the Arc itself, which the recorder thread also holds.
-        //
-        // There may be no outgoing career: the saves folder was empty at startup, and this is the
-        // first one being created. Flushing then would fail and take the creation down with it,
-        // which is the one operation a careerless app must still be able to perform.
-        let outgoing = self.active_path();
-        if !outgoing.as_os_str().is_empty() {
-            self.persist_to(&outgoing)?;
-        }
+        // From the flush to the seal, under the save lock: nothing saves in between — the
+        // recorder filing a session included — so no save can read the outgoing path and then
+        // write the incoming career into it. See `data_store::SAVING`.
+        let saving = crate::career::data_store::saving();
         {
-            let mut active = self.data_path.write().unwrap();
-            *self.store.write().unwrap() = incoming;
-            *active = target.clone();
+            // Held for writing from the flush to the swap, so a change cannot land between them
+            // and end up in neither file. The path is changed while it is held too, so anything
+            // holding the store and reading the path finds the pair as one.
+            let mut data = self.store.write().unwrap();
+            // Flush the outgoing career before repointing, then swap the store's *contents* —
+            // never the Arc itself, which the recorder thread also holds.
+            //
+            // There may be no outgoing career: the saves folder was empty at startup, and this is
+            // the first one being created. Flushing then would fail and take the creation down
+            // with it, which is the one operation a careerless app must still be able to perform.
+            let outgoing = self.active_path();
+            if !outgoing.as_os_str().is_empty() {
+                saving.persist_from(&mut data, &outgoing).map_err(internal)?;
+            }
+            *data = incoming;
+            *self.data_path.write().unwrap() = target.clone();
         }
         // The incoming career is being loaded, so it gets the same upgrade startup gives the
         // one the app opened with — this and startup are the only two places a career is read in.
-        self.seal_career(&target).map_err(internal)?;
+        self.seal_career(&saving, &target).map_err(internal)?;
+        drop(saving);
         self.store_active_save(&target).map_err(internal)?;
         Ok(self.saves_view(&target))
     }
@@ -137,17 +155,29 @@ impl App {
         if saves::name_taken(&self.saves_dir, &new_name) {
             return Err(conflict("a save with that name already exists"));
         }
-        // Flush first: an active save with unwritten changes would otherwise be renamed out from
-        // under the next persist. Refused when the file could not be read, so it must not be
-        // renamed either — moving it would leave the unreadable career under a name the switcher
-        // offers as this one.
+        // Under the save lock: the active career's folder must not move while anything is writing
+        // into it. A capture that read the old path and wrote after the move would recreate the
+        // old folder — a lap chart creates its own — and save a second copy of the career there.
+        let saving = crate::career::data_store::saving();
         let was_active = self.active_path() == from;
-        if was_active {
-            self.persist_to(&from)?;
-        }
-        let to = saves::rename_save(&self.saves_dir, &name, &new_name).map_err(internal)?;
-        if was_active {
+        let to = if was_active {
+            // Flushed, moved and repointed while the career is held for writing: a change cannot
+            // land after the flush, and anything holding the store never finds the folder gone
+            // from where the path says it is.
+            let mut data = self.store.write().unwrap();
+            // Flush first: an active save with unwritten changes would otherwise be renamed out
+            // from under the next persist. Refused when the file could not be read, so it must not
+            // be renamed either — moving it would leave the unreadable career under a name the
+            // switcher offers as this one.
+            saving.persist_from(&mut data, &from).map_err(internal)?;
+            let to = saves::rename_save(&self.saves_dir, &name, &new_name).map_err(internal)?;
             *self.data_path.write().unwrap() = to.clone();
+            to
+        } else {
+            saves::rename_save(&self.saves_dir, &name, &new_name).map_err(internal)?
+        };
+        drop(saving);
+        if was_active {
             self.store_active_save(&to).map_err(internal)?;
         }
         Ok(self.saves())

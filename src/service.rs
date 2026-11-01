@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::RwLockReadGuard;
 
-use crate::career::data_store::{persist, CareerData, Championship, SavePath, SharedStore};
+use crate::career::data_store::{CareerData, Championship, SavePath, Saving, SharedStore};
 use crate::game::spotter::Focus;
 
 mod career_saves;
@@ -38,7 +38,10 @@ pub use championships::{
     SessionEligibility, TeamEligibilityView,
 };
 pub use live::{live_seat_status, resolve_live_teams, GridStatus, LiveTeams, RosterMismatch};
-pub use live_frame::{on_track, session_bests, LiveFrame, RideSeen, SessionBests};
+pub use live_frame::{
+    on_track, sector_cells, session_bests, LiveFrame, RideSeen, SectorCell, SectorMark,
+    SessionBests,
+};
 pub use performance::{
     CarPerformance, CarPerformanceClass, CarRow, DriverAttrEdit, DriverPerformance,
     DriverPerformanceClass, PlayerRating, TeamScalarsEdit,
@@ -157,18 +160,23 @@ impl App {
         crate::config::load_or_create(&self.config_path)
     }
 
-    /// Persists the store to `path`, as an [`AppError::Internal`] if the write was refused.
+    /// Saves the store to the active career's file, as an [`AppError::Internal`] if the write
+    /// was refused.
+    ///
+    /// The active path is read *under* the save lock, not before taking it. Switching careers and
+    /// renaming the active one happen under the same lock, so the file written always belongs to
+    /// the career the store holds. A path read first could name the career just switched away
+    /// from, and the save would write one career into the other's file — which is why there is
+    /// no way to save the active career to a path the caller supplies.
     ///
     /// A change that reached memory but not the file is not a change the user may be told
-    /// succeeded — that is precisely the silent failure the guard in [`persist`] exists to
-    /// surface.
-    fn persist_to(&self, path: &PathBuf) -> AppResult<()> {
-        persist(&self.store, path).map_err(AppError::Internal)
-    }
-
-    /// [`Self::persist_to`] the active save.
+    /// succeeded — that is precisely the silent failure the guard in
+    /// [`persist`](crate::career::data_store::persist) exists to surface.
     fn persist(&self) -> AppResult<()> {
-        self.persist_to(&self.active_path())
+        let saving = crate::career::data_store::saving();
+        saving
+            .persist(&self.store, &self.active_path())
+            .map_err(AppError::Internal)
     }
 
     /// The configured Custom AI Drivers folder, if one is set and non-empty.
@@ -198,13 +206,27 @@ impl App {
     /// Every upgrade takes its figures from the config the career has been running on, so they
     /// preserve what it was already doing; run any on the request path and it would capture
     /// whatever the settings had since been retuned to. See [`crate::career::contracts::seal_finished`].
-    pub fn seal_career(&self, path: &PathBuf) -> Result<(), String> {
-        seal_career(&self.store, path, &self.config_path)
+    ///
+    /// Takes the save lock as held: switching careers seals the incoming one before letting go
+    /// of it, so nothing can save the career between its arrival and its upgrade.
+    pub fn seal_career(&self, saving: &Saving, path: &Path) -> Result<(), String> {
+        seal_career_held(saving, &self.store, path, &self.config_path)
     }
 }
 
-/// [`App::seal_career`] without an `App`, for callers holding the pieces.
-pub fn seal_career(store: &SharedStore, path: &PathBuf, config_path: &Path) -> Result<(), String> {
+/// [`App::seal_career`] without an `App`, for callers holding the pieces — startup, before
+/// anything else can be saving. Takes the save lock itself.
+pub fn seal_career(store: &SharedStore, path: &Path, config_path: &Path) -> Result<(), String> {
+    seal_career_held(&crate::career::data_store::saving(), store, path, config_path)
+}
+
+/// [`seal_career`] for a caller already holding the save lock.
+fn seal_career_held(
+    saving: &Saving,
+    store: &SharedStore,
+    path: &Path,
+    config_path: &Path,
+) -> Result<(), String> {
     if path.as_os_str().is_empty() {
         return Ok(()); // No active career — nothing loaded, nothing to seal.
     }
@@ -255,7 +277,7 @@ pub fn seal_career(store: &SharedStore, path: &PathBuf, config_path: &Path) -> R
     if !stamped_rating && sealed == 0 && charts == 0 && seated == 0 {
         return Ok(());
     }
-    persist(store, path)
+    saving.persist(store, path)
 }
 
 /// Gives every signed season that has no roster of its own a copy of the game's file — seasons

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<USER_OVERRIDES>
+
+
+	<LIVERY_OVERRIDE LIVERY="51" NAME="Brabham-BMW #5 Piquet" BASELIVERY="Default">
+        <PREVIEWIMAGE PATH="TAMS2SP\1983preview5.dds" />
+        <TEXTURE NAME="BODY" PATH="TAMS2SP\1983body5.dds" />
+	</LIVERY_OVERRIDE>
+	<HELMET_OVERRIDE LIVERY="51" NAME="Brabham-BMW #5 Piquet" BASEHELMET="DEFAULT">
+    	<TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\83_Piquet_Helmet.dds" />
+    	<TEXTURE NAME="VISOR_DIFF" PATH="TAMS2SP\83_Piquet_visor.dds" />
+		<TEXTURE NAME="VISOR_SPEC" PATH="TAMS2SP\83_Piquet_visor_spec.dds" />
+    </HELMET_OVERRIDE>
+	<OUTFIT_OVERRIDE LIVERY="51" BASEOUTFIT="DEFAULT">
+        <TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\Suits\brabham_torso.dds" />
+        <TEXTURE NAME="ARMS_DIFF" PATH="TAMS2SP\Suits\brabham_arms.dds" />
+        <TEXTURE NAME="GLOVES_DIFF" PATH="TAMS2SP\Suits\brabham_gloves.dds" />
+        <TEXTURE NAME="LEGS_DIFF" PATH="TAMS2SP\Suits\brabham_legs.dds" />
+        <TEXTURE NAME="SEATBELTS_DIFF" PATH="TAMS2SP\Suits\blue_safety_harness.dds" />
+    </OUTFIT_OVERRIDE>
+
+    <LIVERY_OVERRIDE LIVERY="52" NAME="Brabham-BMW #6 Patrese" BASELIVERY="Default">
+        <PREVIEWIMAGE PATH="TAMS2SP\1983preview6.dds" />
+        <TEXTURE NAME="BODY" PATH="TAMS2SP\1983body6.dds" />
+	</LIVERY_OVERRIDE>
+	<HELMET_OVERRIDE LIVERY="52" NAME="Brabham-BMW #6 Patrese" BASEHELMET="DEFAULT">
+    	<TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\83_Patrese_Helmet.dds" />
+    	<TEXTURE NAME="VISOR_DIFF" PATH="TAMS2SP\83_Patrese_visor.dds" />
+		<TEXTURE NAME="VISOR_SPEC" PATH="TAMS2SP\83_Patrese_visor_spec.dds" />
+    </HELMET_OVERRIDE>
+	<OUTFIT_OVERRIDE LIVERY="52" BASEOUTFIT="DEFAULT">
+        <TEXTURE NAME="BODY_DIFF" PATH="TAMS2SP\Suits\brabham_torso.dds" />
+        <TEXTURE NAME="ARMS_DIFF" PATH="TAMS2SP\Suits\brabham_arms.dds" />
+        <TEXTURE NAME="GLOVES_DIFF" PATH="TAMS2SP\Suits\brabham_gloves.dds" />
+        <TEXTURE NAME="LEGS_DIFF" PATH="TAMS2SP\Suits\brabham_legs.dds" />
+        <TEXTURE NAME="SEATBELTS_DIFF" PATH="TAMS2SP\Suits\blue_safety_harness.dds" />
+    </OUTFIT_OVERRIDE>
+
+</USER_OVERRIDES>

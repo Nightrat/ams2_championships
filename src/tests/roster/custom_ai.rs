@@ -2101,3 +2101,103 @@ fn test_clearing_a_class_with_nothing_to_clear_changes_nothing() {
     assert_eq!(removed, 0);
     assert_eq!(out, ROSTER);
 }
+
+/// A 1984 grid on a 1983 skinpack: the Osella can only be fielded in the Theodore livery, and
+/// Mansell's Lotus-Renault in the old Lotus-Ford one.
+const ANNOTATED_ROSTER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<custom_ai_drivers>
+    <!-- team: Not A Team, this comment sits outside every driver -->
+    <driver livery_name="Lotus-Renault #11 de Angelis">
+        <name>Elio de Angelis</name>
+        <power_scalar>0.97</power_scalar>
+        <race_skill>0.92</race_skill>
+    </driver>
+    <driver livery_name="Lotus-Ford #12 Mansell">
+        <!-- team: Lotus-Renault -->
+        <name>Nigel Mansell</name>
+        <power_scalar>1.00</power_scalar>
+        <race_skill>0.90</race_skill>
+    </driver>
+    <driver livery_name="Theodore-Ford #34 Cecotto">
+        <!-- TEAM:   Osella-Alfa Romeo   -->
+        <name>Piercarlo Ghinzani</name>
+        <race_skill>0.75</race_skill>
+    </driver>
+    <driver livery_name="Theodore-Ford #34 Cecotto" tracks="Monza">
+        <name>Jo Gartner</name>
+    </driver>
+    <driver livery_name="Spirit-Honda #40 Johansson">
+        <!-- team: -->
+        <!-- Spirit-Hart 101 -->
+        <name>Mauro Baldi</name>
+    </driver>
+</custom_ai_drivers>
+"#;
+
+#[test]
+fn test_a_team_annotation_names_the_team_instead_of_the_livery() {
+    let teams = parse_driver_teams_str(ANNOTATED_ROSTER);
+    assert_eq!(teams["Nigel Mansell"], "Lotus-Renault");
+    // Case and padding are forgiven: it is a hand-written comment.
+    assert_eq!(teams["Piercarlo Ghinzani"], "Osella-Alfa Romeo");
+    // An entry without one, an empty one, or an unrelated comment keeps the livery's team.
+    assert_eq!(teams["Elio de Angelis"], "Lotus-Renault");
+    assert_eq!(teams["Mauro Baldi"], "Spirit-Honda");
+}
+
+#[test]
+fn test_a_team_annotation_applies_only_to_its_own_block() {
+    // A per-track block carries none of its own, so it falls back to the livery — an
+    // annotation is not inherited, and one outside every block names nobody.
+    let teams = parse_driver_teams_str(ANNOTATED_ROSTER);
+    assert_eq!(teams["Jo Gartner"], "Theodore-Ford");
+    assert!(!teams.values().any(|t| t.starts_with("Not A Team")));
+}
+
+#[test]
+fn test_annotated_entries_join_the_team_they_name() {
+    let cars = parse_car_performance_str(ANNOTATED_ROSTER);
+    let lotus = cars.iter().find(|c| c.team == "Lotus-Renault").unwrap();
+    assert_eq!(lotus.drivers, vec!["Elio de Angelis", "Nigel Mansell"]);
+    // First occurrence wins, as for any team.
+    assert_eq!(lotus.power_scalar, 0.97);
+    assert!(!cars.iter().any(|c| c.team == "Lotus-Ford"));
+
+    // The team bar is the weaker of the two, as for any two-car team.
+    let skills = parse_team_skills_str(ANNOTATED_ROSTER);
+    assert_eq!(skills["Lotus-Renault"], 0.90);
+    assert_eq!(skills["Osella-Alfa Romeo"], 0.75);
+
+    let liveries = parse_team_liveries_str(ANNOTATED_ROSTER);
+    assert_eq!(
+        liveries["Lotus-Renault"],
+        vec!["Lotus-Renault #11 de Angelis", "Lotus-Ford #12 Mansell"]
+    );
+}
+
+#[test]
+fn test_annotated_seats_keep_their_own_car_number() {
+    let seats = parse_seats_str(ANNOTATED_ROSTER);
+    let seat = |driver: &str| seats.iter().find(|s| s.driver == driver).unwrap();
+    assert_eq!(seat("Nigel Mansell").seat, "Lotus-Renault #12");
+    assert_eq!(seat("Elio de Angelis").seat, "Lotus-Renault #11");
+    assert_eq!(seat("Piercarlo Ghinzani").seat, "Osella-Alfa Romeo #34");
+    // Still the livery AMS2 binds to: the phantom check must keep matching the manifest.
+    assert_eq!(seat("Nigel Mansell").livery, "Lotus-Ford #12 Mansell");
+
+    let rows = parse_driver_attributes_str(ANNOTATED_ROSTER);
+    assert_eq!(rows[1].team, "Lotus-Renault");
+    assert_eq!(rows[1].livery, "Lotus-Ford #12 Mansell");
+}
+
+#[test]
+fn test_team_scalars_reach_annotated_entries_and_keep_the_annotation() {
+    let out =
+        set_team_scalars_str(ANNOTATED_ROSTER, "Lotus-Renault", scalars(0.95, 1.0, 1.0)).unwrap();
+    assert_eq!(out.matches("<power_scalar>0.95</power_scalar>").count(), 2);
+    assert!(out.contains("<!-- team: Lotus-Renault -->"));
+    assert_eq!(parse_driver_teams_str(&out)["Nigel Mansell"], "Lotus-Renault");
+
+    // The livery's own team is no longer a team of this file.
+    assert!(set_team_scalars_str(ANNOTATED_ROSTER, "Lotus-Ford", scalars(1.0, 1.0, 1.0)).is_err());
+}

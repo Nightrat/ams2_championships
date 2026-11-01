@@ -1,9 +1,8 @@
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::game::shared_memory::{read_live_session, LiveSessionData};
 use crate::career::data_store::{
-    persist, LapChartEntry, RecordedSession, SavePath, SessionResult, SharedStore,
+    saving, LapChartEntry, RecordedSession, SavePath, SessionResult, SharedStore,
 };
 
 #[allow(dead_code)]
@@ -60,24 +59,39 @@ mod tests;
 /// player's own car during the post-race results/podium screen, so the *last* cached snapshot
 /// before capture — the one actually persisted — can have every participant's `is_player`
 /// read back as false even though it was correctly true earlier in the same session.
+///
+/// Returns why the session did not reach the career's file, when it did not. A session that was
+/// taken but could not be saved is still in the store, and the save has recorded why on the
+/// career — the Live tab shows that until a save succeeds.
+///
+/// `active` is the shared handle to the active career's path, not a path read from it: the
+/// whole capture runs under the save lock, which switching careers and renaming the active one
+/// also take, and the path is read only once that lock is held. The career read as active is
+/// therefore the one the session is pushed into, the one its lap chart is written beside and the
+/// one saved. A path read before waiting on the lock could name a career the user has since
+/// switched away from, and the save would write the career it found — the new one — into that
+/// career's file.
 pub(crate) fn capture(
     store: &SharedStore,
-    path: &PathBuf,
+    active: &SavePath,
     session: &LiveSessionData,
     lap_chart: Vec<LapChartEntry>,
     player_name: Option<&str>,
-) {
+) -> Result<(), String> {
+    let saving = saving();
+    let path = active.read().map(|p| p.clone()).unwrap_or_default();
     // No active career — the saves folder was empty at startup. Pushing the session into the
     // store would look like it had been recorded, but creating the first career replaces the
     // store's contents, so it would vanish the moment the user did the thing they are being
     // asked to do. Say so instead.
     if path.as_os_str().is_empty() {
-        eprintln!(
+        let msg = format!(
             "No active career — the session at {} was NOT recorded. \
              Create a career in the app first.",
             session.track_location
         );
-        return;
+        eprintln!("{msg}");
+        return Err(msg);
     }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -135,30 +149,20 @@ pub(crate) fn capture(
 
     // The chart goes beside the career rather than into it — it is the bulk of a session and
     // nothing but its own view reads it. A save that cannot take one keeps it inline.
-    crate::career::lap_charts::externalize(path, std::slice::from_mut(&mut recorded));
+    crate::career::lap_charts::externalize(&path, std::slice::from_mut(&mut recorded));
 
     {
         let mut data = store.write().unwrap();
         data.sessions.push(recorded);
     }
-    // A refusal is already on the console with its reason, and there is no request to answer —
-    // the session stays in memory, so nothing is lost until the file is fixed.
-    let _ = persist(store, path);
+    // A save that fails leaves the session in memory, nothing lost until the server closes.
+    // The save says why on the console and records it on the career, which is how the Live tab
+    // can tell the user in time.
+    saving.persist(store, &path)
 }
 
-/// Capture the current live session immediately, regardless of auto-record settings.
-/// Returns an error string if nothing is worth capturing.
-pub fn capture_current(store: &SharedStore, path: &PathBuf) -> Result<(), String> {
-    if path.as_os_str().is_empty() {
-        return Err("No active career — create one first".into());
-    }
-    let session = read_live_session();
-    recordable(&session)?;
-    capture(store, path, &session, vec![], None);
-    Ok(())
-}
-
-/// Whether the live session is one [`capture_current`] would record, and why not when it is not.
+/// Whether the live session is one `App::record_current_session` would record, and why not when
+/// it is not.
 ///
 /// Its own function so the live tab's Record button is enabled on exactly this test: a button
 /// judged by a looser one is a button that offers a click the route then refuses.
@@ -261,18 +265,20 @@ pub fn start(
     record_race: bool,
 ) {
     std::thread::spawn(move || {
-        // Read fresh from the shared path at each capture — the active save can be switched
-        // at runtime via POST /api/saves/activate while this thread is running.
-        let current_path = || path.read().map(|p| p.clone()).unwrap_or_default();
+        // The shared path goes to each capture as it is, not read here: the active save can be
+        // switched at runtime via POST /api/saves/activate, and `capture` reads it only once it
+        // holds the save lock that a switch takes too.
         let mut state = RecorderState::new(record_practice, record_qualify, record_race);
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
 
             if let Some(taken) = state.poll(&read_live_session()) {
-                capture(
+                // There is no one to answer here. A failure is already on the console and, for
+                // a session held in memory, on the career for the Live tab to show.
+                let _ = capture(
                     &store,
-                    &current_path(),
+                    &path,
                     &taken.session,
                     taken.lap_chart,
                     taken.player_name.as_deref(),

@@ -551,8 +551,34 @@ fn reference_career() -> crate::career::data_store::CareerData {
 
 const AI_DIR: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/docs/custom_ai_files_with_perf_scalars"
+    "/custom_ai_files_with_perf_scalars"
 );
+
+/// Every shipped grid: the rosters in [`AI_DIR`] and in each season folder beside them
+/// (`F1_1983/`, `F1_1984/`), as the roster's path and its class performance.
+///
+/// A season folder also keeps the livery manifests its roster depends on, which name no
+/// drivers, so a file with no cars is not a grid.
+fn shipped_grids() -> Vec<(std::path::PathBuf, crate::roster::custom_ai::ClassPerformance)> {
+    let root = std::path::Path::new(AI_DIR);
+    let mut dirs = vec![root.to_path_buf()];
+    let mut seasons: Vec<_> = std::fs::read_dir(root)
+        .expect("roster folder")
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    seasons.sort();
+    dirs.extend(seasons);
+    dirs.iter()
+        .flat_map(|dir| {
+            crate::roster::custom_ai::class_performance(dir)
+                .into_iter()
+                .filter(|perf| !perf.cars.is_empty())
+                .map(|perf| (dir.join(format!("{}.xml", perf.class)), perf))
+        })
+        .collect()
+}
 
 /// The reference driver's rating, and the F-Classic_Gen1 grid it opens.
 fn reference_eligibility() -> (f32, Vec<TeamEligibility>) {
@@ -1562,10 +1588,10 @@ fn test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most() {
     //
     // Re-measured against the real rosters rather than asserted as a number, so retuning the
     // economy fails loudly instead of quietly breaking the promise. It has been retuned: at the
-    // shipped 100,000 balance, F-Retro_Gen3 (90,000 then 113,999) and F-Classic_Gen2 (100,000
-    // then 102,000) each put only their cheapest seat in reach. That is a choice of *economy* —
-    // a balance near 115,000 would buy a second seat everywhere — so the threshold records where
-    // the tuning stands rather than pretending eight of eight still holds.
+    // shipped 100,000 balance, the 1983 F-Retro_Gen3 (90,000 then 113,999) and F-Classic_Gen2
+    // (100,000 then 102,000) each put only their cheapest seat in reach. That is a choice of
+    // *economy* — a balance near 115,000 would buy a second seat everywhere — so the threshold
+    // records where the tuning stands rather than pretending every grid still does.
     use crate::career::driver_rating::{expected_positions, team_eligibility_with};
 
     // Measured against the shipped config as a whole, not `OfferParams::default()`: the promise
@@ -1578,7 +1604,6 @@ fn test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most() {
         cfg.rating_params(),
     );
     let rating = tuning.starting_rating;
-    let dir = std::path::Path::new(AI_DIR);
 
     // Every shipped grid puts at least two seats up for sale. Two rosters used to offer fewer —
     // F-Vintage_Gen2 one and F-Classic_Gen3 none — precisely because their back rows were
@@ -1588,8 +1613,7 @@ fn test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most() {
     let mut checked = 0;
     let mut grids_with_a_choice = 0;
 
-    for perf in crate::roster::custom_ai::class_performance(dir) {
-        let path = dir.join(format!("{}.xml", perf.class));
+    for (path, perf) in shipped_grids() {
         let pace: std::collections::HashMap<String, f32> = perf
             .cars
             .iter()
@@ -1641,7 +1665,8 @@ fn test_a_new_career_can_buy_a_seat_on_every_shipped_grid_and_choose_on_most() {
         }
         checked += 1;
     }
-    assert_eq!(checked, 8, "every shipped grid");
+    // Seven flat rosters plus the two season folders' F-Retro_Gen3 (1983, 1984).
+    assert_eq!(checked, 9, "every shipped grid");
     assert!(
         grids_with_a_choice >= 6,
         "only {grids_with_a_choice} of {checked} grids offer a choice of bought seat"
@@ -1665,11 +1690,9 @@ fn test_the_starting_balance_buys_a_choice_not_the_grid() {
         cfg.rating_params(),
     );
     let rating = tuning.starting_rating;
-    let dir = std::path::Path::new(AI_DIR);
     let mut grids_with_seats_out_of_reach = 0;
 
-    for perf in crate::roster::custom_ai::class_performance(dir) {
-        let path = dir.join(format!("{}.xml", perf.class));
+    for (path, perf) in shipped_grids() {
         let pace: std::collections::HashMap<String, f32> = perf
             .cars
             .iter()

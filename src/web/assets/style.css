@@ -1140,6 +1140,8 @@ body.hide-phantom-entries .driverperf-phantom-count::after { content: ' (hidden)
    badge has to opt back out by hand or it is never hidden at all. Same trap as the collapsed
    `<details>` rule further up. */
 .tab-warn[hidden] { display: none; }
+/* Red rather than amber: an unsaved career is lost when the server closes, not merely misjudged. */
+.tab-warn.tab-warn-bad { color: #fff; background: #e74c3c; }
 .config-check-group { display: flex; gap: 1.2rem; flex-wrap: wrap; }
 /* Class season years: one narrow box per class, wrapping into columns. */
 .config-class-years {
@@ -1399,6 +1401,14 @@ header h1 { flex: 1 1 100%; }
 /* The roster banner carries its own button, so the text no longer runs to the edge. */
 .live-roster-warning { align-items: center; }
 .live-roster-btn, .live-roster-dismiss { flex: none; }
+/* A failed save: the server's reason on a line of its own under the sentence, in plain weight —
+   it is often a path and an OS error, read rather than shouted. */
+.live-save-warning { align-items: center; }
+.live-save-reason {
+  display: block; margin-top: 0.3rem; font-weight: 400; font-size: 0.85rem; color: #f0b8b8;
+  overflow-wrap: anywhere;
+}
+.live-save-btn { flex: none; }
 
 /* Dropping a per-track entry. The row button is a quiet × inside the Tracks cell — the entry it
    removes is named right beside it, so the button needs no label of its own. */

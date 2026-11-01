@@ -8,6 +8,11 @@ use crate::career::data_store::{try_load_data, CareerData, CareerMode};
 /// rather than a directory and the file inside it.
 pub const CAREER_FILE: &str = "career.json";
 
+/// The career as it was before its last change, kept beside [`CAREER_FILE`] by
+/// `data_store::persist`. Not `.json`, and not the career file, so it is never listed or loaded
+/// as a save; restoring it is a rename the user makes by hand.
+pub const BACKUP_FILE: &str = "career.json.bak";
+
 /// One career save found in the saves directory.
 #[derive(Serialize, Debug, Clone, PartialEq)]
 pub struct SaveInfo {
