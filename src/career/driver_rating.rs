@@ -6,8 +6,20 @@
 //! The central problem is that raw finishing positions are confounded by machinery: P3 in an
 //! Osella is a better drive than P3 in a Williams, so a naive "win races to unlock top teams"
 //! rule would reward the player for already owning a fast car. Every score here is therefore
-//! measured against what the *car* was expected to do, using the pace scalars in the
-//! championship's Custom AI Driver file.
+//! measured against what the *car* was expected to do.
+//!
+//! **The rating is on the roster's own skill scale.** Each roster is *calibrated* against the AI
+//! it fielded (see [`Calibration`]): their finishing positions are fitted to their base car, their
+//! car's pace scalars and their `race_skill` (`qualifying_skill` for Saturdays). A player's
+//! session then scores as the skill a roster driver would have needed for that result in that
+//! car, so a rating of 90 means "drives like a 0.90 roster driver" — the same unit the team bars
+//! are built from. Before that, the rating counted 50 as "finished where the car should", which
+//! sat below every driver on most grids and could never reach the bars it was compared with.
+//!
+//! The base car matters because the scalars are fractions *of* it: 0.91 power on a turbo chassis
+//! is not 0.91 power on a Cosworth one. A calibration measures each base car's offset from the
+//! AI driving it, which is also the only way to place a car no AI drives — the player's own.
+//! Where there is too little to fit, a session falls back to the old positional score.
 //!
 //! Nothing about the user's setup is assumed. AI difficulty, lobby size and field composition
 //! are never constants — they are read from, or cancelled out of, each session individually, so
@@ -70,6 +82,29 @@ const OFFER_MARGIN: f32 = 10.0;
 
 /// Allowance against the incumbent's `race_skill`, in the same 0–1 units.
 const INCUMBENT_MARGIN: f32 = 0.05;
+
+/// Fewest sessions of one type a calibration is fitted from. One grid is one draw of the AI's
+/// luck; a fit on it would read a single first-lap tangle as a property of the car.
+const MIN_FIT_SESSIONS: usize = 3;
+
+/// Observations a fit needs beyond its own parameter count before it is trusted.
+const MIN_FIT_SLACK: usize = 10;
+
+/// Weakest skill effect a calibration may report and still be used, in grid fractions per unit
+/// of skill: the whole 0–1 range must move a car at least a quarter of the way down the order.
+/// A flatter fit means the roster's skills explain nothing on this grid, and dividing by a
+/// near-zero slope would turn every small finishing difference into a wild implied skill.
+const MIN_SKILL_EFFECT: f32 = 0.25;
+
+/// Rating points a 100% retirement rate costs. It is the reliability term's old share of the
+/// rating (0.15 of a ±50 swing either side), now charged only for the races not finished.
+const RELIABILITY_PENALTY: f32 = 15.0;
+
+/// What one session may contribute, in rating points. Wide enough not to bias the mean — a win
+/// from the back of the grid really does imply a skill above the roster's best — but bounded, so
+/// one freak result in a thin fit cannot outweigh a season.
+const SESSION_VALUE_MIN: f32 = -50.0;
+const SESSION_VALUE_MAX: f32 = 150.0;
 
 /// Which of the two bars a team's requirement is built from.
 ///
@@ -279,6 +314,62 @@ fn positional_score(expected: f32, actual: f32, field: f32) -> f32 {
     ((expected - actual) / (field - 1.0)).clamp(-1.0, 1.0)
 }
 
+/// The base car a recorded `car_name` names, without its aero package.
+///
+/// AMS2 reports a car's track-specific aero kit as part of its name ("Formula Retro Gen3 Turbo -
+/// High Downforce"). It is the same chassis and engine as the plain name, so a calibration that
+/// kept the two apart would fit each base car twice from half the data — and at a track run on the
+/// other package, the player's car would have no offset at all.
+fn base_car(car_name: &str) -> &str {
+    car_name.split(" - ").next().unwrap_or(car_name).trim()
+}
+
+/// A finishing position as a fraction of the grid: 0 for first, 1 for last. What a calibration
+/// fits, so grids of different sizes can be fitted together.
+fn grid_fraction(position: u32, field: usize) -> f32 {
+    if field <= 1 {
+        return 0.0;
+    }
+    (position.saturating_sub(1) as f32 / (field - 1) as f32).clamp(0.0, 1.0)
+}
+
+/// Ordinary least squares over `(x, y)` rows of width `k`, by the normal equations and Gaussian
+/// elimination with partial pivoting. `None` when the system is singular — a column that is a
+/// copy of others, or one that never varies.
+fn least_squares(rows: impl Iterator<Item = (Vec<f64>, f64)>, k: usize) -> Option<Vec<f64>> {
+    let mut a = vec![vec![0.0f64; k + 1]; k];
+    for (x, y) in rows {
+        for i in 0..k {
+            a[i][k] += x[i] * y;
+            for j in 0..k {
+                a[i][j] += x[i] * x[j];
+            }
+        }
+    }
+    let scale = (0..k).map(|i| a[i][i].abs()).fold(0.0, f64::max);
+    for col in 0..k {
+        let pivot = (col..k).max_by(|&p, &q| a[p][col].abs().total_cmp(&a[q][col].abs()))?;
+        if a[pivot][col].abs() <= scale * 1e-9 {
+            return None;
+        }
+        a.swap(col, pivot);
+        let (top, below) = a.split_at_mut(col + 1);
+        let lead = &top[col];
+        for row in below {
+            let f = row[col] / lead[col];
+            for (cell, l) in row[col..].iter_mut().zip(&lead[col..]) {
+                *cell -= f * l;
+            }
+        }
+    }
+    let mut b = vec![0.0f64; k];
+    for i in (0..k).rev() {
+        let rest: f64 = (i + 1..k).map(|j| a[i][j] * b[j]).sum();
+        b[i] = (a[i][k] - rest) / a[i][i];
+    }
+    Some(b)
+}
+
 /// The row to rate in a session.
 ///
 /// With an explicit `target` the lookup is by name only — rating a specific driver must never be
@@ -397,10 +488,13 @@ fn session_team(
 pub struct Reputation {
     /// 0–100. Performance at the AI difficulty actually raced, not an absolute skill measure.
     pub value: f32,
-    /// Car-relative race pace, −1..+1.
+    /// Race performance around a rating of 50: `(points − 50) / 50`, so 0 is a 50 and +1 a 100.
+    /// On the old positional score this is exactly the car-relative −1..+1 it always was.
     pub pace: f32,
-    /// Car-relative qualifying pace, −1..+1.
+    /// Qualifying performance, on the same scale as [`Self::pace`].
     pub quali: f32,
+    /// Sessions scored against a calibration rather than by the positional fallback.
+    pub calibrated: u32,
     /// Share of race starts that were classified finishes, 0..1.
     pub finish_rate: f32,
     /// Reputation points contributed by online racing, within ±[`MP_BONUS_CAP`].
@@ -442,6 +536,40 @@ fn weighted_mean(entries: &[(f32, f32)], half_life: f32) -> f32 {
     }
 }
 
+/// Where the AI finished on one roster's grids, explained by their car and their skill.
+///
+/// `y = models[base car] + pace × pace_delta + skill × skill`, where `y` is a finishing position
+/// as a fraction of the grid (0 = first, 1 = last). One offset per base car — the recorded
+/// `car_name`, e.g. "Formula Retro Gen3 Turbo" — because a roster's scalars scale whichever car a
+/// team runs and say nothing about how the base cars compare.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Fit {
+    /// Base car → its offset, in grid fractions.
+    pub models: HashMap<String, f32>,
+    /// Grid fractions per percentage point of `pace_delta_pct`. Zero when the scalars could not
+    /// be separated from the base cars (every team on its own model).
+    pub pace: f32,
+    /// Grid fractions per unit of skill; negative, since better drivers finish higher.
+    pub skill: f32,
+}
+
+impl Fit {
+    /// The skill a roster driver would have needed to finish at `y` in this car. `None` for a
+    /// base car no AI drove, whose offset was never measured.
+    fn implied_skill(&self, model: &str, pace: f32, y: f32) -> Option<f32> {
+        let offset = self.models.get(base_car(model))?;
+        Some((y - offset - self.pace * pace) / self.skill)
+    }
+}
+
+/// A roster's race and qualifying fits — see [`RatingContext::calibrate`]. Either may be absent,
+/// and a session with no fit for its type is scored by the positional fallback.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Calibration {
+    pub race: Option<Fit>,
+    pub quali: Option<Fit>,
+}
+
 /// One car class's roster and pace figures, as needed to score a session run in it.
 ///
 /// A rating spanning several classes needs one of these per class: the expected finishing
@@ -451,6 +579,10 @@ pub struct RatingContext {
     pub class: String,
     pub seats: Vec<SeatEntry>,
     pub expected: HashMap<String, f32>,
+    /// Each team's `pace_delta_pct`, from its scalars alone.
+    pub pace: HashMap<String, f32>,
+    /// Empty until [`Self::calibrate`] has seen the sessions.
+    pub calibration: Calibration,
     /// The sessions this roster is restricted to, for a season that keeps its own copy of the
     /// roster (see [`crate::career::signed_rosters`]). `None` covers every session in the class.
     pub only: Option<HashSet<String>>,
@@ -463,8 +595,173 @@ impl RatingContext {
             class: class.to_string(),
             seats,
             expected,
+            pace: pace.clone(),
+            calibration: Calibration::default(),
             only: None,
         }
+    }
+
+    /// Fits this roster against the AI it fielded in `sessions` (those it covers, single-player
+    /// only), and re-ranks [`Self::expected`] by the race fit when every seated team can be placed.
+    ///
+    /// The re-ranking is what corrects the expected finishing positions — and with them the grid
+    /// half of every team bar and every offer's objective — for base cars the scalars cannot see.
+    /// It needs each team's base car, read off the grids: the AI's rows, and the player's own row
+    /// for the team they drove, which is the only way to learn the base car of a seat no AI ever
+    /// sat in. A team still unplaced leaves the scalar ranking in force, since a ranking half
+    /// measured and half estimated would compare two different things.
+    pub fn calibrate(&mut self, sessions: &[RecordedSession], params: &RatingParams) {
+        let own: Vec<&RecordedSession> = sessions
+            .iter()
+            .filter(|s| self.covers(s) && !is_multiplayer(s))
+            .collect();
+        let race = self.fit(&own, 5, params);
+        let quali = self.fit(&own, 3, params);
+        if let Some(predicted) = race.as_ref().and_then(|f| self.predicted_pace(&own, f)) {
+            self.expected = expected_positions(&predicted, &self.seats);
+        }
+        self.calibration = Calibration { race, quali };
+    }
+
+    /// The roster entry a recorded name belongs to.
+    fn seat_of(&self, name: &str) -> Option<&SeatEntry> {
+        let key = name_key(name);
+        self.seats.iter().find(|e| name_key(&e.driver) == key)
+    }
+
+    /// Least-squares fit of one session type. `None` when the data cannot carry one: too few
+    /// sessions or rows, a singular system, or skill explaining too little.
+    fn fit(
+        &self,
+        sessions: &[&RecordedSession],
+        session_type: u32,
+        params: &RatingParams,
+    ) -> Option<Fit> {
+        struct Obs<'a> {
+            model: &'a str,
+            pace: f32,
+            skill: f32,
+            y: f32,
+        }
+        let mut obs: Vec<Obs> = Vec::new();
+        let mut used = 0;
+        for s in sessions.iter().filter(|s| s.session_type == session_type) {
+            let field = s.results.len();
+            let leader = leader_laps(s);
+            let before = obs.len();
+            for r in &s.results {
+                if r.is_player || r.car_name.is_empty() {
+                    continue;
+                }
+                // A retirement says nothing about pace, here as in the player's own score.
+                if session_type == 5 && retired_with(r, leader, params) {
+                    continue;
+                }
+                let Some(seat) = self.seat_of(&r.name) else { continue };
+                let skill = if session_type == 3 {
+                    seat.quali_skill.or(seat.skill)
+                } else {
+                    seat.skill
+                };
+                let (Some(skill), Some(&pace)) = (skill, self.pace.get(&seat.team)) else {
+                    continue;
+                };
+                obs.push(Obs {
+                    model: base_car(&r.car_name),
+                    pace,
+                    skill,
+                    y: grid_fraction(r.race_position, field),
+                });
+            }
+            if obs.len() > before {
+                used += 1;
+            }
+        }
+        if used < MIN_FIT_SESSIONS {
+            return None;
+        }
+
+        let mut models: Vec<&str> = obs.iter().map(|o| o.model).collect();
+        models.sort_unstable();
+        models.dedup();
+        // With every team on its own base car the scalars are a copy of the offsets and the
+        // system is singular; the offsets alone then carry each team's pace.
+        for with_pace in [true, false] {
+            let k = models.len() + 1 + usize::from(with_pace);
+            if obs.len() < k + MIN_FIT_SLACK {
+                return None;
+            }
+            let rows = obs.iter().map(|o| {
+                let mut x = vec![0.0f64; k];
+                x[models.iter().position(|m| *m == o.model).unwrap_or(0)] = 1.0;
+                if with_pace {
+                    x[k - 2] = f64::from(o.pace);
+                }
+                x[k - 1] = f64::from(o.skill);
+                (x, f64::from(o.y))
+            });
+            let Some(b) = least_squares(rows, k) else { continue };
+            let skill = b[k - 1] as f32;
+            if skill > -MIN_SKILL_EFFECT {
+                return None;
+            }
+            return Some(Fit {
+                models: models
+                    .iter()
+                    .enumerate()
+                    .map(|(i, m)| (m.to_string(), b[i] as f32))
+                    .collect(),
+                pace: if with_pace { b[k - 2] as f32 } else { 0.0 },
+                skill,
+            });
+        }
+        None
+    }
+
+    /// Each team's predicted grid fraction for an average driver, under `fit` — a stand-in for
+    /// pace that [`expected_positions`] can rank. `None` unless every seated team can be placed.
+    fn predicted_pace(
+        &self,
+        sessions: &[&RecordedSession],
+        fit: &Fit,
+    ) -> Option<HashMap<String, f32>> {
+        let mut seen: HashMap<String, HashMap<&str, u32>> = HashMap::new();
+        for s in sessions {
+            let me = player_row(s, &self.seats, None);
+            if let Some(me) = me.filter(|r| !r.car_name.is_empty()) {
+                if let Some(team) = session_team(s, &self.seats, &self.expected, None) {
+                    *seen.entry(team).or_default().entry(base_car(&me.car_name)).or_default() += 1;
+                }
+            }
+            for r in &s.results {
+                if r.is_player || r.car_name.is_empty() {
+                    continue;
+                }
+                if let Some(seat) = self.seat_of(&r.name) {
+                    *seen
+                        .entry(seat.team.clone())
+                        .or_default()
+                        .entry(base_car(&r.car_name))
+                        .or_default() += 1;
+                }
+            }
+        }
+        let mut out = HashMap::new();
+        for seat in &self.seats {
+            if out.contains_key(&seat.team) {
+                continue;
+            }
+            // Most often seen, ties to the first name, so the answer cannot follow hash order.
+            let model = seen
+                .get(&seat.team)?
+                .iter()
+                .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
+                .map(|(m, _)| *m)?;
+            let offset = fit.models.get(model)?;
+            let pace = self.pace.get(&seat.team)?;
+            out.insert(seat.team.clone(), offset + fit.pace * pace);
+        }
+        Some(out)
     }
 
     /// A season's own roster: it scores that season's sessions and no others.
@@ -628,11 +925,14 @@ fn compute_reputation_inner(
     params: &RatingParams,
 ) -> Reputation {
     // A single-class rating is the global one over a roster that covers everything it is given.
+    // It is never calibrated, so it scores on the positional fallback throughout.
     let expected = expected_positions(pace, seats);
     let ctx = RatingContext {
         class: String::new(),
         seats: seats.to_vec(),
         expected,
+        pace: pace.clone(),
+        calibration: Calibration::default(),
         only: None,
     };
     accumulate_covering_all(player_name, sessions, &ctx, declared_team, params)
@@ -677,6 +977,7 @@ fn accumulate_with<'a>(
     let (mut starts, mut finishes) = (0u32, 0u32);
     let (mut mp_wins, mut mp_losses) = (0u32, 0u32);
     let (mut mate_wins, mut mate_losses) = (0u32, 0u32);
+    let mut calibrated = 0u32;
 
     for s in ordered {
         // A session in a class with no Custom AI file has no roster and no car pace, so there
@@ -725,6 +1026,28 @@ fn accumulate_with<'a>(
         // that day, with none of the car-pace estimation the positional scores depend on.
         let mate = teammate_row(s, &ctx.seats, &team, me);
 
+        // The session in rating points: the skill this result implies when the roster has a fit
+        // for this session type and the player's base car is one it measured, otherwise the
+        // positional score mapped onto the same 0–100 (50 = finished where the car should).
+        let fit = if s.session_type == 5 {
+            ctx.calibration.race.as_ref()
+        } else {
+            ctx.calibration.quali.as_ref()
+        };
+        let implied = fit.zip(ctx.pace.get(&team)).and_then(|(f, &pace)| {
+            f.implied_skill(&me.car_name, pace, grid_fraction(me.race_position, s.results.len()))
+        });
+        let mut value = || {
+            let points = match implied {
+                Some(skill) => {
+                    calibrated += 1;
+                    100.0 * skill
+                }
+                None => NEUTRAL_RATING * (1.0 + positional_score(exp, me.race_position as f32, field)),
+            };
+            points.clamp(SESSION_VALUE_MIN, SESSION_VALUE_MAX)
+        };
+
         match s.session_type {
             5 => {
                 // Retirements say nothing about pace; they feed the reliability term instead —
@@ -739,7 +1062,7 @@ fn accumulate_with<'a>(
                     continue;
                 }
                 finishes += 1;
-                races.push((positional_score(exp, me.race_position as f32, field), 1.0));
+                races.push((value(), 1.0));
                 // A team-mate who retired was not beaten on pace, so that pairing is skipped
                 // rather than banked — reliability already has its own term.
                 if let Some(mate) = mate.filter(|m| !retired_with(m, leader_laps(s), params)) {
@@ -754,7 +1077,7 @@ fn accumulate_with<'a>(
             }
             // Qualifying is scored on position alone — lap counts there reflect run plans.
             3 => {
-                qualis.push((positional_score(exp, me.race_position as f32, field), 1.0));
+                qualis.push((value(), 1.0));
                 if let Some(mate) = mate {
                     let ahead = me.race_position < mate.race_position;
                     mates.push((if ahead { 1.0 } else { -1.0 }, TEAMMATE_QUALI_WEIGHT));
@@ -770,33 +1093,41 @@ fn accumulate_with<'a>(
     }
 
     let half_life = params.recency_half_life;
-    let pace_score = weighted_mean(&races, half_life);
-    let quali_score = weighted_mean(&qualis, half_life);
+    let race_points = weighted_mean(&races, half_life);
+    let quali_points = weighted_mean(&qualis, half_life);
     let finish_rate = if starts > 0 {
         finishes as f32 / starts as f32
     } else {
         0.0
     };
 
-    // Drop qualifying's share onto race pace when no qualifying has been recorded, so its
-    // absence does not silently drag the rating toward neutral.
-    let raw = if qualis.is_empty() {
-        0.85 * pace_score + 0.15 * (2.0 * finish_rate - 1.0)
+    // Race and qualifying keep their old 0.55 / 0.30 split, renormalised: the 0.15 that was
+    // reliability's is the driver's own pace less what the races they did not finish cost. With
+    // no qualifying recorded, race pace carries it all, so its absence does not drag the rating.
+    let performance = if qualis.is_empty() {
+        race_points
     } else {
-        0.55 * pace_score + 0.30 * quali_score + 0.15 * (2.0 * finish_rate - 1.0)
+        (0.55 * race_points + 0.30 * quali_points) / 0.85
     };
+    let measured = performance - RELIABILITY_PENALTY * (1.0 - finish_rate);
 
-    // The evidence is blended against the starting rating rather than the score simply being
-    // shrunk toward the midpoint, so an unproven driver sits where the user asked. The two are
-    // the same thing when that is 50: 50(1+raw)w + 50(1−w) = 50(1 + raw·w).
+    // The evidence is blended against the starting rating, so an unproven driver sits where the
+    // user asked and a couple of lucky results cannot unlock a top seat.
     //
-    // Race starts alone are the evidence count, deliberately: a career of qualifying sessions
+    // Race finishes alone are the evidence count, deliberately: a career of qualifying sessions
     // with no race, or one where every race ended in a retirement, stays on the starting rating
     // however those sessions went. Races are what a seat is earned in, and a rating that moved
     // on Saturday pace alone would not mean what the team requirements assume it means.
     let n = races.len() as f32;
     let weight = n / (n + SHRINKAGE);
-    let base = NEUTRAL_RATING * (1.0 + raw) * weight + params.starting_rating * (1.0 - weight);
+    let base = measured * weight + params.starting_rating * (1.0 - weight);
+    let around_neutral = |points: f32, any: bool| {
+        if any {
+            (points - NEUTRAL_RATING) / NEUTRAL_RATING
+        } else {
+            0.0
+        }
+    };
     let mp_bonus = if mps.is_empty() {
         0.0
     } else {
@@ -815,8 +1146,9 @@ fn accumulate_with<'a>(
 
     Reputation {
         value: (base + mp_bonus + teammate_bonus).clamp(0.0, 100.0),
-        pace: pace_score,
-        quali: quali_score,
+        pace: around_neutral(race_points, !races.is_empty()),
+        quali: around_neutral(quali_points, !qualis.is_empty()),
+        calibrated,
         finish_rate,
         mp_bonus,
         teammate: mate_h2h,

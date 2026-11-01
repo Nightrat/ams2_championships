@@ -438,11 +438,13 @@ fn reference_career() -> crate::career::data_store::CareerData {
     serde_json::from_str(&std::fs::read_to_string(path).expect("fixture missing")).unwrap()
 }
 
+/// One context per shipped class, calibrated on the fixture's sessions as the server does.
 fn reference_contexts() -> Vec<RatingContext> {
     let dir = std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/custom_ai_files_with_perf_scalars"
     ));
+    let rated = reference_rated();
     crate::roster::custom_ai::class_performance(dir)
         .into_iter()
         .map(|perf| {
@@ -452,7 +454,10 @@ fn reference_contexts() -> Vec<RatingContext> {
                 .iter()
                 .map(|c| (c.team.clone(), c.pace_delta_pct))
                 .collect();
-            RatingContext::new(&perf.class, crate::roster::custom_ai::parse_seats(&path), &pace)
+            let mut ctx =
+                RatingContext::new(&perf.class, crate::roster::custom_ai::parse_seats(&path), &pace);
+            ctx.calibrate(&rated, &RatingParams::default());
+            ctx
         })
         .collect()
 }
@@ -509,9 +514,14 @@ fn test_reference_career_rating_snapshot() {
         "teammate_bonus {}",
         r.teammate_bonus
     );
-    // Snapshot value shifts whenever custom_ai_files_with_perf_scalars/*.xml's scalars change
-    // (power_scalar was rescaled so the fastest car in each class is 1.00, not up to 1.10).
-    assert!((r.value - 57.16).abs() < 0.5, "rating {}", r.value);
+    // Every one of the 1986 races and qualifying sessions is scored against the class's
+    // calibration (24 starts less 7 retirements, plus 24 qualifying sessions).
+    assert_eq!(r.calibrated, 17 + 24, "sessions scored against the fit");
+    // The fixture drove like a roster driver of about 1.01 in races and 1.00 in qualifying, and
+    // beat its team-mate in 34 of 38 — which the old positional score put at 57, below most of
+    // the drivers it was beating. Snapshot value shifts whenever the shipped rosters' scalars
+    // or skills change.
+    assert!((r.value - 89.14).abs() < 0.5, "rating {}", r.value);
 }
 
 #[test]
@@ -1166,4 +1176,234 @@ fn test_the_margin_moves_how_far_short_is_looked_at_not_the_bar() {
         b.iter().map(|e| e.tier).collect::<Vec<_>>(),
         "but the tiers must have moved"
     );
+}
+
+// ── Calibration ──────────────────────────────────────────────────────────────
+//
+// A grid with a known answer: two base cars, where "Car Y" is quicker than its scalars say and
+// "Car X" slower, four AI teams across them, and a one-car team the player drives that no AI
+// ever sits in. Positions follow `offset[car] + 0.2 × pace − 1.5 × skill` plus a little race-to-race
+// noise — without it every grid is the same eight ranks and there is nothing to fit — so a
+// calibration that works recovers the ordering of the base cars and the skill a result implies.
+
+const CAL_ROSTER: &str = r#"<custom_ai_drivers>
+    <driver livery_name="1990 Fastco #1 - A"><name>Ace Alpha</name><race_skill>0.95</race_skill></driver>
+    <driver livery_name="1990 Fastco #2 - B"><name>Bob Bravo</name><race_skill>0.75</race_skill></driver>
+    <driver livery_name="1990 Midco #3 - C"><name>Cal Charlie</name><race_skill>0.90</race_skill></driver>
+    <driver livery_name="1990 Midco #4 - D"><name>Dan Delta</name><race_skill>0.70</race_skill></driver>
+    <driver livery_name="1990 Turbo1 #5 - E"><name>Eve Echo</name><race_skill>0.85</race_skill></driver>
+    <driver livery_name="1990 Turbo1 #6 - F"><name>Fay Foxtrot</name><race_skill>0.65</race_skill></driver>
+    <driver livery_name="1990 Turbo2 #7 - G"><name>Gus Golf</name><race_skill>0.80</race_skill></driver>
+    <driver livery_name="1990 Turbo2 #8 - H"><name>Hal Hotel</name><race_skill>0.60</race_skill></driver>
+    <driver livery_name="1990 Backco #9 - I"><name>Ivo India</name><race_skill>0.70</race_skill></driver>
+</custom_ai_drivers>"#;
+
+const CAR_X: &str = "Car X";
+const CAR_Y: &str = "Car Y";
+
+/// Each AI's name, base car, scalar pace and skill, in roster order. The Backco's Ivo India is
+/// the seat the player took, so he never appears on a grid.
+fn cal_grid() -> Vec<(&'static str, &'static str, f32, f32)> {
+    vec![
+        ("Ace Alpha", CAR_X, 0.0, 0.95),
+        ("Bob Bravo", CAR_X, 0.0, 0.75),
+        ("Cal Charlie", CAR_X, 1.0, 0.90),
+        ("Dan Delta", CAR_X, 1.0, 0.70),
+        ("Eve Echo", CAR_Y, 0.5, 0.85),
+        ("Fay Foxtrot", CAR_Y, 0.5, 0.65),
+        ("Gus Golf", CAR_Y, 1.5, 0.80),
+        ("Hal Hotel", CAR_Y, 1.5, 0.60),
+    ]
+}
+
+fn cal_pace() -> HashMap<String, f32> {
+    [("Fastco", 0.0f32), ("Midco", 1.0), ("Turbo1", 0.5), ("Turbo2", 1.5), ("Backco", BACKCO_PACE)]
+        .into_iter()
+        .map(|(t, p)| (t.to_string(), p))
+        .collect()
+}
+
+const BACKCO_PACE: f32 = 1.0;
+
+/// Where a car finishes under the grid's true model: lower is better.
+fn cal_score(car: &str, pace: f32, skill: f32) -> f32 {
+    let offset = if car == CAR_Y { -0.6 } else { 0.0 };
+    offset + 0.2 * pace - 1.5 * skill
+}
+
+/// A deterministic ±0.2 of luck for one car in one race.
+fn cal_jitter(seed: u64) -> f32 {
+    let x = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    ((x >> 33) as f32 / (1u64 << 31) as f32 - 0.5) * 0.4
+}
+
+/// One session of `session_type`: the eight AI plus the player in the Backco (a Car Y) driving
+/// like a roster driver of `player_skill`, recorded under `player_car`.
+fn cal_session(
+    id: &str,
+    at: u64,
+    session_type: u32,
+    player_skill: f32,
+    player_car: &str,
+) -> RecordedSession {
+    let luck = |i: u64| cal_jitter(at * 31 + i);
+    let mut rows: Vec<(f32, SessionResult)> = cal_grid()
+        .into_iter()
+        .enumerate()
+        .map(|(i, (name, car, pace, skill))| {
+            let mut r = result(name, 0, 10);
+            r.car_name = car.into();
+            (cal_score(car, pace, skill) + luck(i as u64), r)
+        })
+        .collect();
+    let mut me = result("Nightrat", 0, 10);
+    me.car_name = player_car.into();
+    me.is_player = true;
+    rows.push((cal_score(CAR_Y, BACKCO_PACE, player_skill) + luck(99), me));
+    rows.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let results = rows
+        .into_iter()
+        .enumerate()
+        .map(|(i, (_, mut r))| {
+            r.race_position = i as u32 + 1;
+            r
+        })
+        .collect();
+    RecordedSession {
+        id: id.into(),
+        recorded_at: at,
+        track: "Monza".into(),
+        track_variation: String::new(),
+        car_name: CAR_Y.into(),
+        car_class: "F-Cal".into(),
+        session_type,
+        results,
+        lap_chart: vec![],
+    }
+}
+
+fn cal_sessions(n: u64, session_type: u32, player_skill: f32) -> Vec<RecordedSession> {
+    (0..n)
+        .map(|i| {
+            let id = format!("{session_type}-{i}");
+            cal_session(&id, 100 + i, session_type, player_skill, CAR_Y)
+        })
+        .collect()
+}
+
+fn cal_context(sessions: &[RecordedSession]) -> RatingContext {
+    let mut ctx = RatingContext::new("F-Cal", parse_seats_str(CAL_ROSTER), &cal_pace());
+    ctx.calibrate(sessions, &RatingParams::default());
+    ctx
+}
+
+#[test]
+fn test_calibration_finds_the_base_car_the_scalars_miss() {
+    let sessions = cal_sessions(6, 5, 0.70);
+    let scalars_only = RatingContext::new("F-Cal", parse_seats_str(CAL_ROSTER), &cal_pace());
+    let ctx = cal_context(&sessions);
+    let fit = ctx.calibration.race.as_ref().expect("enough data to fit");
+    assert!(fit.models[CAR_Y] < fit.models[CAR_X], "Car Y is the quicker base car: {fit:?}");
+    assert!(fit.skill < 0.0, "better drivers finish higher: {fit:?}");
+
+    // On scalars alone the Midco (Car X, pace 1.0) is ahead of the Turbo2 (Car Y, pace 1.5);
+    // measured, the Car Y teams move ahead of the Car X ones they out-run.
+    assert!(scalars_only.expected["Midco"] < scalars_only.expected["Turbo2"]);
+    assert!(ctx.expected["Turbo2"] < ctx.expected["Midco"], "{:?}", ctx.expected);
+    assert!(ctx.expected["Turbo1"] < ctx.expected["Fastco"], "{:?}", ctx.expected);
+}
+
+#[test]
+fn test_a_calibrated_rating_is_the_skill_the_results_imply() {
+    // The player finishes where a roster driver of that skill would in the Backco, a car no AI
+    // drives — its offset comes from the other Car Y teams.
+    let strong = cal_sessions(30, 5, 0.90);
+    let weak = cal_sessions(30, 5, 0.65);
+    let r_strong =
+        compute_reputation_global(Some("Nightrat"), &strong, &[cal_context(&strong)], None);
+    let r_weak = compute_reputation_global(Some("Nightrat"), &weak, &[cal_context(&weak)], None);
+    assert_eq!(r_strong.calibrated, 30);
+    // Race performance reads straight off the skill scale: (points − 50) / 50.
+    let implied = |r: &Reputation| (50.0 + 50.0 * r.pace) / 100.0;
+    assert!((implied(&r_strong) - 0.90).abs() < 0.08, "implied {}", implied(&r_strong));
+    assert!((implied(&r_weak) - 0.65).abs() < 0.08, "implied {}", implied(&r_weak));
+    assert!(r_strong.value > r_weak.value);
+}
+
+#[test]
+fn test_an_aero_package_is_the_same_base_car() {
+    // AMS2 names a track's aero kit as part of the car. Here the Car Y teams and the player run
+    // the high-downforce kit for half the races: still one base car, still one offset.
+    let mut sessions = cal_sessions(4, 5, 0.80);
+    for i in 0..4u64 {
+        let mut s = cal_session(&format!("hd{i}"), 200 + i, 5, 0.80, "Car Y - High Downforce");
+        for r in &mut s.results {
+            if r.car_name == CAR_Y {
+                r.car_name = "Car Y - High Downforce".into();
+            }
+        }
+        sessions.push(s);
+    }
+    let ctx = cal_context(&sessions);
+    let fit = ctx.calibration.race.as_ref().expect("fit");
+    let mut models: Vec<&str> = fit.models.keys().map(|m| m.as_str()).collect();
+    models.sort();
+    assert_eq!(models, vec![CAR_X, CAR_Y]);
+    let r = compute_reputation_global(Some("Nightrat"), &sessions, &[ctx], None);
+    assert_eq!(r.calibrated, 8, "the high-downforce races are calibrated too");
+}
+
+#[test]
+fn test_too_little_data_falls_back_to_the_positional_score() {
+    let sessions = cal_sessions(2, 5, 0.80);
+    let ctx = cal_context(&sessions);
+    assert_eq!(ctx.calibration, Calibration::default(), "two grids are not enough to fit");
+    let uncalibrated = RatingContext::new("F-Cal", parse_seats_str(CAL_ROSTER), &cal_pace());
+    assert_eq!(ctx.expected, uncalibrated.expected, "nothing to re-rank by");
+
+    let r = compute_reputation_global(Some("Nightrat"), &sessions, &[ctx], None);
+    let old = compute_reputation_global(Some("Nightrat"), &sessions, &[uncalibrated], None);
+    assert_eq!(r.calibrated, 0);
+    assert_eq!(r.value, old.value);
+}
+
+#[test]
+fn test_a_base_car_no_ai_drove_is_scored_on_the_fallback() {
+    // A fit exists, but in one race the player drove a car none of the AI did, so it has no
+    // offset to measure that result against.
+    let mut sessions = cal_sessions(6, 5, 0.80);
+    sessions.push(cal_session("z", 300, 5, 0.80, "Car Z"));
+    let ctx = cal_context(&sessions);
+    assert!(ctx.calibration.race.is_some());
+    let r = compute_reputation_global(Some("Nightrat"), &sessions, &[ctx], None);
+    assert_eq!((r.sp_races, r.calibrated), (7, 6));
+}
+
+#[test]
+fn test_qualifying_gets_its_own_calibration() {
+    let mut sessions = cal_sessions(6, 5, 0.80);
+    sessions.extend(cal_sessions(6, 3, 0.80));
+    let ctx = cal_context(&sessions);
+    assert!(ctx.calibration.race.is_some() && ctx.calibration.quali.is_some());
+    let r = compute_reputation_global(Some("Nightrat"), &sessions, &[ctx], None);
+    assert_eq!(r.calibrated, 12);
+}
+
+#[test]
+fn test_least_squares_recovers_an_exact_line_and_refuses_a_singular_system() {
+    // y = 2 + 3x, exactly.
+    let rows = (0..5).map(|i| (vec![1.0, i as f64], 2.0 + 3.0 * i as f64));
+    let b = least_squares(rows, 2).expect("solvable");
+    assert!((b[0] - 2.0).abs() < 1e-9 && (b[1] - 3.0).abs() < 1e-9, "{b:?}");
+    // A second column that never varies is a copy of the first.
+    let rows = (0..5).map(|i| (vec![1.0, 1.0], i as f64));
+    assert!(least_squares(rows, 2).is_none());
+}
+
+#[test]
+fn test_base_car_drops_only_the_aero_package() {
+    assert_eq!(base_car("Formula Retro Gen3 Turbo - High Downforce"), "Formula Retro Gen3 Turbo");
+    assert_eq!(base_car("McLaren Cosworth MP4/1C"), "McLaren Cosworth MP4/1C");
 }

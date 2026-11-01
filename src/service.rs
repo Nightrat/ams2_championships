@@ -395,7 +395,15 @@ struct ClassData {
 /// cars are ahead of it — so the seat list has to be the grid AMS2 will actually field. Entries
 /// whose livery the game does not own never start, and counting them stretches every expected
 /// position down the order, making the whole field look easier to beat than it was.
-fn load_classes(config_path: &Path) -> Vec<ClassData> {
+///
+/// Each class is calibrated against `rated` — the career's assigned sessions, judged on its own
+/// `params` — so its expected positions and team bars reflect the base cars as raced. See
+/// [`crate::career::driver_rating::RatingContext::calibrate`].
+fn load_classes(
+    config_path: &Path,
+    rated: &[crate::career::data_store::RecordedSession],
+    params: &crate::career::driver_rating::RatingParams,
+) -> Vec<ClassData> {
     use crate::{career::driver_rating, roster::custom_ai};
     let Some((dir, years)) = cfg_custom_ai(config_path) else {
         return vec![];
@@ -413,11 +421,12 @@ fn load_classes(config_path: &Path) -> Vec<ClassData> {
                 .iter()
                 .map(|c| (c.team.clone(), c.pace_delta_pct))
                 .collect();
-            let ctx = driver_rating::RatingContext::new(
+            let mut ctx = driver_rating::RatingContext::new(
                 &perf.class,
                 roster_seats_with(&dir, &file, names.as_ref()),
                 &pace,
             );
+            ctx.calibrate(rated, params);
             ClassData {
                 skills: custom_ai::parse_team_skills(&path),
                 has_baseline: custom_ai::has_baseline(&path),
@@ -524,10 +533,13 @@ fn champ_roster_seats(
 /// from [`load_classes`]: a session is scored against the first context that covers it, so a
 /// signed season's races are judged on the roster it was signed on, whatever the game's file
 /// has become since, while every other session in the class reads the game's file.
+///
+/// Each is calibrated on its own season's sessions, like [`load_classes`] is on the class's.
 fn season_contexts(
     config_path: &Path,
     career: &Path,
     data: &CareerData,
+    params: &crate::career::driver_rating::RatingParams,
 ) -> Vec<(String, crate::career::driver_rating::RatingContext)> {
     use crate::{
         career::{driver_rating, signed_rosters},
@@ -535,6 +547,7 @@ fn season_contexts(
     };
     let installed =
         cfg_custom_ai_dir(config_path).and_then(|d| crate::roster::liveries::installed_livery_names(&d));
+    let rated = driver_rating::assigned_sessions(&data.championships, &data.sessions);
     data.championships
         .iter()
         .filter_map(|champ| {
@@ -551,12 +564,13 @@ fn season_contexts(
                 .iter()
                 .flat_map(|r| r.session_ids.iter().cloned())
                 .collect();
-            let ctx = driver_rating::RatingContext::for_season(
+            let mut ctx = driver_rating::RatingContext::for_season(
                 &class,
                 seats_at(&copy, installed.as_ref()),
                 &pace,
                 sessions,
             );
+            ctx.calibrate(&rated, params);
             Some((champ.id.clone(), ctx))
         })
         .collect()
@@ -598,8 +612,11 @@ impl App {
 
         let file = champ.custom_ai_file.as_deref()?;
         let class = Path::new(file).file_stem()?.to_str()?;
-        let classes = load_classes(config_path);
-        let seasons = season_contexts(config_path, career, data);
+        // Only sessions committed to a championship count, and they calibrate the rosters too.
+        let rated = driver_rating::assigned_sessions(&data.championships, &data.sessions);
+        let params = self.career_rating_params(data);
+        let classes = load_classes(config_path, &rated, &params);
+        let seasons = season_contexts(config_path, career, data, &params);
         // A signed season's bars come from the roster it was signed on, like its results do;
         // anything else reads the game's file.
         let (expected, skills) = match seasons.iter().find(|(id, _)| id == &champ.id) {
@@ -618,11 +635,8 @@ impl App {
         };
 
         // The rating spans the driver's whole career — a seat is earned by racing, not by racing
-        // this particular car — while the requirement comes from this class's own grid. Only
-        // sessions committed to a championship count toward it.
+        // this particular car — while the requirement comes from this class's own grid.
         let contexts = rating_contexts(seasons, classes);
-        let rated = driver_rating::assigned_sessions(&data.championships, &data.sessions);
-        let params = self.career_rating_params(data);
         let reputation = driver_rating::compute_reputation_global_with(
             None,
             &rated,

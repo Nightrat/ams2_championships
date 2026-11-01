@@ -580,11 +580,20 @@ fn shipped_grids() -> Vec<(std::path::PathBuf, crate::roster::custom_ai::ClassPe
         .collect()
 }
 
-/// The reference driver's rating, and the F-Classic_Gen1 grid it opens.
+/// A mid-career rating, and the F-Classic_Gen1 grid it opens.
+///
+/// The rating is **fixed**, not computed. These tests are about how offers are made on a real
+/// roster — who sells, who renews, what a shortfall costs — and they were written around a driver
+/// part-way up the ladder. The fixture's own rating is now 89 (pinned by the rating module's
+/// snapshot), which opens nearly the whole grid and would leave the mechanics nothing to show. The
+/// grid is the scalar-ranked one, uncalibrated, for the same reason: it is the grid these
+/// scenarios were drawn on.
+const REFERENCE_RATING: f32 = 57.16;
+
 fn reference_eligibility() -> (f32, Vec<TeamEligibility>) {
-    use crate::career::driver_rating::{
-        assigned_sessions, compute_reputation_global, team_eligibility, RatingContext,
-    };
+    use crate::career::driver_rating::{team_eligibility, RatingContext};
+
+    let rep = REFERENCE_RATING;
 
     let dir = std::path::Path::new(AI_DIR);
     let contexts: Vec<RatingContext> = crate::roster::custom_ai::class_performance(dir)
@@ -600,10 +609,6 @@ fn reference_eligibility() -> (f32, Vec<TeamEligibility>) {
         })
         .collect();
 
-    let data = reference_career();
-    let rated = assigned_sessions(&data.championships, &data.sessions);
-    let rep = compute_reputation_global(Some("Nightrat"), &rated, &contexts, None).value;
-
     let own = contexts
         .iter()
         .find(|c| c.class == "F-Classic_Gen1")
@@ -616,9 +621,6 @@ fn reference_eligibility() -> (f32, Vec<TeamEligibility>) {
 #[test]
 fn test_reference_career_offers_snapshot() {
     let (rep, eligibility) = reference_eligibility();
-    // Pinned by the rating module's own snapshot; repeated here so a failure here says which of
-    // the two moved.
-    assert!((rep - 57.16).abs() < 0.5, "rating {rep}");
 
     let offers = offers_for("1777758943816", rep, &eligibility, &params());
     // Five of fourteen 1986 seats are open in any sense. The front nine are simply shut — a

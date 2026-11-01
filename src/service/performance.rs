@@ -137,18 +137,19 @@ impl App {
 
         let config_path = &self.config_path;
         let career = self.active_path();
-        let classes = load_classes(config_path);
         // Only sessions committed to a championship are rated, and they are rated on the
         // career's own tuning rather than whatever Config happens to say now.
         let (params, sessions, active, seasons) = {
             let data = self.data();
+            let params = self.career_rating_params(&data);
             (
-                self.career_rating_params(&data),
+                params,
                 driver_rating::assigned_sessions(&data.championships, &data.sessions),
                 crate::career::data_store::active_classes(&data.championships),
-                season_contexts(config_path, &career, &data),
+                season_contexts(config_path, &career, &data, &params),
             )
         };
+        let classes = load_classes(config_path, &sessions, &params);
 
         let class_rows: Vec<CarPerformanceClass> = classes
             .iter()

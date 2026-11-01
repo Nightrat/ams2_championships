@@ -8,15 +8,21 @@
 
 Your driver rating is a number from 0 to 100 that says how good a drive you are giving, relative to the car you are giving it in. It is what decides which seats the grid will offer you.
 
-The problem it exists to solve: P3 in an Osella is a far better drive than P3 in a Williams. A rating built on finishing positions alone would reward you for already having a quick car, so **every score is measured against what your car was expected to do**, using the performance scalars in the season's Custom AI Drivers roster.
+The problem it exists to solve: P3 in an Osella is a far better drive than P3 in a Williams. A rating built on finishing positions alone would reward you for already having a quick car, so **every score is measured against what your car was expected to do**.
+
+**The rating is on the roster's own skill scale.** A rating of 90 means you are driving like a roster driver with a `race_skill` of 0.90 — the same unit every team's bar is built from, so "beat the incumbent's 0.70" means exactly what it says. The app works this out from the AI you raced against: it fits where they finished to the car they drove and the skill the roster gives them, then asks what skill would have produced your results in your car.
+
+**The base car counts.** A roster's power, weight and drag values are fractions *of* the car a team runs, so 0.91 power on a turbo chassis is not 0.91 power on a Cosworth one. The fit measures each base car's real pace from the AI driving it. That is also what places your own car, which no AI drives, and it re-ranks the grid: expected finishing positions, team bars and offers all follow the cars as raced rather than as the scalars estimate them. A track's aero package ("… - High Downforce") counts as the same base car.
+
+**Until there is enough to fit, the old measure is used** — where you finished against where the car's scalars say it should, with 50 meaning "exactly what the car should do". That covers the first couple of rounds of a roster, and any race in a base car none of the AI drove.
 
 It is built from your recorded results:
 
 | Signal | Weight | What it measures |
 |---|---|---|
-| **Race pace** | 55% | Where you finished against where the car should have finished |
-| **Qualifying** | 30% | The same question on Saturday. When a career has no qualifying sessions at all, race pace carries its share rather than qualifying dragging the rating toward the middle |
-| **Finishing** | 15% | Whether you get to the end |
+| **Race pace** | 55% | The skill your race finishes imply |
+| **Qualifying** | 30% | The same question on Saturday, against the roster's `qualifying_skill`. When a career has no qualifying sessions at all, race pace carries its share rather than qualifying dragging the rating toward the middle |
+| **Finishing** | 15% | Your pace, less up to 15 points for the races you did not finish |
 | **Team-mate** | bonus, capped | Beating the driver in the other half of your garage — same car, same track, same conditions, so the cleanest signal there is |
 | **Multiplayer** | bonus, capped | Results against humans, capped because a small lobby is close to a coin flip |
 

@@ -1289,6 +1289,10 @@ pub struct SeatEntry {
     /// The entry's `race_skill`, when the file declares one — on the 0–1 scale the team bar is
     /// built from. See [`seat_choices`].
     pub skill: Option<f32>,
+    /// The entry's `qualifying_skill`, when the file declares one. Qualifying is calibrated
+    /// against this rather than `race_skill`: rosters set the two apart (1983's Winkelhock is
+    /// 0.75 on race day and 0.89 on Saturday), and AMS2 races them apart too.
+    pub quali_skill: Option<f32>,
 }
 
 /// A team plus car number, without the driver — the unit the player declares.
@@ -1371,6 +1375,8 @@ pub fn parse_seats_str(xml: &str) -> Vec<SeatEntry> {
                 livery,
                 stand_in: tracks.is_some(),
                 skill: element_text(&block, "race_skill").and_then(|s| s.trim().parse().ok()),
+                quali_skill: element_text(&block, "qualifying_skill")
+                    .and_then(|s| s.trim().parse().ok()),
             })
         })
         .collect()
