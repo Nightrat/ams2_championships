@@ -9,7 +9,11 @@ function showTab(name) {
   panel.classList.remove('tab-panel-hidden');
   // A roster edited in another tab may now differ from the one the season was signed on, and
   // the live banner only re-asks when the grid changes — so ask again on the way in.
-  if (name === 'live') loadLiveTeams();
+  if (name === 'live') {
+    loadLiveTeams();
+    // A session recorded or reassigned since moves the title fight.
+    loadLiveTitle();
+  }
 }
 
 document.querySelectorAll('.tab-btn').forEach(function (btn) {

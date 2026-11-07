@@ -16,6 +16,10 @@ var careerMode = 'unset';
 /// leaving them in the tab bar offers the user pages that can only ever be empty.
 var ROSTER_TABS = ['carperf', 'driverperf'];
 
+/// Career sub-tabs with nothing to show in multiplayer: Finances, since there are no contracts.
+/// (The Paddock stays: its news needs no team, and it leaves out the teammate card itself.)
+var ROSTER_CAREER_SUBS = ['finances'];
+
 function applyCareerMode() {
   var hide = careerMode === 'multiplayer';
   ROSTER_TABS.forEach(function (name) {
@@ -25,14 +29,15 @@ function applyCareerMode() {
     // Never leave the user looking at a tab that has just disappeared.
     if (hide && btn.classList.contains('tab-active')) showTab('live');
   });
-  var contracts = document.querySelector('.sub-tab-btn[data-career-sub="finances"]');
-  if (contracts) {
-    contracts.style.display = hide ? 'none' : '';
-    if (hide && contracts.classList.contains('sub-tab-active')) {
+  ROSTER_CAREER_SUBS.forEach(function (name) {
+    var sub = document.querySelector('.sub-tab-btn[data-career-sub="' + name + '"]');
+    if (!sub) return;
+    sub.style.display = hide ? 'none' : '';
+    if (hide && sub.classList.contains('sub-tab-active')) {
       var champs = document.querySelector('.sub-tab-btn[data-career-sub="champs"]');
       if (champs) champs.click();
     }
-  }
+  });
 }
 
 /// A career written before careers had a kind has to be asked once — every rule turns on it.

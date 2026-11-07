@@ -223,10 +223,12 @@ function renderChampDetail(id) {
       // Not locked by the first session the way the roster and the seat are: the wage is capped
       // and never topped up, so resizing the calendar only changes the instalments still to
       // come. It is also how a season created before calendars existed starts paying per race.
-      (mpCareer ? '' :
-      '<label title="How many races the season runs. Your salary is paid out across them, one instalment per race.">Races&nbsp;' +
+      // Every mode gets it: the title fight on the Paddock needs to know how many races are left.
+      '<label title="' + (spCareer
+        ? 'How many races the season runs. Your salary is paid out across them, one instalment per race, and the Paddock works out the title fight from it.'
+        : 'How many races the season runs. The Paddock works out the title fight from it.') + '">Races&nbsp;' +
         '<input type="number" min="1" max="99" class="manage-input manage-input-num champ-races-input" value="' + (champ.planned_rounds || '') + '" placeholder="—">' +
-      '</label>') +
+      '</label>' +
       '<label class="manage-checkbox-label"><input type="checkbox" class="champ-manufacturer-check"' + (champ.manufacturer_scoring ? ' checked' : '') + '> Constructor Scoring</label>' +
       // A multiplayer career has no roster and no team, so both pickers are left out rather
       // than shown disabled — a dead control that explains why it is dead is still dead.
@@ -259,6 +261,9 @@ function renderChampDetail(id) {
     '</div>' +
     // Filled by loadOffers when contracts are switched on; empty otherwise, so the team picker
     // above stays the whole story for anyone not using them.
+    // Which team of this grid continues which of last season's, filled by loadLineage. Sits above
+    // the offers because they are built on it: it decides whether last season's team renews.
+    (spCareer ? '<div id="champ-lineage-panel"></div>' : '') +
     '<div id="champ-contract-panel"></div>' +
     // Whether this season's recorded sessions were actually raced on its roster. Empty when
     // there is nothing to say, so a season raced properly shows no panel at all.
@@ -282,7 +287,6 @@ function renderChampDetail(id) {
   right.querySelector('.champ-manufacturer-check').addEventListener('change', function () {
     patchChamp(champ.id, { manufacturer_scoring: this.checked });
   });
-  // Absent in a multiplayer career, which has no salary to pay out across a calendar.
   var racesInput = right.querySelector('.champ-races-input');
   if (racesInput) racesInput.addEventListener('blur', function () {
     var n = parseInt(this.value, 10);
@@ -310,6 +314,7 @@ function renderChampDetail(id) {
     });
   });
   loadPlayerTeamOptions(champ.id);
+  if (spCareer) loadLineage(champ.id);
   loadOffers(champ.id);
   loadGridCheck(champ.id);
   right.querySelector('.champ-delete-btn').addEventListener('click', function () {
@@ -483,9 +488,10 @@ if (addChampBtn && newForm) {
   addChampBtn.addEventListener('click', function () {
     newForm.style.display = '';
     var ai = document.getElementById('new-champ-ai');
-    // The calendar is only asked for where a salary is paid out across it.
+    // Asked for in every mode — the title fight needs it — but required only where a salary is
+    // paid out across it.
     var racesLabel = document.getElementById('new-champ-races-label');
-    if (racesLabel) racesLabel.style.display = careerMode === 'singleplayer' ? '' : 'none';
+    if (racesLabel) racesLabel.style.display = '';
     if (ai) {
       var sp = careerMode === 'singleplayer';
       ai.style.display = sp ? '' : 'none';
@@ -523,13 +529,17 @@ if (addChampBtn && newForm) {
     if (careerMode === 'singleplayer') {
       if (!aiEl || !aiEl.value) { alert('Choose a Custom AI Drivers file for the season.'); return; }
       body.custom_ai_file = aiEl.value;
-      // Declared up front because nothing later can supply it: rounds appear as they are raced,
-      // so a season in progress cannot say how far through it is. It is what a salary is split
-      // across, so a season without one could only ever pay in one lump at the end.
-      var racesEl = document.getElementById('new-champ-races');
-      var races = racesEl ? parseInt(racesEl.value, 10) : NaN;
-      if (!races || races < 1) { alert('Enter how many races the season runs.'); return; }
+    }
+    // Declared up front because nothing later can supply it: rounds appear as they are raced,
+    // so a season in progress cannot say how far through it is. It is what a salary is split
+    // across — so singleplayer must give it — and what the title fight counts the races left by.
+    var racesEl = document.getElementById('new-champ-races');
+    var races = racesEl ? parseInt(racesEl.value, 10) : NaN;
+    if (races > 0) {
       body.planned_rounds = races;
+    } else if (careerMode === 'singleplayer') {
+      alert('Enter how many races the season runs.');
+      return;
     }
     fetch('/api/championships', {
       method: 'POST',

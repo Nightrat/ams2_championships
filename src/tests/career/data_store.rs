@@ -25,6 +25,7 @@ fn sample_championship() -> Championship {
         player_team: None,
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     }
 }
 
@@ -239,6 +240,7 @@ fn make_champ(pts: Vec<i32>, sessions: &[&str]) -> Championship {
         player_team: None,
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     }
 }
 
@@ -1271,6 +1273,7 @@ fn champ_with(id: &str, status: ChampionshipStatus, file: Option<&str>) -> Champ
         player_team: None,
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     }
 }
 

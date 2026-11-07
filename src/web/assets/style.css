@@ -1367,6 +1367,78 @@ header h1 { flex: 1 1 100%; }
 .grid-box-hint { margin-top: 0.35rem; color: #b89a5a; font-size: 0.76rem; }
 .grid-warn-icon { color: #f0c674; }
 
+/* ── Story: the teammate head-to-head ──────────────────────────────────────── */
+.story-table th {
+  padding: 0.2rem 0.5rem; text-align: left;
+  color: #7a7a8c; font-size: 0.72rem; font-weight: 400;
+}
+.story-table td { font-variant-numeric: tabular-nums; }
+.story-lead { color: #6a9955; }
+.story-box > .contract-note:last-child { margin-top: 0.35rem; }
+.story-summary { margin-top: 0.35rem; color: #c8c8d8; font-size: 0.85rem; }
+.paddock-season { margin: 0 0 0.25rem; font-size: 1.2rem; }
+.story-line { margin-top: 0.25rem; }
+.story-row-player td { color: #e8e8f0; font-weight: 600; }
+.title-status { font-size: 0.72rem; padding: 0.05rem 0.4rem; border-radius: 3px; border: 1px solid #2a2a4a; color: #9a9ab0; }
+.title-status-clinched { color: #f0c674; border-color: #7a5c18; }
+.title-status-eliminated { color: #666; }
+.live-title-line { margin: 0.35rem 0; color: #c8c8d8; font-size: 0.85rem; }
+.mood-head { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.3rem; }
+.mood-figure { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2.5rem; text-align: center; }
+/* One bar per race, as tall as the mood, coloured by band. Plain CSS: a chart library for a
+   row of bars would be more code than the page it sits on. */
+.mood-trend {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 3rem; margin-top: 0.5rem; padding-top: 0.2rem;
+  border-bottom: 1px solid #2a2a4a;
+}
+.mood-bar { flex: 1; max-width: 1.4rem; min-height: 2px; border-radius: 2px 2px 0 0; }
+.mood-delighted { background: #6a9955; }
+.mood-content { background: #4a7a9a; }
+.mood-concerned { background: #b89a5a; }
+.mood-losing_patience { background: #c0392b; }
+.mood-text-delighted { color: #6a9955; }
+.mood-text-content { color: #6aa9ff; }
+.mood-text-concerned { color: #f0c674; }
+.mood-text-losing_patience { color: #e74c3c; }
+.review-lines { margin: 0.35rem 0 0.4rem; padding-left: 1.1rem; color: #c8c8d8; font-size: 0.85rem; line-height: 1.5; }
+.champ-review { max-width: 900px; margin-bottom: 0.5rem; }
+.career-milestones { margin-top: 0.4rem; }
+.lineage-list { max-height: 16rem; overflow-y: auto; margin-top: 0.4rem; }
+.lineage-source { font-size: 0.72rem; color: #7a7a8c; }
+.lineage-source-chosen { color: #6aa9ff; }
+.lineage-source-unmatched { color: #f0c674; }
+.target-verdict { font-weight: 700; }
+.target-verdict-met { color: #6a9955; }
+.target-verdict-missed { color: #e74c3c; }
+.target-verdict-void { color: #666; }
+/* A long season's history should not push the cards below it off the screen. */
+.target-history { max-height: 12rem; overflow-y: auto; }
+.news-round { margin-top: 0.6rem; }
+.news-round-title { color: #7a7a8c; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.news-list { margin: 0.2rem 0 0; padding-left: 1.1rem; }
+.news-item { color: #b0b0c0; font-size: 0.85rem; line-height: 1.5; }
+.news-item-player { color: #e8e8f0; font-weight: 600; }
+/* Two columns on a wide screen: the season's standing on the left, the news on the right. The
+   news is the long part, so it scrolls inside its own card instead of making the page scroll. */
+#paddock-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 1rem;
+  align-items: start;
+  max-width: 1800px;
+}
+.paddock-news .story-box { max-height: calc(100vh - 13rem); overflow-y: auto; padding-top: 0; }
+/* The heading stays put while the rounds scroll under it. */
+.paddock-news .story-box > .contract-title {
+  position: sticky; top: 0; z-index: 1;
+  padding: 0.6rem 0 0.3rem; background: #12121f;
+}
+@media (max-width: 1100px) {
+  #paddock-story { grid-template-columns: minmax(0, 1fr); }
+  .paddock-news .story-box { max-height: none; overflow-y: visible; }
+}
+
 .session-grid-note {
   flex-basis: 100%; margin-top: 0.35rem;
   color: #f0c674; font-size: 0.76rem; line-height: 1.4;

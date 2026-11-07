@@ -27,6 +27,12 @@ A red **NOT SAVED** banner at the top of the tab means the career could not be w
 
 The session and every other change are held in memory, so nothing is lost while the server keeps running. Fix what the banner names, then press **Save now**. The banner disappears once a save succeeds. Closing the server first loses those changes. See [Data & Backup](Data-and-Backup.md#if-a-career-cannot-be-saved).
 
+## Title line
+
+Above the timing table, one line shows where you stand in the season you are racing, for example "1986: 8 of 12 races run — 14 points behind Nelson Piquet". It is updated whenever you open the tab. It needs the season's race count. See [Title fight](Career.md#title-fight).
+
+In a singleplayer career a second line gives your team's target for the coming round, for example "The team's target for round 9: finish 12th or better." See [Weekend targets](Career.md#weekend-targets).
+
 ## Grid check
 
 In a singleplayer career, a banner above the timing table says whether the grid on track is the one your season will be judged against — **including when it is**:

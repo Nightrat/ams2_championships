@@ -54,7 +54,31 @@ Miss it and you drop back to whatever you can earn on merit — not to something
 
 A renewal is never charged: a team that just had its target met does not turn round and bill you.
 
+**How the team felt at the end of the season counts too.** This is the team mood from the [Paddock](Career.md#team-mood):
+
+- **Target met:** you are re-signed whatever the mood.
+- **Target missed:** you drop back to merit, unless the team ended the season *delighted* with you. Then it keeps you anyway.
+- **No target set** (a car too far back for one): you are re-signed unless the team ended the season *losing patience* with you.
+- **Delighted team:** a renewal from a delighted team pays a little more, on top of the loyalty rise.
+
+The offer's explanation says when the mood decided it, and the line above the offers says how the team ended the season. If the team loses patience for three races running during a season, the Paddock warns that it is considering its options. It's a warning only: your contract always runs to the end of the season.
+
 **An incumbency does not leave its series.** Team names repeat across rosters — "Ferrari" appears in seven of the eight shipped classes, spanning thirty years — so a seat is only held inside the class it was held in. Switching series is a fresh start, and the offers panel says so rather than leaving the missing renewal looking like a bug. Moving between generations of one series (Gen1 to Gen2, say) counts as a change: different grid, different cars, different bar.
+
+### Teams carried over to the next season
+
+A roster for the next season often renames a team that changed engine. Spirit-Honda in 1983 becomes Spirit-Hart in 1984, for example. Without a link the app would treat you as a stranger to your own team, with no renewal.
+
+When you create the next season in the same series, the Manage tab shows **Teams carried over from** the season you finished, above the offers:
+
+- A team still racing under the same name carries over to itself.
+- Otherwise a team carries over when its constructor (the part of the name before the hyphen, "Spirit") is unique on both grids.
+- Where that is unclear (1983 ran both a Lotus-Ford and a Lotus-Renault) or a team is gone, it shows **no match**.
+- Your own last team is listed first, because its link decides whether its offer is a renewal. Pick a different successor, or "none", from the dropdown and press **Save**; the offers update straight away.
+- The line above the offers says which team continues your last seat, or that none does.
+- The links lock once you sign or the season has a recorded session, since the offers were made on them.
+
+The usual way through: finish the season, put the next season's roster file in the game's Custom AI Drivers folder, create the new season with it, then check the links before signing. The finished season keeps its own copy of its roster, so replacing the game's file doesn't change how it was judged.
 
 ### One season at a time
 

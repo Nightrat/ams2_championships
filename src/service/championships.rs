@@ -325,6 +325,7 @@ impl App {
             // The seat is taken by signing, never by creating — see `App::sign`.
             player_team: None,
             planned_rounds: planned,
+            team_lineage: Vec::new(),
         };
 
         self.store.write().unwrap().championships.push(champ.clone());

@@ -213,6 +213,7 @@ fn make_champ(id: &str) -> Championship {
         player_team: None,
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     }
 }
 
@@ -5797,5 +5798,85 @@ fn test_route_save_career_reports_why_it_cannot_and_saves_once_it_can() {
     assert_eq!(store.read().unwrap().save_error, None);
     let saved = ams2_championship::career::data_store::try_load_data(&path).unwrap();
     assert_eq!(saved.sessions.len(), 1);
+    let _ = std::fs::remove_file(&path);
+}
+
+// ── GET /api/championships/:id/story ─────────────────────────────────────────
+
+#[test]
+fn test_route_story_carries_the_teammate_head_to_head() {
+    let (root, config) = make_offer_fixture(true);
+    let (store, data_path) = make_sp_store();
+    let mut champ = rated_champ("c1");
+    champ.player_team = Some("Williams".into());
+    champ.player_seat = Some(ams2_championship::career::data_store::SeatLock {
+        seat: "Williams #6".into(),
+        replaces: "Nelson Piquet".into(),
+    });
+    champ.rounds = vec![ams2_championship::career::data_store::Round {
+        session_ids: vec!["s1".into()],
+    }];
+    {
+        let mut data = store.write().unwrap();
+        data.championships.push(champ);
+        // The player finishes last, behind Mansell.
+        data.sessions = vec![grid_session("s1", &["Nigel Mansell", "Piercarlo Ghinzani", "Allen Berg"])];
+    }
+    let resp = call_with_config(
+        store,
+        data_path,
+        b"GET /api/championships/c1/story HTTP/1.1\r\nHost: localhost\r\n\r\n".to_vec(),
+        Some(config.clone()),
+    );
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    let v = body_json(&resp);
+    let t = &v["teammates"];
+    assert_eq!(t["team"], "Williams");
+    assert_eq!(t["head_to_head"][0]["teammate"], "Nigel Mansell");
+    assert_eq!(t["head_to_head"][0]["race"]["teammate"], 1);
+    assert_eq!(t["head_to_head"][0]["points"]["teammate"], 25);
+    assert!(t["summary"].as_str().unwrap().contains("races 0–1"), "{t}");
+    assert!(v["news"]["rounds"][0]["headlines"].is_array(), "{v}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn test_route_story_unknown_championship_is_404() {
+    let (store, path) = make_test_store();
+    let resp = get(store, path.clone(), "/api/championships/nope/story");
+    assert!(status_line(&resp).contains("404"));
+    let _ = std::fs::remove_file(&path);
+}
+
+// ── GET / PUT /api/championships/:id/lineage ─────────────────────────────────
+
+#[test]
+fn test_route_lineage_unknown_championship_is_404() {
+    let (store, path) = make_sp_store();
+    let resp = get(store, path.clone(), "/api/championships/nope/lineage");
+    assert!(status_line(&resp).contains("404"), "{resp}");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_lineage_without_a_previous_season_says_why() {
+    let (store, path) = make_sp_store();
+    store.write().unwrap().championships.push(rated_champ("c1"));
+    let resp = get(store, path.clone(), "/api/championships/c1/lineage");
+    assert!(status_line(&resp).contains("200"), "{resp}");
+    assert!(body_json(&resp)["reason"].is_string(), "{resp}");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_route_lineage_put_with_a_bad_body_is_400() {
+    let (store, path) = make_sp_store();
+    store.write().unwrap().championships.push(rated_champ("c1"));
+    let resp = call(
+        store,
+        path.clone(),
+        b"PUT /api/championships/c1/lineage HTTP/1.1\r\nHost: localhost\r\nContent-Length: 3\r\n\r\nnot".to_vec(),
+    );
+    assert!(status_line(&resp).contains("400"), "{resp}");
     let _ = std::fs::remove_file(&path);
 }

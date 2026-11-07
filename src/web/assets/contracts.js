@@ -31,6 +31,79 @@ function fmtTarget(pos) {
   return pos ? 'finish P' + pos + ' or better' : 'no target';
 }
 
+// ── Manage tab: teams carried over from last season ───────────────────────────
+//
+// Rosters for consecutive seasons rename teams that change engine (Spirit-Honda becomes
+// Spirit-Hart), and a renewal is recognised by name. The server proposes links by constructor;
+// this panel shows them and lets the player correct them. Nothing is decided here.
+
+var LINK_SOURCE_LABELS = { proposed: 'matched by name', chosen: 'your choice', unmatched: 'no match' };
+
+function loadLineage(champId) {
+  var panel = document.getElementById('champ-lineage-panel');
+  if (!panel) return;
+  fetch('/api/championships/' + encodeURIComponent(champId) + '/lineage')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) {
+      if (manageState.selectedId !== champId) return;
+      renderLineage(champId, data);
+    })
+    .catch(function () {});
+}
+
+function renderLineage(champId, data) {
+  var panel = document.getElementById('champ-lineage-panel');
+  if (!panel) return;
+  // The first season of a series has nothing to carry over: say nothing rather than explain it.
+  if (!data || !data.previous) { panel.innerHTML = ''; return; }
+  // The player's own team first: it is the link the renewal reads.
+  var links = data.links.slice().sort(function (a, b) {
+    return (b.from === data.your_team) - (a.from === data.your_team);
+  });
+  var rows = links.map(function (l) {
+    var options = '<option value="">— none —</option>' + data.teams.map(function (t) {
+      return '<option value="' + esc(t) + '"' + (t === l.to ? ' selected' : '') + '>' + esc(t) + '</option>';
+    }).join('');
+    var own = l.from === data.your_team;
+    return '<tr class="' + (own ? 'story-row-player' : '') + '">' +
+      '<td class="contract-team">' + esc(l.from) + (own ? ' <span class="contract-note">(your team)</span>' : '') + '</td>' +
+      '<td>→</td>' +
+      '<td><select class="manage-select lineage-select" data-from="' + esc(l.from) + '"' + (data.locked ? ' disabled' : '') + '>' + options + '</select></td>' +
+      '<td><span class="lineage-source lineage-source-' + l.source + '">' + LINK_SOURCE_LABELS[l.source] + '</span></td>' +
+      '</tr>';
+  }).join('');
+  panel.innerHTML = '<div class="contract-box">' +
+    '<div class="contract-header">' +
+      '<span class="contract-title">Teams carried over from ' + esc(data.previous.name) + '</span>' +
+      (data.locked ? '' : '<button class="manage-btn manage-btn-primary lineage-save">Save</button>') +
+    '</div>' +
+    '<div class="contract-note">' + (data.locked
+      ? 'Locked: this season is signed or under way, and its offers were made on these links.'
+      : 'Which team on this grid continues each of last season’s. Your own team’s link decides whether its offer is a renewal.') +
+    '</div>' +
+    '<div class="lineage-list"><table class="contract-table story-table"><tbody>' + rows + '</tbody></table></div>' +
+    '</div>';
+  var save = panel.querySelector('.lineage-save');
+  if (save) save.addEventListener('click', function () {
+    var chosen = [];
+    panel.querySelectorAll('.lineage-select').forEach(function (s) {
+      chosen.push({ from: s.getAttribute('data-from'), to: s.value || null });
+    });
+    fetch('/api/championships/' + encodeURIComponent(champId) + '/lineage', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ links: chosen })
+    }).then(function (r) {
+      return r.json().then(function (body) {
+        if (!r.ok) { alert(body.error || 'Could not save the links.'); return; }
+        renderLineage(champId, body);
+        // The offers are built on the links, so they may have changed.
+        loadOffers(champId);
+      });
+    }).catch(function () {});
+  });
+}
+
 // ── Manage tab: this season's offers ──────────────────────────────────────────
 
 function loadOffers(champId) {

@@ -59,6 +59,10 @@ const CSS: &str = concat!(
     ".lap-top{background:#eaf6e8}",
     ".track-lap-driver{color:#444}",
     ".track-lap-cell{white-space:nowrap}",
+    ".career-story li,.career-milestones li,.review-panel li{margin:0.15rem 0}",
+    ".career-milestones{color:#555;font-size:0.9em}",
+    ".review-panel{margin-bottom:0.8rem}",
+    ".review-headlines{color:#555;font-size:0.88em}",
 );
 
 fn esc(s: &str) -> String {
@@ -110,6 +114,7 @@ impl App {
              <h1>AMS2 Career Championships</h1>\n<p class=\"export-date\">Exported {}</p>\n",
             format::today()
         );
+        self.career_story_block(&mut h);
         h.push_str("<h2>Championships</h2>\n");
         if career.championships.is_empty() {
             h.push_str("<p class=\"manage-empty\">No championships yet.</p>\n");
@@ -125,6 +130,51 @@ impl App {
         h
     }
 
+    /// The career as a story: a line per season raced, then the firsts. Left out when nothing
+    /// has been raced.
+    fn career_story_block(&self, h: &mut String) {
+        let story = self.career_story();
+        if story.seasons.is_empty() {
+            return;
+        }
+        h.push_str("<h2>Career</h2>\n<ul class=\"career-story\">");
+        for s in &story.seasons {
+            let _ = write!(h, "<li><strong>{}</strong> \u{2014} {}</li>", esc(&s.name), esc(&s.line));
+        }
+        h.push_str("</ul>\n");
+        if !story.milestones.is_empty() {
+            h.push_str("<ul class=\"career-milestones\">");
+            for m in &story.milestones {
+                let _ = write!(h, "<li>{}</li>", esc(m));
+            }
+            h.push_str("</ul>\n");
+        }
+    }
+
+    /// A finished season's review, above its standings.
+    fn review_block(&self, h: &mut String, champ: &ChampionshipView) {
+        let Ok(story) = self.season_story(&champ.id) else {
+            return;
+        };
+        let review = story.review;
+        if review.lines.is_empty() {
+            return;
+        }
+        h.push_str("<div class=\"review-panel\"><h3>Season review</h3><ul>");
+        for line in &review.lines {
+            let _ = write!(h, "<li>{}</li>", esc(line));
+        }
+        h.push_str("</ul>");
+        if !review.headlines.is_empty() {
+            h.push_str("<ul class=\"review-headlines\">");
+            for hl in &review.headlines {
+                let _ = write!(h, "<li>Round {}: {}</li>", hl.round, esc(&hl.text));
+            }
+            h.push_str("</ul>");
+        }
+        h.push_str("</div>");
+    }
+
     fn champ_block(&self, h: &mut String, champ: &ChampionshipView) {
         let _ = write!(
             h,
@@ -133,6 +183,9 @@ impl App {
             esc(&champ.name),
             status_badge(&champ.status)
         );
+        if champ.status == ChampionshipStatus::Final {
+            self.review_block(h, champ);
+        }
         h.push_str("<div class=\"standings-panel\"><h3>Driver Standings</h3>");
         standings(h, &champ.driver_standings, "Driver / Team");
         h.push_str("</div>");

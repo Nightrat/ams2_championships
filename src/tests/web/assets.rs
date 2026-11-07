@@ -10,6 +10,7 @@ fn scripts() -> Vec<(&'static str, &'static str)> {
         ("career.js", JS_CAREER),
         ("manage.js", JS_MANAGE),
         ("contracts.js", JS_CONTRACTS),
+        ("story.js", JS_STORY),
         ("config.js", JS_CONFIG),
         ("saves.js", JS_SAVES),
         ("car_performance.js", JS_CARPERF),

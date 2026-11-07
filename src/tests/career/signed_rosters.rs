@@ -24,6 +24,7 @@ fn champ(id: &str, file: Option<&str>) -> Championship {
         player_team: None,
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     }
 }
 

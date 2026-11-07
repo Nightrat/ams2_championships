@@ -112,14 +112,23 @@ pub(super) fn offer_why(
              which only teams this far back do"
         )
     } else if o.renewal {
-        format!(
-            "your own team: they re-sign you whatever the rating says{}",
-            if standing.delivered == Some(true) {
-                ", and pay more for the seasons you have served"
-            } else {
-                ""
-            }
-        )
+        let delighted = standing.mood == Some(contracts::TeamMood::Delighted);
+        if standing.delivered == Some(false) {
+            // Only a delighted team renews a missed target — say so, or it looks like a bug.
+            "your own team: you missed the target, but they are delighted enough with you to \
+             keep you"
+                .to_string()
+        } else {
+            format!(
+                "your own team: they re-sign you whatever the rating says{}{}",
+                if standing.delivered == Some(true) {
+                    ", and pay more for the seasons you have served"
+                } else {
+                    ""
+                },
+                if delighted { ", with a little extra because they are delighted with you" } else { "" }
+            )
+        }
     } else if you > asks {
         format!("wants {asks} and you have {you} — clear of their bar, so they pay over their rate")
     } else if you < asks {
@@ -144,8 +153,16 @@ pub(super) fn offer_why(
 }
 
 /// The line above the offers. A seat is only held inside the series it was held in, so it says
-/// when the last one was another series — otherwise the missing renewal looks like a bug.
-pub(super) fn offers_summary(reputation: f32, balance: i64, standing: &Standing, class: &str) -> String {
+/// when the last one was another series — otherwise the missing renewal looks like a bug. And it
+/// says which team of this grid continues it (`link`), when the roster renamed it or nobody does.
+pub(super) fn offers_summary(
+    reputation: f32,
+    balance: i64,
+    standing: &Standing,
+    class: &str,
+    link: Option<&(String, Option<String>)>,
+    mood: Option<contracts::TeamMood>,
+) -> String {
     let mut bits = vec![
         format!("Rating {}/100", reputation.round()),
         format!("Balance {}", crate::format::credits(balance)),
@@ -160,7 +177,25 @@ pub(super) fn offers_summary(reputation: f32, balance: i64, standing: &Standing,
                 None => String::new(),
             }
         };
-        bits.push(format!("Last seat: {incumbent}{why}"));
+        let continued = match link {
+            Some((_, Some(to))) if to != incumbent => format!(", now {to}"),
+            Some((_, None)) => ", which no team on this grid continues".into(),
+            _ => String::new(),
+        };
+        bits.push(format!("Last seat: {incumbent}{continued}{why}"));
+        if standing.class == class {
+            if let Some(m) = mood {
+                bits.push(
+                    match m {
+                        contracts::TeamMood::Delighted => "the team ended it delighted with you",
+                        contracts::TeamMood::Content => "the team ended it content",
+                        contracts::TeamMood::Concerned => "the team ended it concerned",
+                        contracts::TeamMood::LosingPatience => "the team ended it losing patience",
+                    }
+                    .to_string(),
+                );
+            }
+        }
     }
     bits.join(" · ")
 }
@@ -220,6 +255,8 @@ impl App {
         let open = signed.is_none() && champ.rounds.iter().all(|r| r.session_ids.is_empty());
 
         let (ledger, standing) = career_standing(&cfg, &data);
+        // A team renamed between rosters is still the team being renewed.
+        let carried = super::lineage::carried(self, &data, &ledger, &standing, champ);
         let rated = self.champ_eligibility(&career, champ, &data);
         let previews = champ_previews(&self.config_path, &career, champ);
         Ok(match &rated {
@@ -230,7 +267,7 @@ impl App {
                     rep.value,
                     ledger.balance,
                     eligibility,
-                    &standing,
+                    &carried.standing,
                     &cfg.offer_params(),
                 );
                 let roster = champ_roster_seats(&self.config_path, &career, champ);
@@ -244,12 +281,12 @@ impl App {
                 let notes = offers
                     .iter()
                     .map(|o| {
-                        let note = offer_why(o, rep.value, eligibility.len(), &standing, ledger.balance);
+                        let note = offer_why(o, rep.value, eligibility.len(), &carried.standing, ledger.balance);
                         (o.team.clone(), note)
                     })
                     .collect();
                 OffersView {
-                    summary: offers_summary(rep.value, ledger.balance, &standing, &class),
+                    summary: offers_summary(rep.value, ledger.balance, &standing, &class, carried.link.as_ref(), carried.standing.mood),
                     notes,
                     enabled: data.mode.uses_contracts(),
                     rated: true,
@@ -266,7 +303,7 @@ impl App {
                 }
             }
             None => OffersView {
-                summary: offers_summary(0.0, ledger.balance, &standing, &class),
+                summary: offers_summary(0.0, ledger.balance, &standing, &class, carried.link.as_ref(), carried.standing.mood),
                 notes: Default::default(),
                 enabled: data.mode.uses_contracts(),
                 rated: false,
@@ -340,13 +377,14 @@ impl App {
         };
         let cfg = self.config();
         let (ledger, standing) = career_standing(&cfg, &data);
+        let carried = super::lineage::carried(self, &data, &ledger, &standing, &current);
         let offers = contracts::offers_for_with(
             id,
             &champ_class(&current),
             reputation.value,
             ledger.balance,
             &eligibility,
-            &standing,
+            &carried.standing,
             &cfg.offer_params(),
         );
         let wanted = req.team.trim();

@@ -300,6 +300,7 @@ fn test_assigned_sessions_keeps_only_what_a_championship_claims() {
         player_team: None,
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     };
     let kept = assigned_sessions(&[champ], &sessions);
     assert_eq!(
@@ -332,6 +333,7 @@ fn test_rating_ignores_unassigned_sessions() {
         player_team: None,
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     };
     let rated = assigned_sessions(&[champ], &winning);
     let r = compute_reputation_global(Some("Nightrat"), &rated, &ctxs, None);

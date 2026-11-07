@@ -15,7 +15,7 @@ use ams2_championship::web::http::{
 };
 use ams2_championship::service::{
     exe_dir, startup, App, AppError, AppResult, ChampionshipPatch, ConfigPatch, DriverAttrEdit,
-    NewChampionship, SignRequest, SpotterPatch, TeamScalarsEdit,
+    LineagePatch, NewChampionship, SignRequest, SpotterPatch, TeamScalarsEdit,
 };
 use ams2_championship::web::websocket::handle_websocket;
 
@@ -179,6 +179,7 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, app: &App, poll_ms: u64) {
             return send_download(&mut stream, "text/html; charset=utf-8", &name, html.as_bytes());
         }
         ("GET", "/api/career/finances") => return reply(&mut stream, Ok(app.finances())),
+        ("GET", "/api/career/story") => return reply(&mut stream, Ok(app.career_story())),
         ("PATCH", "/api/career/mode") => {
             let parsed = parse::<ModeReq>(body);
             with_body!(stream, parsed, |b| match app.set_career_mode(b.mode) {
@@ -344,6 +345,12 @@ fn handle(mut stream: TcpStream, html: Arc<Vec<u8>>, app: &App, poll_ms: u64) {
         }
         ("GET", ["api", "championships", id, "grid-check"]) => {
             reply(&mut stream, app.grid_check(id))
+        }
+        ("GET", ["api", "championships", id, "story"]) => reply(&mut stream, app.season_story(id)),
+        ("GET", ["api", "championships", id, "lineage"]) => reply(&mut stream, app.lineage(id)),
+        ("PUT", ["api", "championships", id, "lineage"]) => {
+            let parsed = parse::<LineagePatch>(body);
+            with_body!(stream, parsed, |b| reply(&mut stream, app.set_lineage(id, b)));
         }
         ("GET", ["api", "championships", id, "available-sessions"]) => {
             reply(&mut stream, app.available_sessions(id))

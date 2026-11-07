@@ -197,6 +197,8 @@ function champDetailHtml(champ) {
       '<h2>' + esc(champ.name) + '</h2>' +
       '<span class="badge ' + badgeCls + '">' + esc(champ.status) + '</span>' +
     '</div>' +
+    // A finished season's review, filled by loadChampReview.
+    (champ.status === 'Final' ? '<div id="champ-review" class="champ-review" data-champ="' + esc(champ.id) + '"></div>' : '') +
     '<div class="champ-body">' +
       '<div class="standings-panel"><h3>Driver Standings</h3>' + careerStandingsHtml(champ.driver_standings) + '</div>' +
       (champ.constructor_standings.length ? '<div class="standings-panel"><h3>Constructor Standings</h3>' + careerConstructorsHtml(champ.constructor_standings) + '</div>' : '') +
@@ -216,6 +218,7 @@ function selectChamp(idx) {
     detail.innerHTML = '<div class="champ-detail-empty">Select a championship.</div>';
   } else {
     detail.innerHTML = champDetailHtml(careerChamps[idx]);
+    if (careerChamps[idx].status === 'Final') loadChampReview(careerChamps[idx].id);
   }
 }
 

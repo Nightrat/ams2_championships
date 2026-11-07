@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::career::data_store::{Championship, ChampionshipStatus, RecordedSession};
 use crate::career::driver_rating::{TeamEligibility, Tier};
+use crate::career::seed::hash64;
 
 /// Per-season pay for the quickest car on the grid, in credits.
 ///
@@ -101,6 +102,23 @@ const LOYALTY_BONUS: f32 = 0.3;
 
 /// Seasons at one team that earn the full [`OfferParams::loyalty_bonus`].
 const LOYALTY_TENURE: u32 = 3;
+
+/// Pay rise a renewal carries when the team ended the season delighted with the driver, on top
+/// of any loyalty rise. Smaller than leverage or loyalty: a team's warmth is worth something at
+/// the table, but it is one season's feeling, not a record.
+const DELIGHTED_BONUS: f32 = 0.10;
+
+/// How the driver's own team felt about them when their last season ended — the story's team
+/// mood, handed over by the service as a plain value so this module never depends on how it is
+/// worked out. `None` (every path that has no mood, and [`Standing::default`]) changes nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TeamMood {
+    Delighted,
+    Content,
+    Concerned,
+    LosingPatience,
+}
 
 /// Which way the money flows. That is the whole of it: either the team wants the driver, or the
 /// driver wants the seat.
@@ -302,6 +320,26 @@ pub struct Standing {
     pub delivered: Option<bool>,
     /// Consecutive completed seasons at the incumbent, most recent last.
     pub tenure: u32,
+    /// How the incumbent team felt about the driver when that season ended. `None` when nobody
+    /// worked it out, which renews exactly as before moods existed.
+    pub mood: Option<TeamMood>,
+}
+
+/// Whether the incumbent re-signs the driver, from what they delivered and how the team feels.
+///
+/// - A met target always renews: delivering keeps the seat, whatever the mood.
+/// - A missed target drops the driver back to merit — unless the team is delighted with them
+///   anyway, and keeps them.
+/// - No target set: the team renews unless it has lost patience.
+///
+/// Never worse than merit: a dropped renewal leaves the team's ordinary offer, if the rating
+/// earns one.
+fn renews(delivered: Option<bool>, mood: Option<TeamMood>) -> bool {
+    match delivered {
+        Some(true) => true,
+        Some(false) => mood == Some(TeamMood::Delighted),
+        None => mood != Some(TeamMood::LosingPatience),
+    }
 }
 
 /// The driver's standing, read off a ledger [`finances`] has already built.
@@ -326,24 +364,9 @@ pub fn standing(ledger: &Finances) -> Standing {
         class: last.class.clone(),
         delivered: last.objective_met,
         tenure,
+        // The ledger knows money, not feelings; the service adds the mood when it has one.
+        mood: None,
     }
-}
-
-/// FNV-1a over the given parts, with a separator so `("ab", "c")` and `("a", "bc")` differ.
-///
-/// Hand-rolled rather than taken from `DefaultHasher`, whose algorithm is explicitly allowed to
-/// change between Rust releases. A team's terms must not move because the toolchain did.
-fn hash64(parts: &[&str]) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for p in parts {
-        for b in p.as_bytes() {
-            h ^= *b as u64;
-            h = h.wrapping_mul(0x0000_0100_0000_01b3);
-        }
-        h ^= 0xff;
-        h = h.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    h
 }
 
 /// A stable −1..+1 figure for one team in one championship, used only to vary salaries.
@@ -493,7 +516,7 @@ pub fn offers_for_with(
             // rating because delivering keeps the seat. An empty class matches nothing.
             let same_series = !class.is_empty() && standing.class == class;
             let held = same_series && standing.incumbent.as_deref() == Some(e.team.as_str());
-            let renewing = held && standing.delivered != Some(false);
+            let renewing = held && renews(standing.delivered, standing.mood);
 
             // What a team at the back would have to see before it pays rather than charges. Above
             // this it wants the driver; below it, the seat is merchandise. See
@@ -533,8 +556,16 @@ pub fn offers_for_with(
                 0.0
             };
 
+            let warmth = if renewing && standing.mood == Some(TeamMood::Delighted) {
+                DELIGHTED_BONUS
+            } else {
+                0.0
+            };
+
             let rate = match kind {
-                OfferKind::Paid => 1.0 + LEVERAGE_BONUS * surplus + params.loyalty_bonus * loyalty,
+                OfferKind::Paid => {
+                    1.0 + LEVERAGE_BONUS * surplus + params.loyalty_bonus * loyalty + warmth
+                }
                 // A bought seat is paid at a reduced rate: the team is being paid to have the
                 // driver, not paying for one it rates.
                 OfferKind::Pay => PAY_DRIVER_RATE,

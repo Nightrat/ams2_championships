@@ -25,11 +25,13 @@ mod career_saves;
 mod championships;
 mod export;
 mod live;
+mod lineage;
 mod live_frame;
 mod performance;
 mod settings;
 mod signing;
 mod startup;
+mod story;
 
 pub use career_saves::SavesView;
 pub use championships::{
@@ -37,6 +39,7 @@ pub use championships::{
     NewChampionship, SessionListing,
     SessionEligibility, TeamEligibilityView,
 };
+pub use lineage::{LineagePatch, LineageView, LinkView, PreviousSeason};
 pub use live::{live_seat_status, resolve_live_teams, GridStatus, LiveTeams, RosterMismatch};
 pub use live_frame::{
     on_track, sector_cells, session_bests, LiveFrame, RideSeen, SectorCell, SectorMark,
@@ -52,6 +55,11 @@ pub use settings::{
 };
 pub use signing::{FinancesView, OfferNote, OffersView, SignRequest, Signed};
 pub use startup::{exe_dir, startup, Startup};
+pub use story::{
+    InterestView, InterestedTeam, JudgedView, MoodPoint, MoodView, NewsRound, NewsView, RivalView,
+    CareerSeasonView, CareerStoryView, ReviewView, SeasonStory, TargetsView,
+    TeammatesView, TitleView,
+};
 
 /// Why an operation was refused. The variant says what *kind* of refusal it is, which the server
 /// turns into a status code, while the sentence itself is written once, here.

@@ -428,17 +428,6 @@ fn test_a_different_season_reads_differently() {
     }
 }
 
-#[test]
-fn test_hash_separates_its_parts() {
-    assert_ne!(hash64(&["ab", "c"]), hash64(&["a", "bc"]));
-}
-
-#[test]
-fn test_hash_is_pinned() {
-    // Salaries hang off this. Changing the hash silently re-rolls every team's terms in every
-    // existing career, so it is pinned rather than left to whatever the implementation becomes.
-    assert_eq!(hash64(&["c1", "Brabham"]), 0x4e86_46be_3ed8_0686);
-}
 
 // ── Signing ──────────────────────────────────────────────────────────────────
 
@@ -783,6 +772,7 @@ fn season(id: &str, status: ChampionshipStatus, session_ids: &[&str]) -> Champio
         player_team: Some("Osella".into()),
         player_seat: None,
         planned_rounds: None,
+        team_lineage: Vec::new(),
     }
 }
 
@@ -1253,6 +1243,7 @@ fn served_in(team: &str, class: &str, delivered: Option<bool>, tenure: u32) -> S
         class: class.into(),
         delivered,
         tenure,
+        mood: None,
     }
 }
 
@@ -2241,4 +2232,53 @@ fn test_retuning_the_economy_moves_a_projection_but_not_a_settled_season() {
     let b = finances(&c, &ch, &s, None, 0, &lean).seasons[0].projected_prize;
     assert_ne!(a, b);
     assert_eq!(b, Some(10));
+}
+
+// ── How the team felt: mood at the end of the last season ─────────────────────────────────────
+
+fn with_mood(mut s: Standing, mood: Option<TeamMood>) -> Standing {
+    s.mood = mood;
+    s
+}
+
+fn renewal(standing: &Standing) -> Option<Offer> {
+    offers_for_with("c1", CLASS, 40.0, 0, &grid(), standing, &params())
+        .into_iter()
+        .find(|o| o.team == "Williams" && o.renewal)
+}
+
+#[test]
+fn test_no_mood_renews_exactly_as_before() {
+    for delivered in [Some(true), Some(false), None] {
+        let plain = served("Williams", delivered, 1);
+        assert_eq!(
+            renewal(&plain).map(|o| o.salary),
+            renewal(&with_mood(plain.clone(), Some(TeamMood::Content))).map(|o| o.salary),
+            "content changes nothing ({delivered:?})"
+        );
+    }
+}
+
+#[test]
+fn test_a_delighted_team_pays_more_at_renewal() {
+    let base = renewal(&served("Williams", Some(true), 1)).unwrap().salary;
+    let warm = renewal(&with_mood(served("Williams", Some(true), 1), Some(TeamMood::Delighted)))
+        .unwrap()
+        .salary;
+    assert!(warm > base, "{warm} against {base}");
+}
+
+#[test]
+fn test_a_delighted_team_keeps_a_driver_who_missed_the_target() {
+    assert!(renewal(&served("Williams", Some(false), 1)).is_none());
+    assert!(renewal(&with_mood(served("Williams", Some(false), 1), Some(TeamMood::Delighted))).is_some());
+    assert!(renewal(&with_mood(served("Williams", Some(false), 1), Some(TeamMood::Content))).is_none());
+}
+
+#[test]
+fn test_a_team_that_lost_patience_renews_only_a_met_target() {
+    let no_target = with_mood(served("Williams", None, 1), Some(TeamMood::LosingPatience));
+    assert!(renewal(&no_target).is_none(), "no target, lost patience: no renewal");
+    let met = with_mood(served("Williams", Some(true), 1), Some(TeamMood::LosingPatience));
+    assert!(renewal(&met).is_some(), "delivering keeps the seat, whatever the mood");
 }

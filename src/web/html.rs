@@ -30,6 +30,7 @@ fn generate_html() -> String {
   <div id="tab-career" class="tab-panel tab-panel-hidden">
     <div class="sub-tab-bar">
       <button class="sub-tab-btn sub-tab-active" data-career-sub="champs">Championships</button>
+      <button class="sub-tab-btn" data-career-sub="paddock">Paddock</button>
       <button class="sub-tab-btn" data-career-sub="stats">Driver Stats</button>
       <button class="sub-tab-btn" data-career-sub="tracks">Track Stats</button>
       <button class="sub-tab-btn" data-career-sub="finances">Finances</button>
@@ -41,6 +42,9 @@ fn generate_html() -> String {
         <div id="career-champ-list-resize" class="champ-list-resize"></div>
         <div id="career-champ-detail" class="champ-detail"></div>
       </div>
+    </div>
+    <div id="career-sub-paddock" class="sub-tab-panel sub-tab-panel-hidden">
+      <div id="career-paddock-container"></div>
     </div>
     <div id="career-sub-stats" class="sub-tab-panel sub-tab-panel-hidden">
       <div id="career-stats-container"></div>
@@ -74,6 +78,11 @@ fn generate_html() -> String {
            fix there is — copying the season's roster back — and, once that is done, the reminder
            that AMS2 only reads it when a session loads. -->
       <div id="live-roster-warning" class="live-grid-warning live-roster-warning" hidden></div>
+      <!-- Where the player stands in the title fight of the season being raced — the stakes of
+           the session about to start. Filled by story.js when the tab opens. -->
+      <div id="live-title-line" class="live-title-line" hidden></div>
+      <!-- What the team wants from the coming race. Same source, same moment. -->
+      <div id="live-target-line" class="live-title-line" hidden></div>
       <div id="live-info" class="live-info">
         <span id="live-session-type"></span>
         <span id="live-race-state"></span>
@@ -147,7 +156,7 @@ fn generate_html() -> String {
           <!-- The calendar. Rounds are added as they are raced, so this is the only place the
                length of a season can come from — and without it a salary has no denominator to
                be paid out across. Required wherever contracts exist; manage.js reveals it. -->
-          <label id="new-champ-races-label" class="manage-inline-label" style="display:none">Races&nbsp;<input id="new-champ-races" type="number" min="1" max="99" value="15" class="manage-input manage-input-num" title="How many races the season runs — your salary is paid out across them"></label>
+          <label id="new-champ-races-label" class="manage-inline-label" style="display:none">Races&nbsp;<input id="new-champ-races" type="number" min="1" max="99" value="15" class="manage-input manage-input-num" title="How many races the season runs. A singleplayer salary is paid out across them, and the Paddock works out the title fight from them."></label>
           <label class="manage-checkbox-label"><input type="checkbox" id="new-champ-manufacturer"> Constructor Scoring</label>
           <button id="new-champ-save" class="manage-btn manage-btn-primary">Create</button>
           <button id="new-champ-cancel" class="manage-btn">Cancel</button>
@@ -385,6 +394,7 @@ fn generate_html() -> String {
 <script>{js_career}</script>
 <script>{js_manage}</script>
 <script>{js_contracts}</script>
+<script>{js_story}</script>
 <script>{js_config}</script>
 <script>{js_saves}</script>
 <script>{js_carperf}</script>
@@ -400,6 +410,7 @@ fn generate_html() -> String {
         js_career = JS_CAREER,
         js_manage = JS_MANAGE,
         js_contracts = JS_CONTRACTS,
+        js_story = JS_STORY,
         js_config = JS_CONFIG,
         js_saves = JS_SAVES,
         js_carperf = JS_CARPERF,
@@ -427,6 +438,7 @@ const JS_LIVE: &str = include_str!("assets/live.js");
 const JS_CAREER: &str = include_str!("assets/career.js");
 const JS_MANAGE: &str = include_str!("assets/manage.js");
 const JS_CONTRACTS: &str = include_str!("assets/contracts.js");
+const JS_STORY: &str = include_str!("assets/story.js");
 const JS_CONFIG: &str = include_str!("assets/config.js");
 const JS_SAVES: &str = include_str!("assets/saves.js");
 const JS_CARPERF: &str = include_str!("assets/car_performance.js");

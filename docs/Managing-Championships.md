@@ -13,9 +13,10 @@ What it offers depends on the kind of career you are in. A **singleplayer** seas
    - **F1 1991–2002** — 10-6-4-3-2-1
    - **F1 Classic** — 9-6-4-3-2-1
    - **Custom** — type your own comma-separated values (e.g. `15,12,10,8,6,4,2,1`)
-4. **Singleplayer only:** choose the **Custom AI Drivers** roster the season is raced on, and how many **Races** the season runs.
-5. Optionally tick **Constructor Scoring** to enable a constructor standings table.
-6. Click **Create**.
+4. Enter how many **Races** the season runs. Singleplayer requires it; in other careers it is optional, but without it the Paddock can't work out the title fight.
+5. **Singleplayer only:** choose the **Custom AI Drivers** roster the season is raced on.
+6. Optionally tick **Constructor Scoring** to enable a constructor standings table.
+7. Click **Create**.
 
 ### Why singleplayer asks for a roster and a race count up front
 
@@ -25,7 +26,7 @@ A season is defined by the grid it is raced on, so the roster is picked when the
 
 **The roster has to be one AMS2 actually uses.** A Custom AI Drivers file only binds names and pace to liveries the game already owns, so the class's custom skins must be installed, and the season must be raced with that roster active. A season raced on stock AI records its results and scores its points as normal, but it tells the app nothing about who you were racing — so no rating, no team requirements and no offers. See [What a singleplayer career needs](Getting-Started.md#what-a-singleplayer-career-needs).
 
-The race count is the season's **calendar**. Rounds are added as you race them, so without a declared length there is no way to tell whether you are an eighth or a fifteenth of the way through a season — and that is exactly what a salary has to be paid out against. It is a plan, not a commitment: you can stop short of it or run past it, and you can change it later.
+The race count is the season's **calendar**. Rounds are added as you race them, so without a declared length there is no way to tell whether you are an eighth or a fifteenth of the way through a season — and that is exactly what a salary has to be paid out against. It is also what the [title fight](Career.md#title-fight) counts the races left from. It is a plan, not a commitment: you can stop short of it or run past it, and you can change it later.
 
 A multiplayer career has no roster, no team and no contracts, so it is asked for none of this.
 
@@ -99,6 +100,8 @@ Offers are re-derived every time you look, from your rating and the state of the
 **Tear up** undoes a mis-click: it deletes the contract and clears the seat that came with it, and is only possible before the season has a recorded session.
 
 See [Contracts & Money](Contracts-and-Money.md) for what the terms mean.
+
+How you are doing against your teammate is on the [Career tab's Paddock](Career.md#paddock-sub-tab).
 
 ## Removing sessions and rounds
 

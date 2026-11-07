@@ -65,6 +65,19 @@ pub struct Round {
 /// so the one that counts a round as raced.
 pub const SESSION_RACE: u32 = 5;
 
+/// `session_type` of a qualifying session.
+pub const SESSION_QUALIFY: u32 = 3;
+
+/// Points a race result scores under `points_system`: the entry for its position, nothing for a
+/// retirement or a place past the end of the table. The one statement of the scoring rule, so
+/// the standings and everything else that reads points off a result cannot disagree.
+pub fn race_points(points_system: &[i32], position: u32, dnf: bool) -> i32 {
+    if dnf || position == 0 {
+        return 0;
+    }
+    points_system.get(position as usize - 1).copied().unwrap_or(0)
+}
+
 /// `session_type` of a practice session. Nothing is derived from practice — it scores no
 /// points and feeds no rating — which is why the grid check leaves it alone.
 pub const SESSION_PRACTICE: u32 = 1;
@@ -162,6 +175,11 @@ pub struct Championship {
     /// does not use contracts. Those pay exactly as they did: the whole salary, at `Final`.
     #[serde(default)]
     pub planned_rounds: Option<u32>,
+    /// Which team of this season continues which team of the previous one, as the player
+    /// confirmed or corrected it — see [`crate::career::lineage`]. Only the player's choices are
+    /// kept; the proposal is worked out again each time, so an empty list means "as proposed".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub team_lineage: Vec<crate::career::lineage::Link>,
 }
 
 /// A season's car, fixed by its recorded sessions — see [`Championship::player_seat`].
@@ -520,8 +538,10 @@ fn resolve_sessions<'a>(
 /// `record` pads with zeros up to the position it is about to increment, so the last element is
 /// always at least 1, and an entry that never finished is the empty vec — which sorts below
 /// every entry that finished anything, as it should.
-#[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
-struct Countback(Vec<u32>);
+///
+/// Crate-visible so the story's title maths ranks drivers exactly as the standings do.
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Countback(Vec<u32>);
 
 /// Highest position a countback will record. The shared memory's participant array is 64, so
 /// anything beyond it is not a grid slot — and a career file is hand-edited often enough that
@@ -529,7 +549,9 @@ struct Countback(Vec<u32>);
 const MAX_GRID: u32 = 64;
 
 impl Countback {
-    fn record(&mut self, position: u32) {
+    /// Adds a classified finish at `position`. A retirement is not a place, so callers never
+    /// record one.
+    pub(crate) fn record(&mut self, position: u32) {
         if position == 0 || position > MAX_GRID {
             return;
         }
@@ -540,9 +562,15 @@ impl Countback {
         self.0[i] += 1;
     }
 
-    fn wins(&self) -> u32 {
+    pub(crate) fn wins(&self) -> u32 {
         self.0.first().copied().unwrap_or(0)
     }
+}
+
+/// The order two drivers stand in: points, then the countback, then the name. See [`rank`] for
+/// why the name is there at all. The one comparator every standings table sorts through.
+pub(crate) fn standing_order(a: (i32, &Countback, &str), b: (i32, &Countback, &str)) -> std::cmp::Ordering {
+    b.0.cmp(&a.0).then_with(|| b.1.cmp(a.1)).then_with(|| a.2.cmp(b.2))
 }
 
 /// Sorts a scored table into finishing order and drops the countbacks.
@@ -555,12 +583,7 @@ impl Countback {
 ///
 /// Both tables rank through here so the two cannot drift apart.
 fn rank(mut table: Vec<(StandingsEntry, Countback)>) -> Vec<StandingsEntry> {
-    table.sort_by(|(a, a_cb), (b, b_cb)| {
-        b.points
-            .cmp(&a.points)
-            .then_with(|| b_cb.cmp(a_cb))
-            .then_with(|| a.name.cmp(&b.name))
-    });
+    table.sort_by(|(a, a_cb), (b, b_cb)| standing_order((a.points, a_cb, &a.name), (b.points, b_cb, &b.name)));
     table.into_iter().map(|(e, _)| e).collect()
 }
 
@@ -605,11 +628,8 @@ pub fn standings_with(
                 {
                     teams.insert(r.name.clone(), team);
                 }
+                *p += race_points(&champ.points_system, r.race_position, r.dnf);
                 if !r.dnf {
-                    let pos = r.race_position as usize;
-                    if pos > 0 && pos <= champ.points_system.len() {
-                        *p += champ.points_system[pos - 1];
-                    }
                     cb.record(r.race_position);
                 }
             }
@@ -669,11 +689,8 @@ fn constructors(
                 };
                 let p = pts.entry(key.clone()).or_insert(0);
                 let cb = backs.entry(key.clone()).or_default();
+                *p += race_points(&champ.points_system, r.race_position, r.dnf);
                 if !r.dnf {
-                    let pos = r.race_position as usize;
-                    if pos > 0 && pos <= champ.points_system.len() {
-                        *p += champ.points_system[pos - 1];
-                    }
                     cb.record(r.race_position);
                 }
             }
@@ -902,13 +919,8 @@ pub fn compute_career_full(
                 let mut result_views: Vec<SessionResultView> = Vec::new();
                 for r in &s.results {
                     let a = accum.entry(r.name.clone()).or_default();
-                    let points_earned = if is_race && !r.dnf {
-                        let pos = r.race_position as usize;
-                        if pos > 0 && pos <= champ.points_system.len() {
-                            champ.points_system[pos - 1]
-                        } else {
-                            0
-                        }
+                    let points_earned = if is_race {
+                        race_points(&champ.points_system, r.race_position, r.dnf)
                     } else {
                         0
                     };
