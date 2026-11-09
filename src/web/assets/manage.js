@@ -56,7 +56,9 @@ function renderChampList() {
     }
     return '<div class="champ-list-item' + sel + '" data-id="' + esc(c.id) + '">' +
       '<span class="champ-list-name">' + esc(c.name) + '</span>' +
-      '<button class="champ-rename-btn" data-cid="' + esc(c.id) + '" title="Rename">&#9998;</button>' +
+      // A finished season is read-only, its name included.
+      (c.status === 'Final' ? '' :
+        '<button class="champ-rename-btn" data-cid="' + esc(c.id) + '" title="Rename">&#9998;</button>') +
       control +
       '</div>';
   }).join('');
@@ -134,6 +136,9 @@ function renderChampDetail(id) {
   // The roster and the seat are both committed once the championship has a session: either
   // change would rewrite the meaning of results already scored, so the server refuses them too.
   var started = rounds.some(function (r) { return (r.session_ids || []).length > 0; });
+  // A finished season is read-only — the server refuses every change but its status — so it is
+  // shown as values, with no inputs and no buttons.
+  var finished = champ.status === 'Final';
 
   // The server only lists files whose name AMS2 recognises as a car class, so an assigned file can
   // be absent from it — one assigned before this filter existed, or renamed since. Dropping it
@@ -180,6 +185,8 @@ function renderChampDetail(id) {
   var roundsHtml = rounds.length === 0
     ? '<div class="manage-empty">No rounds yet. Click \u201c+ Add Round\u201d to create one.</div>'
     : rounds.map(function (round, rIdx) {
+        // A finished season keeps only the rounds that were run.
+        if (finished && !(round.session_ids || []).length) return '';
         var roundSessions = (round.session_ids || [])
           .map(function (sid) { return manageState.sessions.find(function (s) { return s.id === sid; }); })
           .filter(Boolean);
@@ -196,8 +203,9 @@ function renderChampDetail(id) {
               '<span class="session-drivers">' + s.results.length + ' drivers</span>' +
               '<span class="session-winner">\u{1f3c6} ' + esc(s.winner || '—') + '</span>' +
             '</div>' +
+            (finished ? '' :
             '<button class="manage-btn manage-btn-danger session-remove-btn"' +
-              ' data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '" data-sid="' + esc(s.id) + '">Remove</button>' +
+              ' data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '" data-sid="' + esc(s.id) + '">Remove</button>') +
             '<div class="session-grid-note" hidden></div>' +
             '</div>';
         }).join('') || '<div class="manage-empty">No sessions in this round.</div>';
@@ -205,12 +213,20 @@ function renderChampDetail(id) {
         return '<div class="round-block">' +
           '<div class="round-block-header">' +
             '<span class="round-block-title">Round ' + (rIdx + 1) + '</span>' +
+            (finished ? '' :
             '<button class="manage-btn manage-btn-primary show-sessions-btn" data-ridx="' + rIdx + '">+ Add Session</button>' +
-            '<button class="manage-btn manage-btn-danger round-remove-btn" data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '">Remove Round</button>' +
+            '<button class="manage-btn manage-btn-danger round-remove-btn" data-cid="' + esc(champ.id) + '" data-ridx="' + rIdx + '">Remove Round</button>') +
           '</div>' +
           '<div class="round-block-sessions">' + sessionCards + '</div>' +
           '</div>';
       }).join('');
+
+  if (finished) {
+    renderFinishedChampDetail(right, champ, roundsHtml, mpCareer);
+    loadGridCheck(champ.id);
+    if (spCareer) loadOffers(champ.id);
+    return;
+  }
 
   right.innerHTML =
     '<div class="champ-detail">' +
@@ -353,6 +369,40 @@ function renderChampDetail(id) {
       if (panel) panel.style.display = '';
     });
   });
+}
+
+// A finished season, read-only: what it was raced on and what it ran, nothing to change. The
+// contract panel (singleplayer) still shows the deal it was raced under; the grid panel still
+// says whether its sessions were raced on its roster.
+function renderFinishedChampDetail(right, champ, roundsHtml, mpCareer) {
+  function field(label, value) {
+    return '<span class="champ-readonly-field">' + label + '&nbsp;<strong>' + esc(value) + '</strong></span>';
+  }
+  var run = (champ.rounds || []).filter(function (r) { return (r.session_ids || []).length; }).length;
+  right.innerHTML =
+    '<div class="champ-detail">' +
+    '<div class="champ-detail-header">' +
+      '<span class="champ-readonly-name">' + esc(champ.name) + '</span>' +
+      '<span class="champ-list-status status-final">Finished</span>' +
+    '</div>' +
+    '<div class="champ-detail-meta">' +
+      field('Points', champ.points_system.join(',')) +
+      (champ.planned_rounds ? field('Races', champ.planned_rounds) : '') +
+      (champ.manufacturer_scoring ? field('Constructor Scoring', 'on') : '') +
+      (mpCareer ? '' : field('Custom AI Drivers', champ.custom_ai_file || 'None')) +
+      (mpCareer || !champ.player_team ? '' : field('My Team', champ.player_team)) +
+      (champ.player_seat
+        ? field('My Car', champ.player_seat.seat +
+            (champ.player_seat.replaces ? ' in place of ' + champ.player_seat.replaces : ''))
+        : '') +
+    '</div>' +
+    '<div id="champ-contract-panel"></div>' +
+    '<div id="champ-grid-panel"></div>' +
+    '<div class="champ-rounds-header"><span>Rounds&nbsp;(' + run + ')</span></div>' +
+    '<div class="champ-rounds-list">' +
+      (run ? roundsHtml : '<div class="manage-empty">No rounds were run.</div>') +
+    '</div>' +
+    '</div>';
 }
 
 function loadPlayerTeamOptions(champId) {

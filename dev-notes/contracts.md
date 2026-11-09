@@ -90,3 +90,4 @@ Developer notes moved out of CLAUDE.md. Read when touching offers, signing, sala
 - `SeasonLedger.projected_prize` is what today's standings would pay, derived server-side for the same reason. `None` once the season is complete, because then `prize` is the fact rather than a forecast — two numbers claiming to be the payout is one too many. Rendered amber (`.ledger-projected`, `.finance-projected`) and prefixed `~`, so money not yet banked never reads like money that is.
 
 
+- **Deleting a season.** An unraced season takes its contract with it, as tearing it up would (sponsorship paid back). A started season keeps its contract as an orphan row: `SeasonLedger.deleted` is set, its spending stays on the balance, and the Finances card never takes it for the season being raced. Before this, deleting a signed unraced season left a contract that the card showed as the current season.

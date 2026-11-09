@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use super::{cfg_custom_ai_dir, seats_at, App};
 use crate::roster::custom_ai::{self, GridEntry, GridFit, SeatEntry, SeatProof, TeamCheck};
-use crate::career::data_store::{Championship, ChampionshipStatus};
+use crate::career::data_store::{Championship, ChampionshipStatus, RecordedSession};
 
 /// Team names and banners for the live timing grid.
 #[derive(Serialize, Default, Debug)]
@@ -82,13 +82,17 @@ impl App {
         match cfg_custom_ai_dir(&self.config_path) {
             Some(dir) => {
                 let live = crate::game::shared_memory::read_live_session();
+                let names: Vec<&str> = live.participants.iter().map(|p| p.name.as_str()).collect();
+                let viewed = live.participants.iter().position(|p| p.is_player);
+                let player = live_player_index(&data.sessions, &names, viewed);
                 let grid: Vec<GridEntry> = live
                     .participants
                     .iter()
-                    .map(|p| GridEntry {
+                    .enumerate()
+                    .map(|(i, p)| GridEntry {
                         name: &p.name,
                         car_name: &p.car_name,
-                        is_player: p.is_player,
+                        is_player: player == Some(i),
                     })
                     .collect();
                 // The proof the session will be held to when it is added, so the banner warns
@@ -117,6 +121,36 @@ impl App {
             },
         }
     }
+}
+
+/// Which car on the live grid is the human's.
+///
+/// AMS2's only pointer to the player is `mViewedParticipantIndex` — the car the camera is on, not
+/// the car being driven. While a session loads it can sit on an AI car (seen in 1984 at
+/// Jacarepaguá: Lauda's McLaren, P2 on the grid), and every check made then judges the grid with
+/// that AI as "you". The roster driver goes missing and the human looks like a stock AI driver,
+/// so the grid banner blames the roster and the seat banner names the wrong car.
+///
+/// The career already knows who the human is: the name its earlier sessions flagged as the
+/// player most often. When that name is on the grid it decides. Otherwise (a new career, or a
+/// renamed profile) the viewed car is all there is.
+pub fn live_player_index(
+    sessions: &[RecordedSession],
+    names: &[&str],
+    viewed: Option<usize>,
+) -> Option<usize> {
+    let mut tally: HashMap<&str, usize> = HashMap::new();
+    for r in sessions.iter().flat_map(|s| &s.results).filter(|r| r.is_player) {
+        *tally.entry(r.name.as_str()).or_default() += 1;
+    }
+    // Ties broken by name so the answer does not depend on hash order.
+    let known = tally
+        .into_iter()
+        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
+        .map(|(name, _)| name);
+    known
+        .and_then(|k| names.iter().position(|n| *n == k))
+        .or(viewed)
 }
 
 /// Team names for the live timing grid, taken from the **active** championship.

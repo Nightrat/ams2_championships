@@ -55,7 +55,9 @@ function renderLineage(champId, data) {
   var panel = document.getElementById('champ-lineage-panel');
   if (!panel) return;
   // The first season of a series has nothing to carry over: say nothing rather than explain it.
-  if (!data || !data.previous) { panel.innerHTML = ''; return; }
+  // Once the season is signed (or raced) the links are spent: the offers were made on them and
+  // they no longer change, so the panel has nothing left to ask.
+  if (!data || !data.previous || data.locked) { panel.innerHTML = ''; return; }
   // The player's own team first: it is the link the renewal reads.
   var links = data.links.slice().sort(function (a, b) {
     return (b.from === data.your_team) - (a.from === data.your_team);
@@ -68,19 +70,17 @@ function renderLineage(champId, data) {
     return '<tr class="' + (own ? 'story-row-player' : '') + '">' +
       '<td class="contract-team">' + esc(l.from) + (own ? ' <span class="contract-note">(your team)</span>' : '') + '</td>' +
       '<td>→</td>' +
-      '<td><select class="manage-select lineage-select" data-from="' + esc(l.from) + '"' + (data.locked ? ' disabled' : '') + '>' + options + '</select></td>' +
+      '<td><select class="manage-select lineage-select" data-from="' + esc(l.from) + '">' + options + '</select></td>' +
       '<td><span class="lineage-source lineage-source-' + l.source + '">' + LINK_SOURCE_LABELS[l.source] + '</span></td>' +
       '</tr>';
   }).join('');
   panel.innerHTML = '<div class="contract-box">' +
     '<div class="contract-header">' +
       '<span class="contract-title">Teams carried over from ' + esc(data.previous.name) + '</span>' +
-      (data.locked ? '' : '<button class="manage-btn manage-btn-primary lineage-save">Save</button>') +
+      '<button class="manage-btn manage-btn-primary lineage-save">Save</button>' +
     '</div>' +
-    '<div class="contract-note">' + (data.locked
-      ? 'Locked: this season is signed or under way, and its offers were made on these links.'
-      : 'Which team on this grid continues each of last season’s. Your own team’s link decides whether its offer is a renewal.') +
-    '</div>' +
+    '<div class="contract-note">Which team on this grid continues each of last season’s. ' +
+      'Your own team’s link decides whether its offer is a renewal.</div>' +
     '<div class="lineage-list"><table class="contract-table story-table"><tbody>' + rows + '</tbody></table></div>' +
     '</div>';
   var save = panel.querySelector('.lineage-save');
@@ -133,7 +133,7 @@ function renderOffers(champId, data) {
   if (data.signed) { renderSignedDeal(champId, data); return; }
   if (!data.open) {
     panel.innerHTML = '<div class="contract-box"><div class="contract-note">' +
-      'This season has started, so its seat is settled.</div></div>';
+      esc(data.closed || '') + '</div></div>';
     return;
   }
 
@@ -200,12 +200,8 @@ function seatPicker(choices) {
 function renderSignedDeal(champId, data) {
   var panel = document.getElementById('champ-contract-panel');
   var c = data.signed;
-  // Releasing is only possible while the season is unraced — the same rule that locks the team.
-  // (`open` cannot say so: it is false for every signed season, raced or not.)
-  var champ = manageState.champs.find(function (ch) { return ch.id === champId; });
-  var canRelease = !!champ && (champ.rounds || []).every(function (r) {
-    return !(r.session_ids || []).length;
-  });
+  // Releasing is only possible while the season is unraced and unfinished — the server says so.
+  var canRelease = !!data.releasable;
   panel.innerHTML = '<div class="contract-box contract-box-signed">' +
     '<div class="contract-header">' +
       liveryImg((data.previews || {})[c.team], 'contract-car') +
@@ -297,7 +293,7 @@ function financeSummary(f) {
 function runningSeason(f) {
   var s = null;
   for (var i = 0; i < f.seasons.length; i++) {
-    if (!f.seasons[i].complete) s = f.seasons[i];
+    if (!f.seasons[i].complete && !f.seasons[i].deleted) s = f.seasons[i];
   }
   if (!s) return '';
 
@@ -380,7 +376,7 @@ function seasonLedger(f) {
     return '<tr class="' + cls + '">' +
       '<td>' + esc(s.name || '(deleted)') + '</td>' +
       '<td>' + esc(s.team) + '</td>' +
-      '<td>' + (s.complete ? 'Complete' : 'Racing') + '</td>' +
+      '<td>' + (s.deleted ? 'Deleted' : s.complete ? 'Complete' : 'Racing') + '</td>' +
       '<td class="num">' + result + '</td>' +
       '<td class="num">' + target + '</td>' +
       '<td class="num">' + races + '</td>' +
@@ -388,7 +384,8 @@ function seasonLedger(f) {
       // A season still being raced has no final position, so its prize is what today's
       // standings would pay rather than what it paid. Marked, so the two never read alike.
       '<td class="num">' +
-        (s.complete
+        (s.deleted ? '—'
+          : s.complete
           ? fmtCredits(s.prize)
           : '<span class="ledger-projected" title="Projected on today&rsquo;s standings">~' +
             fmtCredits(s.projected_prize || 0) + '</span>') +

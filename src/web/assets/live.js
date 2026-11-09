@@ -74,6 +74,7 @@ var liveTeamsKey = null; // track at the last lookup, used to refresh the team n
 // to be re-asked when that changes — a lobby fills up, and an AI grid is only complete once the
 // session loads.
 var liveGridSize = -1;
+var liveViewed = null; // the car AMS2's camera was on at the last lookup
 
 function loadLiveTeams() {
   fetch('/api/live-teams')
@@ -272,9 +273,15 @@ function processLiveData(d) {
       // Resolved server-side from the active championship's Custom AI Driver file; refreshed when
       // the session moves to another track, since that is when the active championship is likely
       // to have been switched too.
-      if (liveTeamsKey !== d.track_location || liveGridSize !== d.participants.length) {
+      // The viewed car too: AMS2 can point it at an AI while the session loads, and the
+      // server falls back to it for a career that has not yet recorded the player's name.
+      var viewed = d.participants.filter(function (p) { return p.is_player; })
+        .map(function (p) { return p.name; })[0] || '';
+      if (liveTeamsKey !== d.track_location || liveGridSize !== d.participants.length ||
+          liveViewed !== viewed) {
         liveTeamsKey = d.track_location;
         liveGridSize = d.participants.length;
+        liveViewed = viewed;
         loadLiveTeams();
       }
 

@@ -758,6 +758,9 @@ pub struct SeasonLedger {
     /// True once the championship is `Final` — and so, since [`seal_finished`] runs whenever a
     /// career is loaded, once its payout is settled and beyond the reach of the Config tab.
     pub complete: bool,
+    /// True when the championship this contract names has been deleted. Such a row is in no
+    /// season at all: it is never the one being raced, and it carries only what was spent.
+    pub deleted: bool,
 }
 
 /// Every contracted season and what the career is worth.
@@ -917,6 +920,7 @@ pub fn finances(
                 _ => None,
             },
             complete,
+            deleted: false,
         });
     }
 
@@ -946,6 +950,7 @@ pub fn finances(
             objective: c.objective,
             objective_met: None,
             complete: false,
+            deleted: true,
         });
     }
 

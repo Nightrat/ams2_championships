@@ -148,7 +148,7 @@ impl App {
             }
             if locked(&data, champ) {
                 return Err(conflict(
-                    "This season is signed or under way: its offers were made on these links, so they no longer change.",
+                    "This season is signed, under way or finished: its offers were made on these links, so they no longer change.",
                 ));
             }
             let (ledger, _) = super::career_standing(&self.config(), &data);
@@ -174,8 +174,9 @@ impl App {
     }
 }
 
-/// Signed, or raced: the same point at which a season stops taking offers.
+/// Signed, raced or finished: the same point at which a season stops taking offers.
 fn locked(data: &CareerData, champ: &Championship) -> bool {
-    contracts::for_championship(&data.contracts, &champ.id).is_some()
+    champ.status == crate::career::data_store::ChampionshipStatus::Final
+        || contracts::for_championship(&data.contracts, &champ.id).is_some()
         || champ.rounds.iter().any(|r| !r.session_ids.is_empty())
 }

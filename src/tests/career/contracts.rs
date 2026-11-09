@@ -890,6 +890,7 @@ fn test_an_orphaned_contract_keeps_its_spending() {
 
     assert_eq!(f.seasons.len(), 1);
     assert_eq!(f.seasons[0].name, "", "no championship to name it after");
+    assert!(f.seasons[0].deleted, "marked, so no client takes it for the season being raced");
     assert_eq!(f.seasons[0].salary, 0, "a season never raced pays no wage");
     assert_eq!(f.spent, 900_000);
     assert_eq!(f.balance, -900_000);
@@ -1182,6 +1183,7 @@ fn ledger_of_in(entries: &[(&str, &str)], missed: &[usize]) -> Finances {
             objective: Some(5),
             objective_met: Some(!missed.contains(&i)),
             complete: true,
+            deleted: false,
         })
         .collect();
     Finances {

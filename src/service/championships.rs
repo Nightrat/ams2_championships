@@ -340,6 +340,17 @@ impl App {
         let Some(current) = data.championships.iter().find(|c| c.id == id) else {
             return Err(not_found("not found"));
         };
+        // A finished season takes nothing but a change of status — the one way back out of it,
+        // where the mode allows one (checked below).
+        let only_status = req.name.is_none()
+            && req.points_system.is_none()
+            && req.manufacturer_scoring.is_none()
+            && req.planned_rounds.is_none()
+            && req.custom_ai_file.is_none()
+            && req.player_team.is_none();
+        if !only_status {
+            refuse_if_finished(current, data.mode)?;
+        }
 
         // Whether this season was already over when the request arrived. Taken as a value
         // rather than read off `current` later, because the mutations below need `data` mutably
@@ -548,12 +559,21 @@ impl App {
     }
 
     /// Deletes a championship, and the roster copy it kept.
+    ///
+    /// An unraced season takes its contract with it, exactly as tearing the contract up would
+    /// (sponsorship paid back): nothing was raced under it, and with the season gone there is
+    /// nothing left to race it in. A season that has started keeps its contract as an orphan
+    /// row — the money paid to take that seat was spent on racing that happened.
     pub fn delete_championship(&self, id: &str) -> AppResult<()> {
         let mut data = self.store.write().unwrap();
-        let before = data.championships.len();
-        data.championships.retain(|c| c.id != id);
-        if data.championships.len() == before {
+        let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
             return Err(not_found("not found"));
+        };
+        refuse_if_finished(champ, data.mode)?;
+        let unraced = champ.rounds.iter().all(|r| r.session_ids.is_empty());
+        data.championships.retain(|c| c.id != id);
+        if unraced {
+            data.contracts.retain(|c| c.champ_id != id);
         }
         // Read while the career is held: switching changes the store and the path together under
         // the store's lock, so this is the folder of the career just changed. The save reads the
@@ -571,9 +591,11 @@ impl App {
     /// Adds a new empty round.
     pub fn add_round(&self, id: &str) -> AppResult<Championship> {
         let mut data = self.store.write().unwrap();
+        let mode = data.mode;
         let Some(champ) = data.championships.iter_mut().find(|c| c.id == id) else {
             return Err(not_found("not found"));
         };
+        refuse_if_finished(champ, mode)?;
         champ.rounds.push(Round::default());
         let result = champ.clone();
         drop(data);
@@ -591,6 +613,7 @@ impl App {
         let Some(champ) = d.championships.iter_mut().find(|c| c.id == id) else {
             return Err(not_found("not found"));
         };
+        refuse_if_finished(champ, d.mode)?;
         if ridx >= champ.rounds.len() {
             return Err(not_found("round not found"));
         }
@@ -618,6 +641,7 @@ impl App {
         let Some(champ) = data.championships.iter().find(|c| c.id == id) else {
             return Err(not_found("not found"));
         };
+        refuse_if_finished(champ, data.mode)?;
         if ridx >= champ.rounds.len() {
             return Err(not_found("round not found"));
         }
@@ -664,6 +688,7 @@ impl App {
         let Some(champ) = d.championships.iter_mut().find(|c| c.id == id) else {
             return Err(not_found("not found"));
         };
+        refuse_if_finished(champ, d.mode)?;
         if ridx >= champ.rounds.len() {
             return Err(not_found("round not found"));
         }
@@ -967,4 +992,22 @@ fn reseat(
     if !seats.is_empty() {
         champ.player_seat = crate::career::data_store::derive_seat_lock(champ, sessions, &seats);
     }
+}
+
+/// A finished season is read-only: its results are settled, it has paid out, and anything built
+/// on it (the next season's offers, its lineage, the career's story) was built on it as it stands.
+/// Every write of a championship asks this first, except a change of status, which is the way
+/// back out where the mode has one.
+pub(super) fn refuse_if_finished(champ: &Championship, mode: CareerMode) -> AppResult<()> {
+    if champ.status != ChampionshipStatus::Final {
+        return Ok(());
+    }
+    Err(conflict(if mode.final_is_terminal() {
+        format!("“{}” is finished, so it can no longer be changed.", champ.name)
+    } else {
+        format!(
+            "“{}” is finished, so it can no longer be changed. Set it back to Progress to edit it.",
+            champ.name
+        )
+    }))
 }

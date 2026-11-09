@@ -722,6 +722,10 @@ span.champ-list-status { cursor: default; padding: 0.1rem 0.4rem; }
 .champ-detail-header { display: flex; gap: 0.75rem; align-items: center; }
 .champ-detail-meta { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
 .champ-detail-meta label { display: flex; gap: 0.5rem; align-items: center; font-size: 0.85rem; color: #95a5a6; }
+/* A finished season: values, not inputs. */
+.champ-readonly-name { font-size: 1.1rem; font-weight: 600; color: #eee; }
+.champ-readonly-field { font-size: 0.85rem; color: #95a5a6; }
+.champ-readonly-field strong { color: #ccc; font-weight: 600; }
 
 .champ-sessions-header {
   display: flex;

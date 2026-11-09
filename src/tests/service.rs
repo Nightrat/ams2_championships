@@ -1253,3 +1253,147 @@ fn test_the_export_carries_the_career_and_the_review_of_a_finished_season() {
     assert!(html.contains("You won the championship with 9 points!"));
     std::fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn test_live_player_is_the_careers_driver_not_the_car_the_camera_is_on() {
+    use crate::career::data_store::{RecordedSession, SessionResult};
+    use crate::service::live::live_player_index;
+    let result = |name: &str, is_player: bool| SessionResult {
+        name: name.into(),
+        car_name: String::new(),
+        car_class: "F-Retro_Gen3".into(),
+        race_position: 1,
+        laps_completed: 10,
+        fastest_lap: 90.0,
+        last_lap: 90.0,
+        dnf: false,
+        is_player,
+    };
+    let session = |results: Vec<SessionResult>| RecordedSession {
+        id: "s".into(),
+        recorded_at: 1,
+        track: "Jacarepagua".into(),
+        track_variation: String::new(),
+        car_name: String::new(),
+        car_class: "F-Retro_Gen3".into(),
+        session_type: 5,
+        results,
+        lap_chart: vec![],
+    };
+    // One earlier session misflagged by the camera; the career's driver is still Nightrat.
+    let sessions = vec![
+        session(vec![result("Nightrat", true), result("Niki Lauda", false)]),
+        session(vec![result("Nightrat", true), result("Niki Lauda", false)]),
+        session(vec![result("Nightrat", false), result("Niki Lauda", true)]),
+    ];
+    let grid = ["Alain Prost", "Niki Lauda", "Nightrat"];
+
+    // The 1984 bug: AMS2's camera sits on Lauda (index 1) while the session loads.
+    assert_eq!(live_player_index(&sessions, &grid, Some(1)), Some(2));
+    // Nothing recorded yet, or the name not on this grid: the viewed car is all there is.
+    assert_eq!(live_player_index(&[], &grid, Some(1)), Some(1));
+    assert_eq!(live_player_index(&sessions, &["Alain Prost", "Niki Lauda"], Some(0)), Some(0));
+    assert_eq!(live_player_index(&[], &grid, None), None);
+}
+#[test]
+fn test_a_finished_season_is_read_only() {
+    let (app, root) = test_app("final_ro", CareerMode::Singleplayer);
+    let champ = app
+        .create_championship(NewChampionship {
+            custom_ai_file: Some("F-Classic_Gen1.xml".into()),
+            planned_rounds: Some(8),
+            ..season("1983")
+        })
+        .unwrap();
+    app.add_round(&champ.id).unwrap();
+    let finish = ChampionshipPatch {
+        status: Some(ChampionshipStatus::Final),
+        ..Default::default()
+    };
+    app.patch_championship(&champ.id, finish.clone()).unwrap();
+
+    let refused = |r: AppResult<Championship>| match r {
+        Err(AppError::Conflict(msg)) => assert!(msg.contains("is finished"), "{msg}"),
+        other => panic!("expected a finished-season refusal, got {other:?}"),
+    };
+    refused(app.patch_championship(
+        &champ.id,
+        ChampionshipPatch { name: Some("1983 again".into()), ..Default::default() },
+    ));
+    refused(app.patch_championship(
+        &champ.id,
+        ChampionshipPatch { planned_rounds: Some(16), ..Default::default() },
+    ));
+    refused(app.add_round(&champ.id));
+    refused(app.remove_round(&champ.id, 0));
+    refused(app.add_session_to_round(&champ.id, 0, "s1"));
+    refused(app.remove_session_from_round(&champ.id, 0, "s1"));
+    assert!(matches!(app.delete_championship(&champ.id), Err(AppError::Conflict(_))));
+    assert!(matches!(
+        app.sign(&champ.id, &SignRequest { team: "Lotus".into(), seat: None }),
+        Err(AppError::Conflict(_))
+    ));
+    // Restating its status is not a change.
+    assert!(app.patch_championship(&champ.id, finish).is_ok());
+    // Nothing reached the season.
+    let kept = app.data().championships[0].clone();
+    assert_eq!((kept.name.as_str(), kept.rounds.len(), kept.planned_rounds), ("1983", 1, Some(8)));
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_a_finished_multiplayer_season_reopens_to_be_edited() {
+    let (app, root) = test_app("final_mp", CareerMode::Multiplayer);
+    let champ = app.create_championship(season("League")).unwrap();
+    let status = |s| ChampionshipPatch { status: Some(s), ..Default::default() };
+    app.patch_championship(&champ.id, status(ChampionshipStatus::Final)).unwrap();
+    match app.add_round(&champ.id) {
+        Err(AppError::Conflict(msg)) => assert!(msg.contains("back to Progress"), "{msg}"),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    app.patch_championship(&champ.id, status(ChampionshipStatus::Progress)).unwrap();
+    assert!(app.add_round(&champ.id).is_ok());
+    std::fs::remove_dir_all(&root).ok();
+}
+#[test]
+fn test_deleting_an_unraced_season_tears_up_its_contract() {
+    // The bug a real save hit: a signed, unraced season deleted, and its contract left behind as
+    // a season still "Racing" — the Finances tab took it for the current one.
+    let (app, root) = lineage_app("delete_unraced");
+    app.store.write().unwrap().contracts.push(
+        serde_json::from_value(serde_json::json!({
+            "champ_id": "c84", "team": "ATS-BMW", "salary": 34696, "bought_for": 30135
+        }))
+        .unwrap(),
+    );
+    let before = app.finances().finances.balance;
+    app.delete_championship("c84").unwrap();
+    let data = app.data();
+    assert!(data.contracts.iter().all(|c| c.champ_id != "c84"), "the deal went with the season");
+    assert_eq!(app.finances().finances.balance, before + 30135, "sponsorship paid back");
+    let saved = crate::career::data_store::try_load_data(&app.active_path()).unwrap();
+    assert_eq!(saved.contracts.len(), 1, "only 1983's contract reached the file");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_deleting_a_started_season_keeps_its_contract_as_a_deleted_row() {
+    use crate::career::data_store::Round;
+    let (app, root) = lineage_app("delete_started");
+    {
+        let mut data = app.store.write().unwrap();
+        data.championships[1].rounds.push(Round { session_ids: vec!["s1".into()] });
+        data.contracts.push(
+            serde_json::from_value(serde_json::json!({
+                "champ_id": "c84", "team": "ATS-BMW", "salary": 34696, "bought_for": 30135
+            }))
+            .unwrap(),
+        );
+    }
+    app.delete_championship("c84").unwrap();
+    let f = app.finances().finances;
+    let row = f.seasons.iter().find(|s| s.champ_id == "c84").expect("the money spent keeps a row");
+    assert!(row.deleted && !row.complete);
+    assert_eq!(row.bought_for, 30135);
+    std::fs::remove_dir_all(&root).ok();
+}

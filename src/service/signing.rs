@@ -34,6 +34,10 @@ pub struct OffersView {
     pub rated: bool,
     /// Whether a seat may still be taken for this season.
     pub open: bool,
+    /// Whether the signed contract may still be torn up: unraced and unfinished.
+    pub releasable: bool,
+    /// Why no seat can be taken, for an unsigned season that is not `open`.
+    pub closed: Option<String>,
     pub reputation: f32,
     /// This season's car class. Shown so a client can explain why an incumbency did not carry:
     /// a seat is only held inside the series it was held in.
@@ -252,7 +256,19 @@ impl App {
         // first-session rule that locks the team picker. A `player_team` picked directly is not
         // a commitment and does not close it: signing may still replace it, exactly as a patch
         // may before the first session.
-        let open = signed.is_none() && champ.rounds.iter().all(|r| r.session_ids.is_empty());
+        // A finished season takes none either: it is read-only.
+        let finished = champ.status == crate::career::data_store::ChampionshipStatus::Final;
+        let open = signed.is_none() && !finished && champ.rounds.iter().all(|r| r.session_ids.is_empty());
+        // The contract can be torn up on the same terms it could have been signed on, bar the
+        // contract itself.
+        let releasable = signed.is_some() && !finished && champ.rounds.iter().all(|r| r.session_ids.is_empty());
+        let closed = (signed.is_none() && !open).then(|| {
+            if finished {
+                "This season is finished without a contract.".to_string()
+            } else {
+                "This season has started, so its seat is settled.".to_string()
+            }
+        });
 
         let (ledger, standing) = career_standing(&cfg, &data);
         // A team renamed between rosters is still the team being renewed.
@@ -291,6 +307,8 @@ impl App {
                     enabled: data.mode.uses_contracts(),
                     rated: true,
                     open,
+                    releasable,
+                    closed: closed.clone(),
                     reputation: rep.value,
                     balance: ledger.balance,
                     class: class.clone(),
@@ -308,6 +326,8 @@ impl App {
                 enabled: data.mode.uses_contracts(),
                 rated: false,
                 open,
+                releasable,
+                closed,
                 reputation: 0.0,
                 balance: ledger.balance,
                 class,
@@ -350,6 +370,7 @@ impl App {
                 data.mode.label()
             )));
         }
+        super::championships::refuse_if_finished(&current, data.mode)?;
         if contracts::for_championship(&data.contracts, id).is_some() {
             return Err(conflict(
                 "This season is already signed. Tear up the contract first to change seat.",
@@ -502,6 +523,7 @@ impl App {
             .iter()
             .find(|c| c.id == id)
             .ok_or_else(|| not_found("not found"))?;
+        super::championships::refuse_if_finished(champ, data.mode)?;
         if champ.rounds.iter().any(|r| !r.session_ids.is_empty()) {
             return Err(conflict(
                 "The season has already started, so its contract stands. Remove its assigned \
